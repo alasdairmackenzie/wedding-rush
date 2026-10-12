@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { MAX_SCORE } from '../src/shared/level';
 
 const TOKEN = 'test-admin-token';
 const PNG = Buffer.from(
@@ -22,8 +23,8 @@ async function signIn(page: Page): Promise<void> {
 }
 
 test('live screen shows the top list and where to play, with nothing to press', async ({ page, request }) => {
-  const name = `Live ${Date.now().toString(36).slice(-6)}`;
-  await seed(request, name, 9999);
+  const name = `Live ${Date.now() % 1000000}`;
+  await seed(request, name, MAX_SCORE);
   await page.goto('/live?url=seanandbeckywedding.run');
   await expect(page.locator('#live-url')).toHaveText('seanandbeckywedding.run');
   await expect(page.locator('#live-rows tr').first()).toContainText(name);
@@ -36,7 +37,7 @@ test('live screen shows the top list and where to play, with nothing to press', 
 });
 
 test('admin needs the password, then renames and deletes scores', async ({ page, request }) => {
-  const stamp = Date.now().toString(36).slice(-5);
+  const stamp = String(Date.now() % 100000);
   await seed(request, `Rn ${stamp}`, 7);
   await seed(request, `Del ${stamp}`, 6);
 

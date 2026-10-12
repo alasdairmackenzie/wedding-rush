@@ -81,13 +81,13 @@ describe('admin API', () => {
   });
 
   it('uploads, serves and removes faces', async () => {
-    const put = (body: Uint8Array, headers = auth) => fetch(`${base}/api/admin/faces/bride`, { method: 'PUT', headers, body });
+    const put = (body: Uint8Array, headers = auth) => fetch(`${base}/api/admin/faces/bride`, { method: 'PUT', headers, body: Buffer.from(body) });
     expect(await (await fetch(`${base}/api/faces`)).json()).toEqual({ faces: {} });
     expect((await fetch(`${base}/api/faces/bride`)).status).toBe(404);
     expect((await put(PNG, {} as typeof auth)).status).toBe(401);
     expect((await put(new TextEncoder().encode('<svg/>'))).status).toBe(415);
     expect((await put(new Uint8Array(MAX_FACE_BYTES + 1))).status).toBe(413);
-    expect((await fetch(`${base}/api/admin/faces/groom`, { method: 'PUT', headers: auth, body: PNG })).status).toBe(404);
+    expect((await fetch(`${base}/api/admin/faces/groom`, { method: 'PUT', headers: auth, body: Buffer.from(PNG) })).status).toBe(404);
 
     const saved = await put(PNG);
     expect(saved.status).toBe(200);
