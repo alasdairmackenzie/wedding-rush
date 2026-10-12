@@ -278,6 +278,7 @@ async function postScore(): Promise<RankedEntry | undefined> {
     playerName.disabled = true;
     try { localStorage.setItem(NAME_KEY, name); } catch { /* storage unavailable */ }
     showStatus(`Posted! You're #${posted.rank} on the top list.`);
+    audio.tada();
     return posted;
   } catch (error) {
     submitScore.disabled = false;

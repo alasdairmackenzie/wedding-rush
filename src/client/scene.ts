@@ -326,8 +326,10 @@ export class WeddingScene extends Phaser.Scene {
   private setDucking(ducking: boolean): void {
     if (this.ducking === ducking || !this.player) return;
     this.ducking = ducking;
-    if (ducking) this.player.setSize(GROOM.width, GROOM.height / 2).setOffset(31, 40 + GROOM.height / 2);
-    else this.player.setSize(GROOM.width, GROOM.height).setOffset(31, 40);
+    if (ducking) {
+      this.player.setSize(GROOM.width, GROOM.height / 2).setOffset(31, 40 + GROOM.height / 2);
+      if (this.run.phase === 'playing') this.ui.audio.effect('duck');
+    } else this.player.setSize(GROOM.width, GROOM.height).setOffset(31, 40);
   }
   private comboCheck(): void {
     const multiplier = this.run.multiplier;
@@ -341,7 +343,7 @@ export class WeddingScene extends Phaser.Scene {
   }
   private bump(title: string, message: string): void {
     this.invulnerableUntil = this.run.elapsed + 900;
-    this.ui.audio.effect('splat');
+    this.ui.audio.effect('bash');
     this.buzz(120);
     this.floatText(this.player.x, this.player.y - 55, '-1 chance!', '#b52f44');
     this.announceEvent(title, '-1 CHANCE', '#b52f44');
@@ -525,6 +527,7 @@ export class WeddingScene extends Phaser.Scene {
         mover.active = true;
         if (definition.kind === 'pigeon') {
           this.announceEvent('PIGEON!', 'DUCK! ↓', '#2d6c9c');
+          this.ui.audio.effect('flap');
           this.ui.notice('A pigeon is swooping at head height. Hold DUCK, S or the down arrow!');
         } else {
           this.announceEvent('BARREL!', 'JUMP IT!', '#a8693c');
@@ -558,7 +561,7 @@ export class WeddingScene extends Phaser.Scene {
       this.player.setVelocityY(-GROOM.jump * 1.5);
       this.groundedAt = this.jumpUntil = -1000;
       this.doubleJumped = false;
-      this.ui.audio.tone('jump');
+      this.ui.audio.effect('cork');
       this.confetti(cork.x, cork.y - 30);
       this.announceEvent('POP!', 'CHAMPAGNE SUPER JUMP', '#c9952a');
       this.ui.notice('Champagne cork! Grab the spinning ring up high.');
@@ -567,13 +570,14 @@ export class WeddingScene extends Phaser.Scene {
       if (this.run.rings.has(id) || !overlaps(ring.x, ring.y, 34, 34)) return;
       this.run.collectRing(id);
       this.ringArt[id].setVisible(false);
-      this.ui.audio.tone('sweet');
+      this.ui.audio.effect('sparkle');
       this.floatText(ring.x, ring.y - 30, `+${RING_VALUE * this.run.multiplier}`, '#c9952a');
       this.announceEvent('RING!', `+${RING_VALUE * this.run.multiplier} POINTS`, '#c9952a');
     });
     const progress = (this.player.x - START.x) / (BRIDE.x - START.x);
     while (this.textsSent < beckyTexts.length && progress >= beckyTexts[this.textsSent].at) {
       this.ui.text(beckyTexts[this.textsSent++].text);
+      this.ui.audio.effect('notify');
     }
   }
 }

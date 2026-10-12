@@ -516,13 +516,13 @@ test('background music loops only during play, preserves its position on pause, 
   expect((await page.evaluate<{ offset: number }>(musicState)).offset).toBe(0);
 });
 
-test('plays splat for collisions and gameover on the final hit, stopping the music', async ({ page }) => {
+test('plays bash for collisions and gameover on the final hit, stopping the music', async ({ page }) => {
   await start(page);
   await page.evaluate(`(async () => {
     const { game } = await import('/src/client/main.ts');
     const scene = game.scene.getScene('wedding');
     scene.contact(0);
-    const buffer = await scene.ui.audio.clips.get('splat');
+    const buffer = await scene.ui.audio.clips.get('bash');
     scene.registry.set('splatDuration', buffer.duration);
   })()`);
   await expect(page.locator('#game')).toHaveAttribute('data-distractions', '1');
@@ -864,6 +864,11 @@ test('best score, name filter and share link to a highlighted top list', async (
       configurable: true,
       value: async (data: ShareData) => { (window as any).__shared = data; },
     });
+    (window as any).__tadas = 0;
+    HTMLMediaElement.prototype.play = function () {
+      if (this.src.includes('tada')) (window as any).__tadas++;
+      return Promise.resolve();
+    };
   });
   await start(page);
   await ringThenCrash(page);
@@ -885,6 +890,7 @@ test('best score, name filter and share link to a highlighted top list', async (
   await expect(posted).toBeVisible();
   await expect(page.locator('#result')).not.toBeVisible();
   await expect(page).toHaveURL(/\/top\?you=[a-z0-9]{12}$/);
+  expect(await page.evaluate(() => (window as any).__tadas)).toBe(1);
   await expect(posted.locator('tr[data-you]')).toContainText(name);
   await expect(page.locator('#top-list-intro')).toContainText("You're #");
   await page.getByRole('button', { name: /Share my place/ }).click();
@@ -978,6 +984,33 @@ test('menu buttons play the click sound unless sound is off', async ({ page }) =
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Jump', exact: true }).click();
   expect(await clicks()).toBe(4);
+});
+
+test('plays recorded effects for corks, rings, ducking, pigeons, texts and hits', async ({ page }) => {
+  await start(page);
+  await exposeScene(page);
+  await page.evaluate(`(() => {
+    const audio = window.__scene.ui.audio;
+    window.__effects = [];
+    const effect = audio.effect.bind(audio);
+    audio.effect = clip => { window.__effects.push(clip); effect(clip); };
+  })()`);
+  const effects = () => page.evaluate<string[]>('window.__effects');
+  await teleport(page, corks[0].x - 60);
+  await expect.poll(effects).toEqual(expect.arrayContaining(['cork', 'sparkle']));
+  await page.keyboard.down('ArrowDown');
+  await expect.poll(effects).toContain('duck');
+  await page.keyboard.up('ArrowDown');
+  await teleport(page, movers[1].x - 300);
+  await expect.poll(effects).toEqual(expect.arrayContaining(['flap', 'notify']));
+  await page.evaluate('window.__scene.contact(0)');
+  await expect.poll(effects).toContain('bash');
+  const loaded = await page.evaluate(`(async () => {
+    const audio = window.__scene.ui.audio;
+    const clips = await Promise.all(['cork', 'sparkle', 'duck', 'flap', 'notify', 'bash'].map(clip => audio.clips.get(clip)));
+    return clips.every(buffer => buffer && buffer.duration > 0 && buffer.duration < 3);
+  })()`);
+  expect(loaded).toBe(true);
 });
 
 test('an unknown top list link still shows the table and copies links without native share', async ({ page }) => {

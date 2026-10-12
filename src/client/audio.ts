@@ -12,15 +12,25 @@ import gameoverUrl from '../assets/sounds/gameover.mp3';
 import levelEndUrl from '../assets/sounds/level_end.mp3';
 import splatUrl from '../assets/sounds/splat.mp3';
 import clickUrl from '../assets/sounds/click.mp3';
+import tadaUrl from '../assets/sounds/tada.mp3';
+import bashUrl from '../assets/sounds/bash.mp3';
+import notifyUrl from '../assets/sounds/notify.mp3';
+import corkUrl from '../assets/sounds/cork.mp3';
+import sparkleUrl from '../assets/sounds/sparkle.mp3';
+import flapUrl from '../assets/sounds/flap.mp3';
+import duckUrl from '../assets/sounds/duck.mp3';
 
 export type VoiceClip = 'intro' | TemptationKind;
-type RecordedEffect = 'gameover' | 'level_end' | 'splat';
+export type RecordedEffect = 'gameover' | 'level_end' | 'splat' | 'bash' | 'notify' | 'cork' | 'sparkle' | 'flap' | 'duck';
 type SoundClip = VoiceClip | RecordedEffect | 'background';
 const soundUrls: Record<SoundClip, string> = {
   intro: introUrl, football: footballUrl, deal: dealUrl, pingpong: pingpongUrl,
   hat: hatUrl, pub: pubUrl, karaoke: karaokeUrl, kebab: kebabUrl,
   background: backgroundUrl, gameover: gameoverUrl, level_end: levelEndUrl, splat: splatUrl,
+  bash: bashUrl, notify: notifyUrl, cork: corkUrl, sparkle: sparkleUrl, flap: flapUrl, duck: duckUrl,
 };
+const effectVolume: Partial<Record<RecordedEffect, number>> = { flap: 1.8, duck: .6, notify: .8 };
+const uiSounds = { click: { url: clickUrl, volume: .6 }, tada: { url: tadaUrl, volume: .8 } };
 
 export class GameAudio {
   private context?: AudioContext;
@@ -38,16 +48,22 @@ export class GameAudio {
   private backgroundStarted = 0;
   private effectRequest = 0;
   private readonly effects = new Set<AudioBufferSourceNode>();
-  private clickSound?: HTMLAudioElement;
+  private readonly uiElements = new Map<keyof typeof uiSounds, HTMLAudioElement>();
   constructor(private readonly notice: (message: string) => void) {}
-  // Menu clicks use a media element so they keep playing while the game audio is paused or restarted.
-  click(): void {
+  click(): void { this.ui('click'); }
+  tada(): void { this.ui('tada'); }
+  // Menu sounds use a media element so they keep playing while the game audio is paused or restarted.
+  private ui(name: keyof typeof uiSounds): void {
     if (this.muted || this.destroyed) return;
-    this.clickSound ??= Object.assign(new Audio(clickUrl), { preload: 'auto' });
-    const sound = this.clickSound.paused ? this.clickSound : this.clickSound.cloneNode() as HTMLAudioElement;
-    sound.volume = .6;
+    let element = this.uiElements.get(name);
+    if (!element) {
+      element = Object.assign(new Audio(uiSounds[name].url), { preload: 'auto' });
+      this.uiElements.set(name, element);
+    }
+    const sound = element.paused ? element : element.cloneNode() as HTMLAudioElement;
+    sound.volume = uiSounds[name].volume;
     sound.currentTime = 0;
-    void sound.play().catch(error => console.warn('Could not play click sound:', error));
+    void sound.play().catch(error => console.warn(`Could not play ${name} sound:`, error));
   }
   unlock(): void {
     if (this.destroyed) return;
@@ -150,10 +166,11 @@ export class GameAudio {
     const request = this.effectRequest;
     void Promise.all([this.loadClip(context, clip), this.resume(context)]).then(([buffer]) => {
       if (request !== this.effectRequest || this.muted || document.hidden || this.destroyed) return;
-      const source = context.createBufferSource();
+      const source = context.createBufferSource(), gain = context.createGain();
       source.buffer = buffer;
-      source.connect(context.destination);
-      source.onended = () => { source.disconnect(); this.effects.delete(source); };
+      gain.gain.value = effectVolume[clip] ?? 1;
+      source.connect(gain); gain.connect(context.destination);
+      source.onended = () => { source.disconnect(); gain.disconnect(); this.effects.delete(source); };
       this.effects.add(source);
       source.start();
     }).catch(error => {

@@ -118,7 +118,10 @@ key, ElevenLabs connection or browser speech synthesis is used during play.
 Only one voice plays at a time; a new clip replaces the previous one.
 Pause, mute, ending a run and leaving the page stop voice playback and cancel
 pending playback. Resuming does not repeat the intro; replay does.
-Menu and dialog buttons play `src/assets/sounds/click.mp3` unless sound is off.
+Menu and dialog buttons play `src/assets/sounds/click.mp3` unless sound is off, and
+posting to the top list plays `tada.mp3`. In play, recorded effects mark hits
+(`bash`), squashes (`splat`), champagne corks (`cork`), rings (`sparkle`),
+ducking (`duck`), incoming pigeons (`flap`) and Becky's texts (`notify`).
 Loading or decoding errors are reported in the status strip.
 The four MP3s in `src/assets/sounds/` supply quiet, looping background music
 during the run, `splat` on hurdle hits, person side hits and squashes, `gameover` on loss and `level_end` when
