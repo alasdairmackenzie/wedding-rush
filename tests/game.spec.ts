@@ -953,6 +953,33 @@ test('the main menu opens the guest top list and returns or starts a run', async
   await expect(page).toHaveURL(/\/$/);
 });
 
+test('menu buttons play the click sound unless sound is off', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as any).__clicks = 0;
+    HTMLMediaElement.prototype.play = function () {
+      if (this.src.includes('click')) (window as any).__clicks++;
+      return Promise.resolve();
+    };
+  });
+  await page.goto('/');
+  const clicks = () => page.evaluate(() => (window as any).__clicks as number);
+  await page.getByRole('button', { name: /View the guest top list/ }).click();
+  await expect.poll(clicks).toBe(1);
+  await page.getByRole('button', { name: 'Back to menu' }).click();
+  await expect.poll(clicks).toBe(2);
+  await page.getByRole('button', { name: 'Sound: on' }).click();
+  await page.getByRole('button', { name: /View the guest top list/ }).click();
+  await page.getByRole('button', { name: 'Back to menu' }).click();
+  expect(await clicks()).toBe(2);
+  await page.getByRole('button', { name: 'Sound: off' }).click();
+  await expect.poll(clicks).toBe(3);
+  await page.getByRole('button', { name: "I'm coming!" }).click();
+  await expect.poll(clicks).toBe(4);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Jump', exact: true }).click();
+  expect(await clicks()).toBe(4);
+});
+
 test('an unknown top list link still shows the table and copies links without native share', async ({ page }) => {
   await page.goto('/top?you=zzzzzzzzzzzz');
   await expect(page.locator('#top-list-intro')).toContainText("couldn't find that score");

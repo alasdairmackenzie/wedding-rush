@@ -11,6 +11,7 @@ import backgroundUrl from '../assets/sounds/background.mp3';
 import gameoverUrl from '../assets/sounds/gameover.mp3';
 import levelEndUrl from '../assets/sounds/level_end.mp3';
 import splatUrl from '../assets/sounds/splat.mp3';
+import clickUrl from '../assets/sounds/click.mp3';
 
 export type VoiceClip = 'intro' | TemptationKind;
 type RecordedEffect = 'gameover' | 'level_end' | 'splat';
@@ -37,7 +38,17 @@ export class GameAudio {
   private backgroundStarted = 0;
   private effectRequest = 0;
   private readonly effects = new Set<AudioBufferSourceNode>();
+  private clickSound?: HTMLAudioElement;
   constructor(private readonly notice: (message: string) => void) {}
+  // Menu clicks use a media element so they keep playing while the game audio is paused or restarted.
+  click(): void {
+    if (this.muted || this.destroyed) return;
+    this.clickSound ??= Object.assign(new Audio(clickUrl), { preload: 'auto' });
+    const sound = this.clickSound.paused ? this.clickSound : this.clickSound.cloneNode() as HTMLAudioElement;
+    sound.volume = .6;
+    sound.currentTime = 0;
+    void sound.play().catch(error => console.warn('Could not play click sound:', error));
+  }
   unlock(): void {
     if (this.destroyed) return;
     if (!this.context || this.context.state === 'closed') {

@@ -349,6 +349,9 @@ element('result-menu', HTMLButtonElement).addEventListener('click', () => {
   result.close(); started = false; showMenu();
 });
 element('menu-button', HTMLButtonElement).addEventListener('click', showMenu);
+document.addEventListener('click', event => {
+  if (event.target instanceof Element && event.target.closest('dialog button, #menu-button, #mobile-pause')) audio.click();
+});
 element('mobile-pause', HTMLButtonElement).addEventListener('click', showMenu);
 let soundMuted = false;
 const soundToggle = element('sound-toggle', HTMLButtonElement);
