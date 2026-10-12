@@ -128,15 +128,36 @@ async function loadScores(): Promise<void> {
   }
 }
 
-/** Scales the picture down to a face-sized PNG, optionally cropped to a circle. */
-async function prepareFace(file: File, circle: boolean): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
+/** Scales the picture down to a face-sized PNG, optionally removing the background and cropping to a circle. */
+async function prepareFace(file: File, options: { circle: boolean; removeBg: boolean; onProgress?: (msg: string) => void }): Promise<Blob> {
+  let source: Blob | File = file;
+  if (options.removeBg) {
+    options.onProgress?.('Removing background (downloading AI model on first use)…');
+    try {
+      const { removeBackground } = await import('@imgly/background-removal');
+      source = await removeBackground(file, {
+        model: 'isnet_quint8',
+        progress: (_key: string, current: number, total: number) => {
+          if (total > 0) {
+            const pct = Math.round((current / total) * 100);
+            options.onProgress?.(`Removing background (${pct}%)…`);
+          } else {
+            options.onProgress?.('Processing image…');
+          }
+        },
+      });
+    } catch (err) {
+      console.error('Background removal failed; falling back to original image', err);
+      options.onProgress?.('Background removal failed, uploading original…');
+    }
+  }
+  const bitmap = await createImageBitmap(source);
   const scale = Math.min(1, FACE_HEIGHT / bitmap.height);
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);
   const context = canvas.getContext('2d') as CanvasRenderingContext2D;
-  if (circle) {
+  if (options.circle) {
     context.beginPath();
     context.ellipse(canvas.width / 2, canvas.height / 2, canvas.width / 2, canvas.height / 2, 0, 0, Math.PI * 2);
     context.clip();
@@ -165,6 +186,10 @@ function faceCard(kind: FaceKind, version?: number): HTMLLIElement {
   file.type = 'file';
   file.accept = 'image/png,image/jpeg,image/webp';
   file.setAttribute('aria-label', `Upload a face for ${FACE_LABELS[kind]}`);
+  const bgLabel = document.createElement('label');
+  const bg = document.createElement('input');
+  bg.type = 'checkbox';
+  bgLabel.append(bg, ' Auto-remove background');
   const circleLabel = document.createElement('label');
   const circle = document.createElement('input');
   circle.type = 'checkbox';
@@ -174,16 +199,21 @@ function faceCard(kind: FaceKind, version?: number): HTMLLIElement {
   file.addEventListener('change', async () => {
     const chosen = file.files?.[0];
     if (!chosen) return;
-    say(status, 'Uploading…');
+    say(status, 'Preparing…');
     try {
-      const body = await prepareFace(chosen, circle.checked);
+      const body = await prepareFace(chosen, {
+        circle: circle.checked,
+        removeBg: bg.checked,
+        onProgress: msg => say(status, msg),
+      });
+      say(status, 'Uploading…');
       await api(`/api/admin/faces/${kind}`, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body });
       await loadFaces();
     } catch (error) {
       failed(error, status);
     }
   });
-  item.append(title, preview, file, circleLabel);
+  item.append(title, preview, file, bgLabel, circleLabel);
   if (version) {
     const reset = document.createElement('button');
     reset.type = 'button';
