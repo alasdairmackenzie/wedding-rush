@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BRIDE, daylightProgress, formatTime, GROOM, hurdles, people, platforms, Run, runnerSpeed, START, sweets,
-  TEMPTATION_DELAY, temptations, TOTAL_SCORE, WEDDING_TIME, WORLD } from './level';
+import { BRIDE, daylightProgress, GROOM, hurdles, people, platforms, Run, runnerSpeed, START, sweets,
+  temptations, TOTAL_SCORE, WORLD } from './level';
 
 function playing(): Run { const run = new Run(); run.phase = 'playing'; return run; }
 
@@ -41,7 +41,7 @@ describe('dice sweets', () => {
 });
 
 describe('hurdle runner rules', () => {
-  it('counts each hit only once, costs a chance and eight seconds, and loses on hit three', () => {
+  it('counts each hit only once, costs only a chance, and loses on hit three', () => {
     const run = playing();
     run.collect(0);
     for (let id = 0; id < 3; id++) {
@@ -49,7 +49,6 @@ describe('hurdle runner rules', () => {
       expect(run.hitHurdle(id)).toBe(false);
       expect(run.clearHurdle(id)).toBe(false);
       expect(run.lives).toBe(2 - id);
-      expect(run.delay).toBe((id + 1) * TEMPTATION_DELAY);
     }
     expect(run.phase).toBe('late');
     expect(run.distractions).toBe(3);
@@ -75,32 +74,19 @@ describe('hurdle runner rules', () => {
     expect(run.clearHurdle(1)).toBe(false);
     expect(run.hitHurdle(1)).toBe(false);
   });
-  it('pauses the clock, freezes results, and fails at the deadline', () => {
+  it('has no deadline: time pauses, never fails a run, and wins stay frozen', () => {
     const run = playing();
-    expect(run.remaining).toBe(WEDDING_TIME);
     run.tick(1000);
     run.phase = 'paused'; run.tick(9000);
-    expect(run.remaining).toBe(119_000);
-    run.phase = 'playing'; run.hitHurdle(0);
-    expect(run.remaining).toBe(111_000);
-    run.tick(run.remaining);
-    expect(run.phase).toBe('late');
-    expect(run.finish()).toBe(false);
-    const won = playing();
-    won.tick(10_000);
-    expect(won.finish()).toBe(true);
-    won.tick(200_000);
-    expect(won.remaining).toBe(110_000);
-    expect(won.hitHurdle(0)).toBe(false);
-  });
-  it('can expire through a hit and formats the countdown', () => {
-    const run = playing();
-    run.tick(WEDDING_TIME - TEMPTATION_DELAY);
-    run.hitHurdle(0);
-    expect(run.phase).toBe('late');
-    expect(formatTime(120_000)).toBe('2:00');
-    expect(formatTime(59_001)).toBe('1:00');
-    expect(formatTime(-1)).toBe('0:00');
+    expect(run.elapsed).toBe(1000);
+    run.phase = 'playing'; run.tick(10 * 60_000);
+    expect(run.phase).toBe('playing');
+    expect(run.finish()).toBe(true);
+    run.tick(10_000);
+    expect(run.elapsed).toBe(601_000);
+    expect(run.hitHurdle(0)).toBe(false);
+    expect(Object.keys(run)).not.toContain('delay');
+    expect('remaining' in run).toBe(false);
   });
 });
 
@@ -140,7 +126,8 @@ describe('runner course', () => {
     }
     expect(BRIDE.x).toBeGreaterThan(hurdles.at(-1)!.x + 100);
     expect(BRIDE.x).toBeLessThan(WORLD.width);
-    expect((BRIDE.x - START.x) / GROOM.speed * 1000 + 2 * TEMPTATION_DELAY).toBeLessThan(WEDDING_TIME);
+    expect(hurdles[0].x - START.x).toBeLessThanOrEqual(GROOM.speed * 4);
+    expect(people[0].x - 430 - START.x).toBeGreaterThan(hurdles[0].x - START.x);
   });
 });
 
@@ -151,7 +138,6 @@ describe('independent people', () => {
     expect(run.squashPerson(0)).toBe(false);
     expect(run.hitPerson(0)).toBe(false);
     expect(run.lives).toBe(3);
-    expect(run.delay).toBe(0);
     expect(run.distractions).toBe(0);
     expect(run.bonusScore).toBe(5);
     expect(run.score).toBe(5);
@@ -184,7 +170,6 @@ describe('independent people', () => {
     expect(run.hitHurdle(0)).toBe(true);
     expect(run.hitPerson(1)).toBe(true);
     expect(run.phase).toBe('late');
-    expect(run.delay).toBe(3 * TEMPTATION_DELAY);
     expect(run.lives).toBe(0);
     expect(new Run().hitPeople.size).toBe(0);
     expect(new Run().squashed.size).toBe(0);

@@ -18,7 +18,7 @@ test('runs automatically, collects exact sweet values, pauses and resets', async
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/');
   await expect(page.locator('#game')).toHaveAttribute('data-phase', 'ready');
-  await expect(page.locator('#timer')).toHaveText('2:00');
+  await expect(page.locator('#timer')).toHaveCount(0);
   await page.getByRole('button', { name: "I'm coming!" }).click();
   await expect(page.locator('#notice')).toHaveText(RUN_OBJECTIVE);
   await page.waitForFunction(() => Number(document.getElementById('game')?.dataset.x) >= 280);
@@ -27,10 +27,8 @@ test('runs automatically, collects exact sweet values, pauses and resets', async
   await page.keyboard.press('Escape');
   await expect(page.locator('#game')).toHaveAttribute('data-phase', 'paused');
   const paused = await state(page);
-  const remaining = await page.locator('#game').getAttribute('data-remaining');
   await page.waitForTimeout(250);
   expect(await state(page)).toEqual(paused);
-  await expect(page.locator('#game')).toHaveAttribute('data-remaining', remaining!);
   await page.getByRole('button', { name: 'Back to Becky' }).click();
   await page.waitForFunction(x => Number(document.getElementById('game')?.dataset.x) > x + 30, paused.x);
   await page.keyboard.press('Escape');
@@ -38,7 +36,6 @@ test('runs automatically, collects exact sweet values, pauses and resets', async
   await expect(page.locator('#score')).toHaveText('0 points');
   await expect(page.locator('#lives')).toHaveText('3 / 3');
   await expect(page.locator('#cleared')).toHaveText(`0 / ${hurdles.length}`);
-  await expect(page.locator('#timer')).toHaveText('2:00');
   expect(errors).toEqual([]);
 });
 
@@ -127,12 +124,9 @@ test('hurdle contact costs one chance per hurdle and the third hit ends the run'
     }
   }
   await expect(page.locator('#game')).toHaveAttribute('data-phase', 'late');
-  expect(Number(await page.locator('#game').getAttribute('data-remaining'))).toBeGreaterThan(0);
   await expect(page.locator('#result-kicker')).toHaveText('THE BIG DAY / OUT OF CHANCES');
   await expect(page.locator('#result-title')).toHaveText('Too many distractions!');
   await expect(page.locator('#result-detail')).toContainText('Three distractions');
-  const timeLeft = await page.locator('#timer').innerText();
-  await expect(page.locator('#result-detail')).toContainText(`with ${timeLeft} left on the clock`);
   await expect(page.locator('#notice')).toContainText('No chances left');
   await page.getByRole('button', { name: 'One more big day' }).click();
   await expect(page.locator('#lives')).toHaveText('3 / 3');
@@ -163,20 +157,18 @@ test('retains photo artwork and the distraction cast without platformer controls
   await expect(page.getByRole('button', { name: 'Move right', exact: true })).toHaveCount(0);
 });
 
-test('timer expiry shows loss and replay restores the countdown', async ({ page }) => {
+test('there is no countdown or time-up loss', async ({ page }) => {
   await start(page);
   await page.evaluate(`(async () => {
     const { game } = await import('/src/client/main.ts');
-    game.scene.getScene('wedding').run.elapsed = 119990;
+    game.scene.getScene('wedding').run.elapsed = 10 * 60_000;
   })()`);
-  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'late');
-  await expect(page.locator('#timer')).toHaveText('0:00');
-  await expect(page.locator('#lives')).toHaveText('3 / 3');
-  await expect(page.locator('#result-kicker')).toHaveText('THE BIG DAY / TIME UP');
-  await expect(page.locator('#result-title')).toHaveText('Fashionably... too late.');
-  await expect(page.locator('#result-detail')).toContainText('Time ran out');
-  await page.getByRole('button', { name: 'One more big day' }).click();
-  await expect(page.locator('#timer')).toHaveText('2:00');
+  await page.waitForTimeout(250);
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+  await expect(page.locator('#timer')).toHaveCount(0);
+  await expect(page.locator('.hud')).not.toContainText('TIME');
+  await expect(page.locator('#controls')).not.toContainText('seconds');
+  await expect(page.locator('#controls')).not.toContainText('minutes');
 });
 
 test('the complete runner course is winnable with real timed jumps', async ({ page }) => {
@@ -293,39 +285,33 @@ test('plays the recorded intro, stops on pause and mute, and repeats only on rep
 });
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
-  test(`intro finishes before the first character speaks at ${viewport.width}px`, async ({ page }) => {
+  test(`first hurdle comes quickly and the first character waits for the intro at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await start(page);
+    const voice = `(async () => {
+      const { game } = await import('/src/client/main.ts');
+      const audio = game.scene.getScene('wedding').ui.audio;
+      return { clip: audio.voiceClip, queued: audio.queuedClip ?? null, playing: Boolean(audio.voice) };
+    })()`;
+    await expect.poll(() => page.evaluate(voice)).toEqual({ clip: 'intro', queued: null, playing: true });
+    const started = Date.now();
+    await page.waitForFunction(x => Number(document.getElementById('game')?.dataset.x) >= x, hurdles[0].x - 40);
+    expect(Date.now() - started).toBeLessThan(5_000);
+    await page.keyboard.press('Escape');
     await page.evaluate(`(async () => {
       const { game } = await import('/src/client/main.ts');
-      const scene = game.scene.getScene('wedding');
-      const audio = scene.ui.audio;
-      const intro = await audio.clips.get('intro');
-      if (!intro || intro.duration <= 0) throw new Error('Intro recording was not decoded.');
-      await new Promise(resolve => setTimeout(resolve, (intro.duration + .5) * 1000));
-      scene.registry.set('introEnded', !audio.voice);
-      scene.pause();
+      const audio = game.scene.getScene('wedding').ui.audio;
+      audio.unlock();
+      audio.speak('intro');
     })()`);
-    const opening = await page.evaluate(`(async () => {
-      const { game } = await import('/src/client/main.ts');
-      const scene = game.scene.getScene('wedding');
-      return {
-        characterVoiceLoaded: scene.ui.audio.clips.has('football'),
-        introEnded: scene.registry.get('introEnded'),
-        x: scene.player.x,
-        hits: scene.run.distractions,
-      };
-    })()`);
-    expect(opening).toMatchObject({ characterVoiceLoaded: false, introEnded: true, hits: 0 });
+    await expect.poll(() => page.evaluate(voice)).toEqual({ clip: 'intro', queued: null, playing: true });
     await page.evaluate(`(async () => {
       const { game } = await import('/src/client/main.ts');
-      game.scene.getScene('wedding').start();
+      game.scene.getScene('wedding').ui.audio.speak('football');
     })()`);
-    await expect(page.locator('#notice')).toContainText('The football fan', { timeout: 12_000 });
-    await expect.poll(() => page.evaluate(`(async () => {
-      const { game } = await import('/src/client/main.ts');
-      return game.scene.getScene('wedding').ui.audio.clips.has('football');
-    })()`)).toBe(true);
+    expect(await page.evaluate(voice)).toEqual({ clip: 'intro', queued: 'football', playing: true });
+    await expect.poll(() => page.evaluate(voice), { timeout: 8_000 })
+      .toEqual({ clip: 'football', queued: null, playing: true });
   });
 }
 
@@ -582,13 +568,13 @@ test('landing on a person squashes once, bounces, plays splat and preserves chan
   await expect(page.locator('#game')).toHaveAttribute('data-squashed', '1');
   await expect(page.locator('#lives')).toHaveText('3 / 3');
   await expect(page.locator('#game')).toHaveAttribute('data-distractions', '0');
-  const bounce = await page.evaluate<{ vy: number; delay: number; hit: number; enabled: boolean }>(`(async () => {
+  const bounce = await page.evaluate<{ vy: number; lives: number; hit: number; enabled: boolean }>(`(async () => {
     const { game } = await import('/src/client/main.ts');
     const scene = game.scene.getScene('wedding');
-    return { vy: scene.player.body.velocity.y, delay: scene.run.delay,
+    return { vy: scene.player.body.velocity.y, lives: scene.run.lives,
       hit: scene.run.hit.size, enabled: scene.characters[0].body.body.enable };
   })()`);
-  expect(bounce).toMatchObject({ delay: 0, hit: 0, enabled: false });
+  expect(bounce).toMatchObject({ lives: 3, hit: 0, enabled: false });
   expect(bounce.vy).toBeLessThan(0);
   await expect.poll(() => page.evaluate(`(async () => {
     const { game } = await import('/src/client/main.ts');
@@ -651,7 +637,7 @@ test('dramatic event overlays fit mobile and desktop, replace old events and res
     await page.setViewportSize(viewport);
     await page.waitForTimeout(100);
     const overlay = await page.evaluate<{ text: string; alpha: number; angle: number; left: number; right: number; top: number; bottom: number; width: number; height: number; fixed: boolean }>(overlayState);
-    expect(overlay.text).toBe('OUCH!\n-1 CHANCE / -8 SECONDS');
+    expect(overlay.text).toBe('OUCH!\n-1 CHANCE');
     expect(overlay.fixed).toBe(true);
     expect(overlay.angle).toBe(0);
     expect(overlay.left).toBeGreaterThanOrEqual(0);

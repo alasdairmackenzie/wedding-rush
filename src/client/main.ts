@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BRIDE, formatTime, GROOM, hurdles, Run, runnerSpeed, START, sweets, TOTAL_SCORE } from '../shared/level';
+import { BRIDE, GROOM, hurdles, Run, runnerSpeed, START, sweets, TOTAL_SCORE } from '../shared/level';
 import { WeddingScene } from './scene';
 import { GameAudio } from './audio';
 import './style.css';
@@ -17,7 +17,6 @@ const play = element('play', HTMLButtonElement);
 const restart = element('restart', HTMLButtonElement);
 const score = element('score', HTMLElement);
 const lives = element('lives', HTMLElement);
-const timer = element('timer', HTMLElement);
 const cleared = element('cleared', HTMLElement);
 const speed = element('speed', HTMLElement);
 const route = element('route', HTMLProgressElement);
@@ -58,33 +57,26 @@ const wedding = new WeddingScene({
     element('mobile-pause', HTMLButtonElement).disabled = wedding.celebrating;
     score.textContent = `${run.score} points`;
     lives.textContent = `${run.lives} / 3`;
-    timer.textContent = formatTime(run.remaining);
     cleared.textContent = `${run.cleared.size} / ${hurdles.length}`;
     speed.textContent = `${Math.round(runnerSpeed(x))}`;
-    timer.classList.toggle('urgent', run.remaining <= 20_000);
     route.value = Phaser.Math.Clamp((x - START.x) / (BRIDE.x - START.x) * 100, 0, 100);
     arena.dataset.phase = run.phase;
     arena.dataset.collected = String(run.collected.size);
     arena.dataset.score = String(run.score);
     arena.dataset.bonus = String(run.bonusScore);
     arena.dataset.distractions = String(run.distractions);
-    arena.dataset.remaining = String(Math.ceil(run.remaining));
     arena.dataset.cleared = String(run.cleared.size);
     arena.dataset.speed = String(runnerSpeed(x));
   },
   end: run => {
     const won = run.phase === 'won';
-    const outOfChances = !won && run.lives === 0;
-    element('result-kicker', HTMLElement).textContent = won ? 'THE BIG DAY / SAVED'
-      : outOfChances ? 'THE BIG DAY / OUT OF CHANCES' : 'THE BIG DAY / TIME UP';
-    element('result-title', HTMLElement).textContent = won ? 'Sean, you may kiss Becky.'
-      : outOfChances ? 'Too many distractions!' : 'Fashionably... too late.';
+    element('result-kicker', HTMLElement).textContent = won ? 'THE BIG DAY / SAVED' : 'THE BIG DAY / OUT OF CHANCES';
+    element('result-title', HTMLElement).textContent = won ? 'Sean, you may kiss Becky.' : 'Too many distractions!';
     element('result-detail', HTMLElement).textContent = won
-      ? `Sean made it to Becky with ${formatTime(run.remaining)} to spare! ${run.cleared.size} / ${hurdles.length} hurdles cleared, ${run.score} total points (${run.sweetScore} / ${TOTAL_SCORE} sweet points + ${run.bonusScore} squash bonus) and ${run.collected.size} / ${sweets.length} dice sweets. Becky said yes.`
-      : `${outOfChances ? `Three distractions used all your chances, with ${formatTime(run.remaining)} left on the clock.` : 'Time ran out. The ceremony started without you.'} You cleared ${run.cleared.size} hurdles and earned ${run.score} total points (${run.sweetScore} sweet points + ${run.bonusScore} squash bonus). Time your jumps and try again.`;
+      ? `Sean made it to Becky with ${run.lives} / 3 chances left! ${run.cleared.size} / ${hurdles.length} hurdles cleared, ${run.score} total points (${run.sweetScore} / ${TOTAL_SCORE} sweet points + ${run.bonusScore} squash bonus) and ${run.collected.size} / ${sweets.length} dice sweets. Becky said yes.`
+      : `Three distractions used all your chances. You cleared ${run.cleared.size} hurdles and earned ${run.score} total points (${run.sweetScore} sweet points + ${run.bonusScore} squash bonus). Time your jumps and try again.`;
     notice.textContent = won ? 'Just married. The football can wait.'
-      : outOfChances ? 'No chances left. Jump the hurdles to avoid distractions on your next run.'
-        : 'Time ran out. Becky is waiting for your next attempt.';
+      : 'No chances left. Jump the hurdles to avoid distractions on your next run.';
     result.showModal();
   },
   ready: readyScene => {

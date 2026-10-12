@@ -38,9 +38,9 @@ from 300 to 430 world pixels per second as you approach the altar.
 The city starts at night with stars and a moon, brightens gradually across the
 course, and reaches full daylight at Becky. Pausing freezes the lighting;
 replay restores the night.
-The opening has an extra 1,750 pixels of clear street before the encounters,
-giving the roughly six-second intro recording time to finish before the first
-character speaks. Later encounter spacing stays unchanged.
+The first hurdle arrives about four seconds after the start. If Sean reaches
+the first character while the roughly six-second intro is still playing, that
+character's line waits until the intro finishes. Later encounter spacing stays unchanged.
 
 - **Space / W / Up**: one press, one full jump. Holding does not auto-jump.
 - **Tap the game** or the mobile **JUMP** button for the same jump.
@@ -49,14 +49,13 @@ character speaks. Later encounter spacing stays unchanged.
   captions, pause and jump controls overlay the game and respect screen safe
   areas. Browser address bars remain under the browser's control.
 - **Escape / How to play / pause**: pause, resume or start a fresh run.
-- Each hurdle hit or side collision with a person costs **one of three chances**
-  and **8 seconds**, once per obstacle.
-  You keep running after a hit; the third hit ends the run, even with time left.
-  The result says **Too many distractions!** when chances run out and
-  **Fashionably... too late.** when the timer expires.
+- Each hurdle hit or side collision with a person costs **one of three chances**,
+  once per obstacle. There is no timer because the run is paced automatically.
+  You keep running after a hit; the third hit ends the run and the result says
+  **Too many distractions!**
 - Passing a hurdle without touching it counts as a clear. People are positioned
   separately between hurdles. Jump over them or land on their heads while falling
-  to squash them and bounce without losing time or a chance. Each person can
+  to squash them and bounce without losing a chance. Each person can
   be squashed once; a side-hit person is no longer collidable for that run.
   Each squash awards **5 bonus points**, added to the HUD's total points.
   Results show sweet points and squash bonuses separately.
@@ -65,11 +64,11 @@ character speaks. Later encounter spacing stays unchanged.
   Only the first two are at street level. The others sit near jump peaks above
   hurdles and around people's heads, including a sweet after each person that
   can be caught on a squash-bounce. These need tighter jump timing.
-- Reach the flower arch within **two minutes** to win. The result shows cleared
-  hurdles and sweet points. A clean run takes roughly 31 seconds.
+- Reach the flower arch to win. The result shows remaining chances, cleared
+  hurdles and points. A clean run takes roughly 27 seconds.
   Sean and Becky meet with floating hearts, then the victory result appears
   after 3.2 seconds. Reduced motion uses a static reunion and hearts.
-- Replay resets the route, chances, hurdle and person states, lighting, score and countdown.
+- Replay resets the route, chances, hurdle and person states, lighting and score.
   The sound preference is preserved.
 
 All seven original distractions appear exactly once between the hurdles with their existing
@@ -96,7 +95,7 @@ the couple meet. Music pauses with the game, resumes from its previous position,
 and restarts on a fresh run. It stops at the finish or game over. Sound off mutes
 music, recordings and generated effects together.
 Captions remain visible without audio. Backgrounding or leaving the window
-pauses the run and countdown. Reduced motion disables Sean's running bob
+pauses the run. Reduced motion disables Sean's running bob
 and floating-text movement, and makes squashes immediate.
 
 ## Structure

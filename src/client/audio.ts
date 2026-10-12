@@ -26,6 +26,8 @@ export class GameAudio {
   private muted = false;
   private voice?: AudioBufferSourceNode;
   private voiceRequest = 0;
+  private voiceClip?: VoiceClip;
+  private queuedClip?: VoiceClip;
   private destroyed = false;
   private readonly clips = new Map<SoundClip, Promise<AudioBuffer>>();
   private background?: AudioBufferSourceNode;
@@ -110,6 +112,7 @@ export class GameAudio {
       this.backgroundStarted = context.currentTime;
       source.start(0, this.backgroundOffset % buffer.duration);
     }).catch(error => {
+      if (request === this.voiceRequest) this.voiceClip = this.queuedClip = undefined;
       if (!this.destroyed) this.notice(`Could not play background music: ${String(error)}`);
     });
   }
@@ -134,6 +137,7 @@ export class GameAudio {
       this.effects.add(source);
       source.start();
     }).catch(error => {
+      if (request === this.voiceRequest) this.voiceClip = this.queuedClip = undefined;
       if (!this.destroyed) this.notice(`Could not play ${clip} sound: ${String(error)}`);
     });
   }
@@ -145,6 +149,7 @@ export class GameAudio {
   }
   stopSpeech(): void {
     this.voiceRequest++;
+    this.voiceClip = this.queuedClip = undefined;
     if (this.voice) {
       this.voice.stop();
       this.voice.disconnect();
@@ -152,23 +157,38 @@ export class GameAudio {
     }
   }
   speak(clip: VoiceClip): void {
+    if (clip !== 'intro' && this.voiceClip === 'intro') {
+      this.queuedClip = clip;
+      return;
+    }
     this.stopSpeech();
     const context = this.context;
     if (this.muted || document.hidden || this.destroyed || !context) return;
+    this.voiceClip = clip;
     const request = this.voiceRequest;
     const loading = this.loadClip(context, clip);
     void Promise.all([loading, context.resume()]).then(([buffer]) => {
-      if (request !== this.voiceRequest || this.muted || document.hidden || this.destroyed || context.state !== 'running') return;
+      if (request !== this.voiceRequest) return;
+      if (this.muted || document.hidden || this.destroyed || context.state !== 'running') {
+        this.voiceClip = this.queuedClip = undefined;
+        return;
+      }
       const voice = context.createBufferSource();
       voice.buffer = buffer;
       voice.connect(context.destination);
       voice.onended = () => {
         voice.disconnect();
-        if (this.voice === voice) this.voice = undefined;
+        if (this.voice !== voice) return;
+        this.voice = undefined;
+        this.voiceClip = undefined;
+        const queued = this.queuedClip;
+        this.queuedClip = undefined;
+        if (queued) this.speak(queued);
       };
       this.voice = voice;
       voice.start();
     }).catch(error => {
+      if (request === this.voiceRequest) this.voiceClip = this.queuedClip = undefined;
       if (!this.destroyed) this.notice(`Could not play ${clip} voice: ${String(error)}. Captions are still shown.`);
     });
   }

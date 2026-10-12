@@ -41,7 +41,6 @@ kbd { font: bold 12px monospace; border: 1px solid #ac9c83; padding: 2px 5px; ba
 .cast { border-top: 1px dashed #ac9c83; margin-top: 25px; padding-top: 17px; font-size: 13px; }
 summary { cursor: pointer; font-weight: bold; }
 .cast ul { padding-left: 20px; line-height: 1.7; }
-.urgent { color: #b52f44; }
 button:disabled { opacity: .6; cursor: wait; }
 .touch-controls { display: none; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 2px solid #302825; background: #f8f0df; }
 .touch-controls span { font: bold 11px monospace; letter-spacing: 1px; }

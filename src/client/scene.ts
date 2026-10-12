@@ -268,10 +268,10 @@ export class WeddingScene extends Phaser.Scene {
       this.invulnerableUntil = this.run.elapsed + 900;
       this.obstacles[id].rail.setAlpha(.35);
       this.ui.audio.effect('splat');
-      this.floatText(this.player.x, this.player.y - 55, '-8 seconds!', '#b52f44');
-      this.announceEvent('OUCH!', '-1 CHANCE / -8 SECONDS', '#b52f44');
-      this.ui.notice('Hurdle hit! One chance and 8 seconds lost. Jump the next hurdle!');
-      if (this.run.lives === 0 || this.run.remaining === 0) this.end();
+      this.floatText(this.player.x, this.player.y - 55, '-1 chance!', '#b52f44');
+      this.announceEvent('OUCH!', '-1 CHANCE', '#b52f44');
+      this.ui.notice('Hurdle hit! One chance lost. Jump the next hurdle!');
+      if (this.run.lives === 0) this.end();
     }
   }
   private contactPerson(id: number): void {
@@ -300,10 +300,10 @@ export class WeddingScene extends Phaser.Scene {
       character.bubble.setVisible(false);
       this.invulnerableUntil = this.run.elapsed + 900;
       this.ui.audio.effect('splat');
-      this.floatText(this.player.x, this.player.y - 55, '-8 seconds!', '#b52f44');
-      this.announceEvent('DISTRACTED!', '-1 CHANCE / -8 SECONDS', '#b52f44');
-      this.ui.notice(`Distracted by ${people[id].temptation.name.toLowerCase()}! One chance and 8 seconds lost. Land on their head or jump over them!`);
-      if (this.run.lives === 0 || this.run.remaining === 0) this.end();
+      this.floatText(this.player.x, this.player.y - 55, '-1 chance!', '#b52f44');
+      this.announceEvent('DISTRACTED!', '-1 CHANCE', '#b52f44');
+      this.ui.notice(`Distracted by ${people[id].temptation.name.toLowerCase()}! One chance lost. Land on their head or jump over them!`);
+      if (this.run.lives === 0) this.end();
     }
     this.syncUI();
   }
@@ -352,7 +352,7 @@ export class WeddingScene extends Phaser.Scene {
       this.syncUI();
       return;
     }
-    this.announceEvent(this.run.lives === 0 ? 'OUT OF CHANCES!' : 'TIME UP!', 'ONE MORE BIG DAY?', '#b52f44');
+    this.announceEvent('OUT OF CHANCES!', 'ONE MORE BIG DAY?', '#b52f44');
     this.syncUI();
     this.ui.end(this.run);
   }
@@ -369,7 +369,6 @@ export class WeddingScene extends Phaser.Scene {
     if (!this.player) return;
     if (this.run.phase === 'playing') {
       this.run.tick(delta);
-      if (this.run.remaining === 0) { this.end(); return; }
       const body = this.player.body;
       if (!(body instanceof Phaser.Physics.Arcade.Body)) throw new Error('Sean physics body missing.');
       const input = this.controls.read();
