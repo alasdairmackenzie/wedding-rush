@@ -15,6 +15,7 @@
 .hint { margin: 0 0 14px; font-size: 14px; color: #5d5045; }
 .faces { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
 .face { display: grid; gap: 8px; align-content: start; border: 2px solid #302825; background: #f8efe3; padding: 12px; }
+.face label { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .face input[type=file] { font-size: 12px; max-width: 100%; }
 .preview { height: 110px; display: grid; place-items: center; border: 2px dashed #ac9c83; background: #ded4bd; font: 12px monospace; color: #756553; }
 .preview img { max-height: 100px; max-width: 100%; }

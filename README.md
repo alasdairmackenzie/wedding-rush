@@ -36,9 +36,9 @@ a password when you start the server, for example
   Add `?url=seanandbeckywedding.run` to override the address it shows.
 - `/admin` lets you upload faces for Becky and the mates, and rename or delete
   scores. Sign in with the `ADMIN_TOKEN` password; without it the admin page is
-  turned off. Cut-out PNGs with a see-through background look best; otherwise
-  tick **Crop to a circle**. Faces are stored with the scores (in Postgres on
-  Railway) and appear the next time someone loads the game.
+  turned off. Tick **Auto-remove background** to erase the background with
+  in-browser AI, or **Crop to a circle** for a round vignette. Faces are stored
+  with the scores (in Postgres on Railway) and appear the next time someone loads the game.
 
 ## Deploy to Railway
 

@@ -16,6 +16,7 @@
     "start": "node src/server/server.ts"
   },
   "dependencies": {
+    "@imgly/background-removal": "^1.7.0",
     "pg": "^8.23.1",
     "phaser": "3.90.0"
   },
