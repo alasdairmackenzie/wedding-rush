@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import QRCode from 'qrcode';
 import { BRIDE, GROOM, hurdles, people, rings, Run, runnerSpeed, runTitle, START, TOTAL_SCORE } from '../shared/level';
 import { cleanName, ENTRY_ID, isRude, NAME_MAX, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
 import { WeddingScene } from './scene';
@@ -36,6 +37,12 @@ const topListRows = element('top-list-rows', HTMLTableSectionElement);
 const topListPlay = element('top-list-play', HTMLButtonElement);
 const topListMenu = element('top-list-menu', HTMLButtonElement);
 const shareStatus = element('share-status', HTMLElement);
+const shareModal = element('share-modal', HTMLDialogElement);
+const shareModalQr = element('share-modal-qr', HTMLElement);
+const shareModalLink = element('share-modal-link', HTMLElement);
+const shareModalCopy = element('share-modal-copy', HTMLButtonElement);
+const shareModalStatus = element('share-modal-status', HTMLElement);
+const shareModalClose = element('share-modal-close', HTMLButtonElement);
 const BEST_KEY = 'wedding-rush-best';
 const NAME_KEY = 'wedding-rush-name';
 let lastRun: { score: number; squashed: number; won: boolean; title: string; lives: number; rings: number } | undefined;
@@ -355,6 +362,53 @@ document.addEventListener('click', event => {
 });
 element('mobile-pause', HTMLButtonElement).addEventListener('click', showMenu);
 let soundMuted = false;
+function openShareModal(): void {
+  const url = `${location.origin}/`;
+  shareModalLink.textContent = url;
+  shareModalStatus.textContent = '';
+  QRCode.toString(url, { type: 'svg', margin: 1, color: { dark: '#302825', light: '#fffaf0' } })
+    .then(svg => { shareModalQr.innerHTML = svg; })
+    .catch(() => { shareModalQr.textContent = 'Scan QR code'; });
+  if (!shareModal.open) shareModal.showModal();
+}
+shareModalCopy.addEventListener('click', async () => {
+  const url = `${location.origin}/`;
+  try {
+    await navigator.clipboard.writeText(url);
+    shareModalStatus.textContent = 'Link copied! Send it to the wedding guests 🥂';
+  } catch {
+    shareModalStatus.textContent = `Copy: ${url}`;
+  }
+});
+shareModalClose.addEventListener('click', () => shareModal.close());
+element('header-share-button', HTMLButtonElement).addEventListener('click', openShareModal);
+element('menu-share', HTMLButtonElement).addEventListener('click', () => {
+  menu.close();
+  openShareModal();
+});
+shareModal.addEventListener('close', () => {
+  if (!started && !result.open && !topList.open) showMenu();
+});
+
+// Secret Cheat Code: Tap the heart between Wedding and Rush 5 times on the title screen
+let heartTapCount = 0;
+let heartTapTimer = 0;
+function onHeartTap(event: MouseEvent | TouchEvent): void {
+  event.preventDefault();
+  event.stopPropagation();
+  window.clearTimeout(heartTapTimer);
+  heartTapCount++;
+  if (heartTapCount >= 5) {
+    heartTapCount = 0;
+    scene?.setDiscoMode(true);
+  } else {
+    heartTapTimer = window.setTimeout(() => { heartTapCount = 0; }, 2500);
+  }
+}
+document.querySelectorAll('.wordmark i, #menu-title i').forEach(el => {
+  el.addEventListener('click', onHeartTap as EventListener);
+});
+
 const soundToggle = element('sound-toggle', HTMLButtonElement);
 soundToggle.addEventListener('click', () => {
   soundMuted = !soundMuted;

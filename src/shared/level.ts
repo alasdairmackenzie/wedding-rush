@@ -31,7 +31,7 @@ export const temptations: Temptation[] = [
   { kind: 'hat', name: 'The bucket-hat detective', line: "I think you've lost your bucket hat, let's go find it", x: 2370, y: 566, left: 2240, right: 2420, speed: 60 },
   { kind: 'pub', name: 'The pub regular', line: 'Just one pint. What could go wrong?', x: 2890, y: 566, left: 2770, right: 2980, speed: 70 },
   { kind: 'karaoke', name: 'The karaoke king', line: 'One song! The crowd needs you!', x: 3510, y: 566, left: 3390, right: 3610, speed: 75 },
-  { kind: 'kebab', name: 'The kebab enthusiast', line: 'Wedding can wait. Extra chilli sauce?', x: 3920, y: 566, left: 3810, right: 4000, speed: 65 },
+  { kind: 'kebab', name: 'The tube mate', line: 'Missed the tube stop! Come with me!', x: 3920, y: 566, left: 3810, right: 4000, speed: 65 },
 ];
 /** Characters after which a rolling barrel or swooping pigeon gets its own stretch of street. */
 const MOVER_AFTER = [1, 3, 4, 5];
