@@ -121,7 +121,7 @@ pending playback. Resuming does not repeat the intro; replay does.
 Menu and dialog buttons play `src/assets/sounds/click.mp3` unless sound is off, and
 posting to the top list plays `tada.mp3`. In play, recorded effects mark hits
 (`bash`), squashes (`splat`), champagne corks (`cork`), rings (`sparkle`),
-ducking (`duck`), incoming pigeons (`flap`) and Becky's texts (`notify`).
+incoming pigeons (`flap`) and Becky's texts (`notify`).
 Loading or decoding errors are reported in the status strip.
 The four MP3s in `src/assets/sounds/` supply quiet, looping background music
 during the run, `splat` on hurdle hits, person side hits and squashes, `gameover` on loss and `level_end` when

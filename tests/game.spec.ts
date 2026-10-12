@@ -986,7 +986,7 @@ test('menu buttons play the click sound unless sound is off', async ({ page }) =
   expect(await clicks()).toBe(4);
 });
 
-test('plays recorded effects for corks, rings, ducking, pigeons, texts and hits', async ({ page }) => {
+test('plays recorded effects for corks, rings, pigeons, texts and hits', async ({ page }) => {
   await start(page);
   await exposeScene(page);
   await page.evaluate(`(() => {
@@ -998,16 +998,14 @@ test('plays recorded effects for corks, rings, ducking, pigeons, texts and hits'
   const effects = () => page.evaluate<string[]>('window.__effects');
   await teleport(page, corks[0].x - 60);
   await expect.poll(effects).toEqual(expect.arrayContaining(['cork', 'sparkle']));
-  await page.keyboard.down('ArrowDown');
-  await expect.poll(effects).toContain('duck');
-  await page.keyboard.up('ArrowDown');
   await teleport(page, movers[1].x - 300);
   await expect.poll(effects).toEqual(expect.arrayContaining(['flap', 'notify']));
+  expect(await effects()).not.toContain('duck');
   await page.evaluate('window.__scene.contact(0)');
   await expect.poll(effects).toContain('bash');
   const loaded = await page.evaluate(`(async () => {
     const audio = window.__scene.ui.audio;
-    const clips = await Promise.all(['cork', 'sparkle', 'duck', 'flap', 'notify', 'bash'].map(clip => audio.clips.get(clip)));
+    const clips = await Promise.all(['cork', 'sparkle', 'flap', 'notify', 'bash'].map(clip => audio.clips.get(clip)));
     return clips.every(buffer => buffer && buffer.duration > 0 && buffer.duration < 3);
   })()`);
   expect(loaded).toBe(true);

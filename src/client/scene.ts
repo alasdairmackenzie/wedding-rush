@@ -328,7 +328,6 @@ export class WeddingScene extends Phaser.Scene {
     this.ducking = ducking;
     if (ducking) {
       this.player.setSize(GROOM.width, GROOM.height / 2).setOffset(31, 40 + GROOM.height / 2);
-      if (this.run.phase === 'playing') this.ui.audio.effect('duck');
     } else this.player.setSize(GROOM.width, GROOM.height).setOffset(31, 40);
   }
   private comboCheck(): void {

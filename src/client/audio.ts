@@ -18,18 +18,17 @@ import notifyUrl from '../assets/sounds/notify.mp3';
 import corkUrl from '../assets/sounds/cork.mp3';
 import sparkleUrl from '../assets/sounds/sparkle.mp3';
 import flapUrl from '../assets/sounds/flap.mp3';
-import duckUrl from '../assets/sounds/duck.mp3';
 
 export type VoiceClip = 'intro' | TemptationKind;
-export type RecordedEffect = 'gameover' | 'level_end' | 'splat' | 'bash' | 'notify' | 'cork' | 'sparkle' | 'flap' | 'duck';
+export type RecordedEffect = 'gameover' | 'level_end' | 'splat' | 'bash' | 'notify' | 'cork' | 'sparkle' | 'flap';
 type SoundClip = VoiceClip | RecordedEffect | 'background';
 const soundUrls: Record<SoundClip, string> = {
   intro: introUrl, football: footballUrl, deal: dealUrl, pingpong: pingpongUrl,
   hat: hatUrl, pub: pubUrl, karaoke: karaokeUrl, kebab: kebabUrl,
   background: backgroundUrl, gameover: gameoverUrl, level_end: levelEndUrl, splat: splatUrl,
-  bash: bashUrl, notify: notifyUrl, cork: corkUrl, sparkle: sparkleUrl, flap: flapUrl, duck: duckUrl,
+  bash: bashUrl, notify: notifyUrl, cork: corkUrl, sparkle: sparkleUrl, flap: flapUrl,
 };
-const effectVolume: Partial<Record<RecordedEffect, number>> = { flap: 1.8, duck: .6, notify: .8 };
+const effectVolume: Partial<Record<RecordedEffect, number>> = { flap: 1.8, notify: .8 };
 const uiSounds = { click: { url: clickUrl, volume: .6 }, tada: { url: tadaUrl, volume: .8 } };
 
 export class GameAudio {
