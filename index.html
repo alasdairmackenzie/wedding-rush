@@ -12,6 +12,7 @@
         <a class="wordmark" href="./" aria-label="WeddingRush featuring Sean and Becky home">Wedding<span>Rush</span><i>♥</i><small>featuring Sean and Becky</small></a>
         <span class="edition">KEEP RUNNING. DON'T GET DISTRACTED.</span>
         <button id="menu-button" type="button">How to play / pause</button>
+        <button id="header-share-button" type="button" aria-label="Share WeddingRush">Share ↗</button>
       </header>
       <section class="game-shell" aria-label="WeddingRush featuring Sean and Becky runner">
         <button id="mobile-pause" type="button" aria-label="Pause game">Ⅱ</button>
@@ -35,13 +36,14 @@
       <footer><span>JUMP THE HURDLES. IGNORE THE LADS. MAKE THE WEDDING.</span><span>SPACE OR TAP TO JUMP. ↓ TO DUCK.</span></footer>
       <dialog id="menu" aria-labelledby="menu-title">
         <span class="stamp">YOU HAD ONE JOB / BE ON TIME</span>
-        <h1 id="menu-title">Wedding<span>Rush</span><small>featuring Sean and Becky</small></h1>
+        <h1 id="menu-title">Wedding<span>Rush</span><i>♥</i><small>featuring Sean and Becky</small></h1>
         <p class="intro">Becky is waiting for Sean.<br />Unfortunately, so are his mates.</p>
         <p id="objective"><strong>Sean runs, you jump.</strong> Clear seven hurdles to get Sean to Becky as the city goes from night to day.</p>
         <p id="controls"><kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd> jump · <kbd>S</kbd> / <kbd>↓</kbd> duck · <kbd>Esc</kbd> pause · on mobile, tap to jump and hold DUCK<br />One press, one full jump; press again in the air to double jump. Jump hurdles and beer barrels, and duck the pigeons. Champagne gives a super jump for the wedding rings. Land on your mates to squash them for +5; running into them costs a chance. Clear things in a row for up to a ×3 combo. Three hits and you're out.</p>
         <button id="play" class="primary" type="button" autofocus>I'm coming! ↗</button>
         <button id="restart" type="button" hidden>Start a fresh run</button>
         <button id="menu-top-list" type="button">🏆 View the guest top list</button>
+        <button id="menu-share" type="button">📱 Share WeddingRush with friends</button>
         <button id="sound-toggle" type="button" aria-pressed="false">Sound: on</button>
       </dialog>
       <dialog id="result" aria-labelledby="result-title">
@@ -78,6 +80,16 @@
         <p id="share-status" role="status"></p>
         <button id="top-list-play" type="button" class="primary" autofocus>Beat them! Play WeddingRush ↗</button>
         <button id="top-list-menu" type="button" class="link" hidden>Back to menu</button>
+      </dialog>
+      <dialog id="share-modal" aria-labelledby="share-modal-title">
+        <span class="stamp">SPREAD THE WORD</span>
+        <h2 id="share-modal-title">Play WeddingRush</h2>
+        <p class="intro">Scan to play on your phone or share the link with the wedding party.</p>
+        <div id="share-modal-qr" class="share-qr" aria-label="QR code to play WeddingRush"></div>
+        <p id="share-modal-link" class="share-url"></p>
+        <button id="share-modal-copy" type="button" class="primary">Copy link ↗</button>
+        <p id="share-modal-status" role="status"></p>
+        <button id="share-modal-close" type="button" class="link">Back</button>
       </dialog>
       <dialog id="error-dialog" aria-labelledby="error-title">
         <h2 id="error-title">A bump in the road</h2>

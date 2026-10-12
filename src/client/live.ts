@@ -1,3 +1,4 @@
+import QRCode from 'qrcode';
 import type { ScoreEntry } from '../shared/leaderboard';
 import './live.css';
 
@@ -5,8 +6,17 @@ const REFRESH_MS = 15_000;
 const rows = document.getElementById('live-rows') as HTMLTableSectionElement;
 const status = document.getElementById('live-status') as HTMLElement;
 const link = document.getElementById('live-url') as HTMLElement;
+const qrContainer = document.getElementById('live-qr') as HTMLElement | null;
 const params = new URLSearchParams(location.search);
-link.textContent = params.get('url') || location.host;
+const targetHost = params.get('url') || location.host;
+link.textContent = targetHost;
+
+const fullUrl = /^https?:\/\//i.test(targetHost) ? targetHost : `${location.protocol}//${targetHost}`;
+if (qrContainer) {
+  QRCode.toString(fullUrl, { type: 'svg', margin: 1, color: { dark: '#302825', light: '#fffaf0' } })
+    .then(svg => { qrContainer.innerHTML = svg; })
+    .catch(() => { /* QR generation fallback */ });
+}
 
 let seen: Set<string> | undefined;
 const time = (): string => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

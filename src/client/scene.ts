@@ -64,6 +64,8 @@ export class WeddingScene extends Phaser.Scene {
   private jumpUntil = -1000;
   private failedAssets = false;
   private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  private discoMode = false;
+  private discoSparkleTimer = 0;
 
   constructor(private readonly ui: GameUI) { super('wedding'); }
 
@@ -301,6 +303,45 @@ export class WeddingScene extends Phaser.Scene {
     this.ui.audio.stop();
     this.syncUI();
   }
+  setDiscoMode(active: boolean): void {
+    this.discoMode = active;
+    if (active) {
+      this.announceEvent('DISCO GROOM!', 'INVINCIBLE & READY TO DANCE!', '#b84b64');
+      this.ui.audio.effect('sparkle');
+      this.ui.notice('Secret Cheat Activated! Sean is invincible with a disco sparkle trail.');
+      if (this.player) this.sparkle(this.player.x, this.player.y + 10);
+    } else {
+      if (this.playerArt) this.playerArt.clearTint();
+    }
+  }
+  isDiscoMode(): boolean {
+    return this.discoMode;
+  }
+  private sparkle(x: number, y: number): void {
+    if (this.reducedMotion.matches) return;
+    const colours = [0xffd700, 0xff69b4, 0x00ffff, 0xff1493, 0xadff2f, 0xffffff];
+    for (let i = 0; i < 3; i++) {
+      const p = this.add.text(x - 25 + Math.random() * 10, y + (Math.random() - 0.5) * 35, '✦', {
+        fontFamily: 'sans-serif',
+        fontSize: `${12 + Math.random() * 14}px`,
+        color: `#${colours[Math.floor(Math.random() * colours.length)].toString(16).padStart(6, '0')}`,
+      }).setOrigin(0.5).setDepth(15);
+      this.effects.add(p);
+      this.tweens.add({
+        targets: p,
+        x: p.x - 30 - Math.random() * 25,
+        y: p.y - 10 + (Math.random() - 0.5) * 30,
+        scale: 0.1,
+        alpha: 0,
+        duration: 450 + Math.random() * 200,
+        ease: 'Cubic.easeOut',
+        onComplete: () => {
+          this.effects.remove(p);
+          p.destroy();
+        },
+      });
+    }
+  }
   private floatText(x: number, y: number, text: string, colour: string): void {
     const label = this.add.text(x, y, text, {
       fontFamily: 'monospace', fontSize: '22px', fontStyle: 'bold', color: colour,
@@ -350,6 +391,12 @@ export class WeddingScene extends Phaser.Scene {
     this.lastMultiplier = multiplier;
   }
   private bump(title: string, message: string): void {
+    if (this.discoMode) {
+      this.sparkle(this.player.x, this.player.y);
+      this.floatText(this.player.x, this.player.y - 55, 'DEFLECTED!', '#b84b64');
+      this.ui.audio.tone('sweet');
+      return;
+    }
     this.invulnerableUntil = this.run.elapsed + 900;
     this.ui.audio.effect('bash');
     this.buzz(120);
@@ -360,6 +407,15 @@ export class WeddingScene extends Phaser.Scene {
     if (this.run.lives === 0) this.end();
   }
   private contact(id: number): void {
+    if (this.discoMode) {
+      if (this.run.clearHurdle(id)) {
+        this.sparkle(this.player.x, this.player.y);
+        this.floatText(this.player.x, 485, 'DISCO DASH!', '#b84b64');
+        this.announceEvent('DISCO CLEARED!', `${this.run.cleared.size} / ${hurdles.length} HURDLES`, '#b84b64');
+        this.comboCheck();
+      }
+      return;
+    }
     if (this.run.hitHurdle(id)) {
       this.obstacles[id].rail.setAlpha(.35);
       this.bump('OUCH!', 'Hurdle hit! One chance lost. Jump the next hurdle!');
@@ -390,6 +446,16 @@ export class WeddingScene extends Phaser.Scene {
       this.announceEvent('SQUASH!', `+${SQUASH_BONUS} BONUS POINTS`, '#42735a');
       this.comboCheck();
       this.ui.notice(`${people[id].temptation.name} squashed! +${SQUASH_BONUS} bonus points. No chance or time lost.`);
+    } else if (this.discoMode) {
+      if (!this.run.hitPeople.has(id) && !this.run.squashed.has(id)) {
+        this.run.hitPeople.add(id);
+        target.enable = false;
+        character.bubble.setVisible(false);
+        this.sparkle(character.art.x, 540);
+        this.floatText(character.art.x, 490, 'DISCO PASS!', '#b84b64');
+        this.ui.audio.tone('sweet');
+        this.announceEvent('DISCO PASS!', 'DANCING RIGHT PAST', '#b84b64');
+      }
     } else if (this.run.hitPerson(id)) {
       target.enable = false;
       character.art.setAlpha(.5);
@@ -525,6 +591,13 @@ export class WeddingScene extends Phaser.Scene {
     this.playerArt.setPosition(this.player.x, this.player.y + 40 + bob);
     this.playerArt.setScale(this.playerScale, this.playerScale * (this.ducking ? .55 : 1));
     this.playerArt.setAlpha(this.run.elapsed < this.invulnerableUntil ? .5 : 1);
+    if (this.discoMode && this.run.phase === 'playing') {
+      this.discoSparkleTimer += delta;
+      if (this.discoSparkleTimer >= 80) {
+        this.discoSparkleTimer = 0;
+        this.sparkle(this.player.x, this.player.y + 20);
+      }
+    }
   }
   private updateExtras(delta: number, body: Phaser.Physics.Arcade.Body): void {
     const overlaps = (x: number, y: number, width: number, height: number): boolean =>

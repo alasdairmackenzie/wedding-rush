@@ -6,7 +6,8 @@ import pingpongUrl from '../shared/sounds/pingpong.mp3';
 import hatUrl from '../shared/sounds/hat.mp3';
 import pubUrl from '../shared/sounds/pub.mp3';
 import karaokeUrl from '../shared/sounds/karaoke.mp3';
-import kebabUrl from '../shared/sounds/kebab.mp3';
+import missedTubeUrl from '../assets/sounds/missed_tube_stop.mp3';
+import brideMusicUrl from '../assets/sounds/herecomesthebride.mp3';
 import backgroundUrl from '../assets/sounds/background.mp3';
 import gameoverUrl from '../assets/sounds/gameover.mp3';
 import levelEndUrl from '../assets/sounds/level_end.mp3';
@@ -21,12 +22,13 @@ import flapUrl from '../assets/sounds/flap.mp3';
 
 export type VoiceClip = 'intro' | TemptationKind;
 export type RecordedEffect = 'gameover' | 'level_end' | 'splat' | 'bash' | 'notify' | 'cork' | 'sparkle' | 'flap';
-type SoundClip = VoiceClip | RecordedEffect | 'background';
+type SoundClip = VoiceClip | RecordedEffect | 'background' | 'wedding';
 const soundUrls: Record<SoundClip, string> = {
   intro: introUrl, football: footballUrl, deal: dealUrl, pingpong: pingpongUrl,
-  hat: hatUrl, pub: pubUrl, karaoke: karaokeUrl, kebab: kebabUrl,
+  hat: hatUrl, pub: pubUrl, karaoke: karaokeUrl, kebab: missedTubeUrl,
   background: backgroundUrl, gameover: gameoverUrl, level_end: levelEndUrl, splat: splatUrl,
   bash: bashUrl, notify: notifyUrl, cork: corkUrl, sparkle: sparkleUrl, flap: flapUrl,
+  wedding: brideMusicUrl,
 };
 const effectVolume: Partial<Record<RecordedEffect, number>> = { flap: 1.8, notify: .8 };
 const uiSounds = { click: { url: clickUrl, volume: .6 }, tada: { url: tadaUrl, volume: .8 } };
@@ -45,6 +47,8 @@ export class GameAudio {
   private backgroundRequest = 0;
   private backgroundOffset = 0;
   private backgroundStarted = 0;
+  private weddingMusic?: AudioBufferSourceNode;
+  private weddingRequest = 0;
   private effectRequest = 0;
   private readonly effects = new Set<AudioBufferSourceNode>();
   private readonly uiElements = new Map<keyof typeof uiSounds, HTMLAudioElement>();
@@ -90,9 +94,36 @@ export class GameAudio {
       if (this.backgroundWanted) this.startBackground();
     }
   }
+  private haltWeddingMusic(): void {
+    this.weddingRequest++;
+    if (this.weddingMusic) {
+      this.weddingMusic.stop();
+      this.weddingMusic.disconnect();
+      this.weddingMusic = undefined;
+    }
+  }
+  startWeddingMusic(): void {
+    const context = this.context;
+    if (this.muted || document.hidden || this.destroyed || !context || this.weddingMusic) return;
+    const request = ++this.weddingRequest;
+    void Promise.all([this.loadClip(context, 'wedding'), this.resume(context)]).then(([buffer]) => {
+      if (request !== this.weddingRequest || this.muted || document.hidden || this.destroyed) return;
+      const source = context.createBufferSource(), gain = context.createGain();
+      source.buffer = buffer;
+      source.loop = true;
+      gain.gain.value = .3;
+      source.connect(gain); gain.connect(context.destination);
+      source.onended = () => { source.disconnect(); gain.disconnect(); };
+      this.weddingMusic = source;
+      source.start(0);
+    }).catch(error => {
+      if (!this.destroyed) this.notice(`Could not play wedding music: ${String(error)}`);
+    });
+  }
   stop(): void {
     this.backgroundWanted = false;
     this.haltBackground();
+    this.haltWeddingMusic();
     this.stopEffects();
     this.stopSpeech();
     if (this.context?.state === 'running') {
@@ -129,6 +160,7 @@ export class GameAudio {
     this.backgroundWanted = true;
     if (fresh) {
       this.haltBackground();
+      this.haltWeddingMusic();
       this.backgroundOffset = 0;
       this.stopEffects();
     }
@@ -182,6 +214,7 @@ export class GameAudio {
     this.haltBackground();
     this.stopSpeech();
     this.effect(won ? 'level_end' : 'gameover');
+    if (won) this.startWeddingMusic();
   }
   stopSpeech(): void {
     this.voiceRequest++;

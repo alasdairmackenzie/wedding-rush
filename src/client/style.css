@@ -11,7 +11,8 @@ main { max-width: 1440px; margin: auto; padding: 22px 32px 12px; }
 .wordmark { color: #292321; text-decoration: none; font-size: clamp(26px, 3.5vw, 43px); font-weight: 1000; letter-spacing: -3px; transform: rotate(-2deg); }
 .wordmark span, h1 span { color: #b84b64; }
 .wordmark small, dialog h1 small { display: block; font-size: 16px; line-height: 1.4; letter-spacing: 0; margin-top: 5px; }
-.wordmark i { font-size: 13px; vertical-align: top; letter-spacing: 0; margin-left: 5px; }
+.wordmark i, dialog h1 i { font-size: 13px; vertical-align: top; letter-spacing: 0; margin-left: 5px; cursor: pointer; user-select: none; }
+dialog h1 i { color: #b84b64; font-size: 18px; margin-left: 6px; }
 .edition, footer, .label, .route label { font: 700 10px/1.5 monospace; letter-spacing: 1.8px; }
 .game-shell { border: 3px solid #302825; box-shadow: 7px 7px 0 #bfb19a; position: relative; background: #ddd0b4; }
 .hud { display: flex; align-items: center; justify-content: space-between; padding: 14px 22px; gap: 20px; border-bottom: 3px solid #302825; background: #f8f0df; }
@@ -105,13 +106,13 @@ button:disabled { opacity: .6; cursor: wait; }
 .combo strong[data-hot] { animation: combo-pop .3s ease-out; }
 @keyframes combo-pop { from { scale: 1.6; } }
 .becky-text {
-  position: absolute; z-index: 4; top: 96px; right: 16px; max-width: min(260px, 70%);
-  display: grid; gap: 3px; padding: 9px 12px; border: 2px solid #302825; border-radius: 16px 16px 4px 16px;
-  background: #fff; box-shadow: 4px 4px 0 #302825; font: bold 13px/1.35 'Trebuchet MS', sans-serif; pointer-events: none;
-  animation: text-in .25s ease-out;
+  position: absolute; z-index: 4; top: 96px; right: 16px; max-width: min(340px, 80%);
+  display: grid; gap: 5px; padding: 12px 18px; border: 3px solid #302825; border-radius: 20px 20px 6px 20px;
+  background: #fff; box-shadow: 6px 6px 0 #302825; font: bold clamp(16px, 2.2vw, 22px)/1.35 'Trebuchet MS', sans-serif; pointer-events: none;
+  animation: text-in .25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-.becky-text .from { font: bold 9px monospace; letter-spacing: 1px; color: #b84b64; }
-.becky-text[data-frantic] { background: #ffe1e8; rotate: -2deg; }
+.becky-text .from { font: 800 12px monospace; letter-spacing: 1.5px; color: #b84b64; }
+.becky-text[data-frantic] { background: #ffe1e8; rotate: -2deg; border-color: #b84b64; box-shadow: 6px 6px 0 #b84b64; }
 @keyframes text-in { from { translate: 0 -12px; opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .becky-text, .combo strong[data-hot] { animation: none; } }
 .badge { display: inline-block; margin: 0; padding: 4px 10px; background: #302825; color: #ffd465; font: bold 13px monospace; letter-spacing: 1px; }
@@ -146,10 +147,21 @@ dialog > button.link { width: auto; margin: 10px auto 0; }
 .toplist td.empty { text-align: center; color: #756553; }
 #top-list-intro strong { color: #b84b64; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.share-qr { display: flex; justify-content: center; align-items: center; margin: 16px auto; padding: 12px; background: #fffaf0; border: 2px solid #302825; box-shadow: 4px 4px 0 #302825; width: fit-content; }
+.share-qr svg { display: block; width: 180px; height: 180px; }
+.share-url { font: bold 12px/1.4 monospace; word-break: break-all; text-align: center; background: #eee5cf; padding: 8px 12px; border: 1px dashed #302825; margin: 10px 0; }
+#share-modal-status { min-height: 1.2em; margin: 6px 0 0; font-size: 13px; text-align: center; font-weight: bold; }
+#share-modal-status:empty { display: none; }
 .touch-controls { gap: 10px; }
 .touch-controls [data-control="duck"] { width: 30%; background: #cfe4f6; }
 @media (max-width: 700px), (pointer: coarse) and (max-width: 1024px) {
-  .becky-text { top: calc(max(10px, env(safe-area-inset-top)) + 110px); right: max(10px, env(safe-area-inset-right)); }
+  .becky-text {
+    top: calc(max(10px, env(safe-area-inset-top)) + 80px);
+    right: max(10px, env(safe-area-inset-right));
+    max-width: min(300px, 85%);
+    font-size: 16px;
+    padding: 10px 14px;
+  }
   .touch-controls { left: max(16px, env(safe-area-inset-left)); justify-content: space-between; }
   .touch-controls [data-control="duck"] { width: auto; min-width: 112px; background: #cfe4f6ee; }
   .label { font-size: 8px; }
