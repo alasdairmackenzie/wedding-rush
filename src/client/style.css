@@ -66,8 +66,8 @@ button:disabled { opacity: .6; cursor: wait; }
   dialog { padding: 24px; }
 }
 @media (max-width: 700px), (pointer: coarse) and (max-width: 1024px) {
-  html, body { height: 100%; overflow: hidden; }
-  main { max-width: none; padding: 0; }
+  html:not(:has(body.admin)), body:not(.admin) { height: 100%; overflow: hidden; }
+  body:not(.admin) main { max-width: none; padding: 0; }
   .masthead, footer { display: none; }
   .game-shell { position: fixed; inset: 0; height: 100dvh; border: 0; box-shadow: none; }
   #game { position: absolute; inset: 0; height: 100%; min-height: 0; max-height: none; aspect-ratio: auto; }

@@ -1,4 +1,31 @@
-.admin main { max-width: 1100px; }
+html,
+body.admin {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.admin main {
+  max-width: 1100px;
+  padding: 24px 16px 64px;
+  margin: 0 auto;
+}
+
+@media (max-width: 700px), (pointer: coarse) and (max-width: 1024px) {
+  html,
+  body.admin {
+    height: auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  body.admin main {
+    max-width: 100% !important;
+    padding: 16px 14px 64px !important;
+  }
+}
+
 .admin h1 { font-size: clamp(28px, 4vw, 44px); letter-spacing: -2px; transform: rotate(-1deg); }
 .admin h2 { margin: 0 0 8px; }
 .admin h3 { margin: 0; font-size: 16px; }
@@ -20,6 +47,7 @@
 .preview { height: 110px; display: grid; place-items: center; border: 2px dashed #ac9c83; background: #ded4bd; font: 12px monospace; color: #756553; }
 .preview img { max-height: 100px; max-width: 100%; }
 .face button.link { justify-self: start; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; margin-top: 6px; }
 .admin .toplist { font-size: 14px; }
 .admin .toplist td { vertical-align: middle; }
 .admin .toplist td:nth-child(2) input { width: 100%; max-width: 200px; }

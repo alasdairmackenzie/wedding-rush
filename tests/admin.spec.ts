@@ -87,3 +87,21 @@ test('an uploaded face shows up in the game and can be removed', async ({ page, 
   await expect(page.getByRole('img', { name: 'Uploaded face for Becky' })).toHaveCount(0);
   expect((await (await request.get('/api/faces')).json()).faces).toEqual({});
 });
+
+test('admin dashboard scrolls on mobile viewports', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await signIn(page);
+  const scrollable = await page.evaluate(() => ({
+    scrollHeight: document.documentElement.scrollHeight,
+    clientHeight: document.documentElement.clientHeight,
+    overflowY: getComputedStyle(document.body).overflowY,
+    htmlOverflowY: getComputedStyle(document.documentElement).overflowY,
+  }));
+  expect(scrollable.scrollHeight).toBeGreaterThan(scrollable.clientHeight);
+  expect(scrollable.overflowY).not.toBe('hidden');
+  expect(scrollable.htmlOverflowY).not.toBe('hidden');
+
+  await page.evaluate(() => window.scrollTo(0, 300));
+  const scrollY = await page.evaluate(() => window.scrollY);
+  expect(scrollY).toBeGreaterThan(0);
+});
