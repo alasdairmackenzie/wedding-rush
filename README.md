@@ -90,10 +90,14 @@ character's line waits until the intro finishes. Later encounter spacing stays u
 - Squashes throw confetti and shake the screen (not with reduced motion), and
   hits vibrate supporting phones.
 - Your **best score** and name are remembered on this device.
-- After a run, post your name and score to the guest **leaderboard**. Names are
-  checked for rude words and posting is rate-limited. **Share my place on the
-  top list** shares (or copies) a `/top?you=<id>` link that opens the top 10
-  with your row highlighted, plus your rank if you are outside the top 10.
+- The end screen shows a short summary and compact stat chips. Post your name
+  to the guest **leaderboard** and it opens the top list with your row
+  highlighted. Names are checked for rude words and posting is rate-limited.
+  **Share my place on the top list** shares (or copies) a `/top?you=<id>` link
+  that opens the top 10 with your row highlighted, plus your rank if you are
+  outside the top 10. The top list can also be opened from the main menu.
+- Leaving the app pauses the run and sound; tapping again on return restarts
+  the audio.
 - Replay resets the route, chances, hurdle and person states, lighting and score.
   The sound preference is preserved.
 

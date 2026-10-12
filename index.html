@@ -37,37 +37,33 @@
         <span class="stamp">YOU HAD ONE JOB / BE ON TIME</span>
         <h1 id="menu-title">Wedding<span>Rush</span><small>featuring Sean and Becky</small></h1>
         <p class="intro">Becky is waiting for Sean.<br />Unfortunately, so are his mates.</p>
-        <p id="objective">Sean runs. You jump. Get Sean to Becky by clearing seven hurdles through a city that brightens from night to day.</p>
-        <p id="controls"><kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd> jump · <kbd>S</kbd> / <kbd>↓</kbd> duck · <kbd>Esc</kbd> pause<br />Tap the game or the JUMP button on mobile, and hold DUCK to duck. One press, one full jump; press again in the air to double jump. Jump the rolling beer barrels and duck the swooping pigeons. Run into a champagne bottle for a super jump to grab the spinning wedding rings. Clear things in a row to build a combo of up to ×3. Jump the hurdles. Jump over your mates or land on their heads to squash them and bounce for 5 bonus points! Hurdle hits and side hits on mates cost a chance; squashing is harmless. Three hits end your run.</p>
+        <p id="objective"><strong>Sean runs, you jump.</strong> Clear seven hurdles to get Sean to Becky as the city goes from night to day.</p>
+        <p id="controls"><kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd> jump · <kbd>S</kbd> / <kbd>↓</kbd> duck · <kbd>Esc</kbd> pause · on mobile, tap to jump and hold DUCK<br />One press, one full jump; press again in the air to double jump. Jump hurdles and beer barrels, and duck the pigeons. Champagne gives a super jump for the wedding rings. Land on your mates to squash them for +5; running into them costs a chance. Clear things in a row for up to a ×3 combo. Three hits and you're out.</p>
         <button id="play" class="primary" type="button" autofocus>I'm coming! ↗</button>
         <button id="restart" type="button" hidden>Start a fresh run</button>
+        <button id="menu-top-list" type="button">🏆 View the guest top list</button>
         <button id="sound-toggle" type="button" aria-pressed="false">Sound: on</button>
       </dialog>
       <dialog id="result" aria-labelledby="result-title">
         <span class="stamp" id="result-kicker">THE BIG DAY</span>
         <h2 id="result-title">You made it!</h2>
         <p id="result-badge" class="badge"></p>
-        <p id="result-detail"></p>
+        <p id="result-summary" class="summary"></p>
+        <ul id="result-detail" class="stats" aria-label="Run stats"></ul>
         <p id="result-best" class="best"></p>
+        <form id="score-form" class="post-score" novalidate>
+          <label for="player-name">Your name for the guest top list</label>
+          <div class="score-row">
+            <input id="player-name" name="name" maxlength="16" autocomplete="nickname" required />
+            <button id="submit-score" type="submit">Post to the top list ↗</button>
+          </div>
+          <p id="score-status" role="status"></p>
+        </form>
         <button id="again" type="button" class="primary" autofocus>One more big day ↗</button>
-        <section class="leaderboard" aria-labelledby="leaderboard-title">
-          <h3 id="leaderboard-title">Wedding guest top list</h3>
-          <form id="score-form">
-            <label for="player-name">Your name</label>
-            <div class="score-row">
-              <input id="player-name" name="name" maxlength="16" autocomplete="nickname" required />
-              <button id="submit-score" type="submit">Post score</button>
-            </div>
-            <p id="score-status" role="status"></p>
-          </form>
-          <button id="share" type="button" class="share">Share my place on the top list ↗</button>
-          <table class="toplist">
-            <caption class="visually-hidden">Top wedding guest scores</caption>
-            <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Points</th><th scope="col">Squashed</th></tr></thead>
-            <tbody id="leaderboard"></tbody>
-          </table>
-        </section>
-        <button id="result-menu" type="button">Back to menu</button>
+        <div class="text-links">
+          <button id="result-top-list" type="button" class="link">See the top list</button>
+          <button id="result-menu" type="button" class="link">Back to menu</button>
+        </div>
       </dialog>
       <dialog id="top-list" aria-labelledby="top-list-title">
         <span class="stamp">WEDDINGRUSH / TOP LIST</span>
@@ -78,7 +74,10 @@
           <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Points</th><th scope="col">Squashed</th></tr></thead>
           <tbody id="top-list-rows"></tbody>
         </table>
+        <button id="share" type="button" class="share" hidden>Share my place on the top list ↗</button>
+        <p id="share-status" role="status"></p>
         <button id="top-list-play" type="button" class="primary" autofocus>Beat them! Play WeddingRush ↗</button>
+        <button id="top-list-menu" type="button" class="link" hidden>Back to menu</button>
       </dialog>
       <dialog id="error-dialog" aria-labelledby="error-title">
         <h2 id="error-title">A bump in the road</h2>

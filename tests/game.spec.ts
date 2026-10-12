@@ -56,7 +56,7 @@ test('uses the Sean and Becky title and character names throughout the UI', asyn
   await page.goto('/');
   await expect(page).toHaveTitle('WeddingRush featuring Sean and Becky');
   await expect(page.getByRole('heading', { name: 'WeddingRush featuring Sean and Becky' })).toBeVisible();
-  await expect(page.locator('#objective')).toContainText('Get Sean to Becky');
+  await expect(page.locator('#objective')).toContainText('get Sean to Becky');
   await expect(page.locator('#notice')).toContainText('Becky is ready. Sean');
   await page.getByRole('button', { name: "I'm coming!" }).click();
   await expect(page.locator('#notice')).toHaveText(RUN_OBJECTIVE);
@@ -154,7 +154,7 @@ test('hurdle contact costs one chance per hurdle and the third hit ends the run'
   await expect(page.locator('#game')).toHaveAttribute('data-phase', 'late');
   await expect(page.locator('#result-kicker')).toHaveText('THE BIG DAY / OUT OF CHANCES');
   await expect(page.locator('#result-title')).toHaveText('Too many distractions!');
-  await expect(page.locator('#result-detail')).toContainText('Three distractions');
+  await expect(page.locator('#result-summary')).toContainText('Three distractions');
   await expect(page.locator('#notice')).toContainText('No chances left');
   await page.getByRole('button', { name: 'One more big day' }).click();
   await expect(page.locator('#lives')).toHaveText('3 / 3');
@@ -870,25 +870,32 @@ test('best score, name filter and share link to a highlighted top list', async (
   await expect(page.locator('#result-best')).toHaveText(`NEW RECORD! ${RING_VALUE} beats your old best of 0.`);
 
   await page.locator('#player-name').fill('');
-  await page.getByRole('button', { name: /Share my place/ }).click();
+  await page.getByRole('button', { name: /Post to the top list/ }).click();
   await expect(page.locator('#score-status')).toContainText('Add your name');
   await expect(page.locator('#player-name')).toBeFocused();
 
   await page.locator('#player-name').fill('Bell End');
-  await page.getByRole('button', { name: 'Post score' }).click();
+  await page.getByRole('button', { name: /Post to the top list/ }).click();
   await expect(page.locator('#score-status')).toContainText('Keep it clean');
 
   const name = `Aunt ${Date.now().toString(36).slice(-6)}`;
   await page.locator('#player-name').fill(name);
+  await page.getByRole('button', { name: /Post to the top list/ }).click();
+  const posted = page.getByRole('dialog', { name: 'Wedding guest top list' });
+  await expect(posted).toBeVisible();
+  await expect(page.locator('#result')).not.toBeVisible();
+  await expect(page).toHaveURL(/\/top\?you=[a-z0-9]{12}$/);
+  await expect(posted.locator('tr[data-you]')).toContainText(name);
+  await expect(page.locator('#top-list-intro')).toContainText("You're #");
   await page.getByRole('button', { name: /Share my place/ }).click();
-  await expect(page.locator('#score-status')).toContainText('Shared!');
+  await expect(page.locator('#share-status')).toContainText('Shared!');
   const shared = await page.evaluate(() => (window as any).__shared as ShareData);
   expect(shared.url).toMatch(/\/top\?you=[a-z0-9]{12}$/);
   expect(shared.text).toContain(name);
-  await expect(page.locator('#leaderboard tr[data-you]')).toContainText(name);
-  await expect(page.locator('#player-name')).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Post score' })).toBeHidden();
-  await expect(page.locator('#score-status')).toBeVisible();
+  await expect(posted.getByRole('button', { name: 'One more big day ↗' })).toBeVisible();
+  await posted.getByRole('button', { name: 'Back to menu' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('#menu')).toBeVisible();
 
   await page.goto(new URL(shared.url!).pathname + new URL(shared.url!).search);
   const topList = page.getByRole('dialog', { name: 'Wedding guest top list' });
@@ -915,7 +922,35 @@ test('best score, name filter and share link to a highlighted top list', async (
   await expect(page.locator('#result-best')).toHaveText(`Your best: ${RING_VALUE} points.`);
   await expect(page.locator('#player-name')).toHaveValue(name);
   await expect(page.locator('#player-name')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Post score' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: /Post to the top list/ })).toBeEnabled();
+  await expect(page.locator('#score-status')).toBeHidden();
+
+  await page.getByRole('button', { name: 'See the top list' }).click();
+  const list = page.getByRole('dialog', { name: 'Wedding guest top list' });
+  await expect(list).toBeVisible();
+  await expect(page.getByRole('button', { name: /Share my place/ })).toBeHidden();
+  await list.getByRole('button', { name: 'One more big day ↗' }).click();
+  await expect(list).not.toBeVisible();
+  await expect(page.locator('#menu')).not.toBeVisible();
+  await expect(page.locator('#game')).toHaveAttribute('data-distractions', '0');
+});
+
+test('the main menu opens the guest top list and returns or starts a run', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /View the guest top list/ }).click();
+  const list = page.getByRole('dialog', { name: 'Wedding guest top list' });
+  await expect(list).toBeVisible();
+  await expect(page.locator('#top-list-intro')).not.toContainText('Loading');
+  await expect(list.getByRole('button', { name: /Share my place/ })).toBeHidden();
+  await list.getByRole('button', { name: 'Back to menu' }).click();
+  await expect(list).not.toBeVisible();
+  await expect(page.locator('#menu')).toBeVisible();
+
+  await page.getByRole('button', { name: /View the guest top list/ }).click();
+  await list.getByRole('button', { name: "I'm coming! ↗" }).click();
+  await expect(list).not.toBeVisible();
+  await expect(page.locator('#menu')).not.toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
 });
 
 test('an unknown top list link still shows the table and copies links without native share', async ({ page }) => {
@@ -931,6 +966,6 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }
     await ringThenCrash(page);
     const overflow = await page.locator('#result').evaluate(dialog => dialog.scrollWidth - dialog.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
-    await expect(page.getByRole('button', { name: /Share my place/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Post to the top list/ })).toBeVisible();
   });
 }

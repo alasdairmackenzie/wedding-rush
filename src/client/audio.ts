@@ -40,9 +40,18 @@ export class GameAudio {
   constructor(private readonly notice: (message: string) => void) {}
   unlock(): void {
     if (this.destroyed) return;
-    if (!this.context) this.context = new AudioContext();
+    if (!this.context || this.context.state === 'closed') {
+      this.context = new AudioContext();
+      this.clips.clear();
+    }
     if (this.muted) return;
-    void this.context.resume().catch(error => this.notice(`Audio could not start: ${String(error)}`));
+    void this.resume(this.context);
+  }
+  // Browsers suspend audio while the page is in the background and only allow it to restart
+  // after a tap or key press, so a failed resume is expected and the next press retries it.
+  private resume(context: AudioContext): Promise<void> {
+    if (context.state === 'running') return Promise.resolve();
+    return context.resume().catch(error => console.warn('Audio is waiting for a tap to restart:', error));
   }
   setMuted(muted: boolean): void {
     this.muted = muted;
@@ -61,7 +70,7 @@ export class GameAudio {
     this.stopEffects();
     this.stopSpeech();
     if (this.context?.state === 'running') {
-      void this.context.suspend().catch(error => this.notice(`Audio could not pause: ${String(error)}`));
+      void this.context.suspend().catch(error => console.warn('Audio could not pause:', error));
     }
   }
   private loadClip(context: AudioContext, clip: SoundClip): Promise<AudioBuffer> {
@@ -100,7 +109,7 @@ export class GameAudio {
     const context = this.context;
     if (this.muted || document.hidden || this.destroyed || !context || this.background) return;
     const request = ++this.backgroundRequest;
-    void Promise.all([this.loadClip(context, 'background'), context.resume()]).then(([buffer]) => {
+    void Promise.all([this.loadClip(context, 'background'), this.resume(context)]).then(([buffer]) => {
       if (request !== this.backgroundRequest || !this.backgroundWanted || this.muted || document.hidden || this.destroyed) return;
       const source = context.createBufferSource(), gain = context.createGain();
       source.buffer = buffer;
@@ -128,7 +137,7 @@ export class GameAudio {
     const context = this.context;
     if (this.muted || document.hidden || this.destroyed || !context) return;
     const request = this.effectRequest;
-    void Promise.all([this.loadClip(context, clip), context.resume()]).then(([buffer]) => {
+    void Promise.all([this.loadClip(context, clip), this.resume(context)]).then(([buffer]) => {
       if (request !== this.effectRequest || this.muted || document.hidden || this.destroyed) return;
       const source = context.createBufferSource();
       source.buffer = buffer;
@@ -167,7 +176,7 @@ export class GameAudio {
     this.voiceClip = clip;
     const request = this.voiceRequest;
     const loading = this.loadClip(context, clip);
-    void Promise.all([loading, context.resume()]).then(([buffer]) => {
+    void Promise.all([loading, this.resume(context)]).then(([buffer]) => {
       if (request !== this.voiceRequest) return;
       if (this.muted || document.hidden || this.destroyed || context.state !== 'running') {
         this.voiceClip = this.queuedClip = undefined;
