@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f8efe3" />
+    <meta name="robots" content="noindex" />
+    <title>Live top list · WeddingRush featuring Sean and Becky</title>
+  </head>
+  <body class="live">
+    <main>
+      <header>
+        <p class="wordmark">Wedding<span>Rush</span><i>♥</i><small>featuring Sean and Becky</small></p>
+        <h1>Wedding guest top list</h1>
+      </header>
+      <table class="board" aria-describedby="live-status">
+        <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Points</th><th scope="col">Squashed</th></tr></thead>
+        <tbody id="live-rows"></tbody>
+      </table>
+      <aside class="join" aria-label="How to play">
+        <span>Play on your phone</span>
+        <strong id="live-url"></strong>
+        <span>Get Sean to Becky and get your name up here!</span>
+      </aside>
+      <p id="live-status" role="status">Loading the top list…</p>
+    </main>
+    <script type="module" src="/src/client/live.ts"></script>
+  </body>
+</html>

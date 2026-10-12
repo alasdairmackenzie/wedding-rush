@@ -8,5 +8,6 @@ export default defineConfig({
     command: 'npm run dev -- --port 5300',
     url: 'http://127.0.0.1:5300',
     reuseExistingServer: false,
+    env: { ADMIN_TOKEN: 'test-admin-token' },
   },
 });

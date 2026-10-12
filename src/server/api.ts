@@ -1,6 +1,8 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ENTRY_ID, validateSubmission } from '../shared/leaderboard.ts';
-import type { ScoreStore } from './store.ts';
+import { imageType, isFaceKind, MAX_FACE_BYTES } from '../shared/faces.ts';
+import { cleanName, ENTRY_ID, isRude, NAME_MAX, validateSubmission } from '../shared/leaderboard.ts';
+import { ADMIN_LIST_SIZE, type ScoreStore } from './store.ts';
 
 const MAX_BODY = 1024;
 const WINDOW_MS = 60_000;
@@ -19,26 +21,139 @@ function clientIp(req: IncomingMessage): string {
 
 class TooLarge extends Error {}
 
-function readBody(req: IncomingMessage): Promise<string> {
+function readBytes(req: IncomingMessage, limit: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => {
       size += chunk.length;
-      if (size <= MAX_BODY) chunks.push(chunk);
+      if (size <= limit) chunks.push(chunk);
     });
-    req.on('end', () => size > MAX_BODY ? reject(new TooLarge()) : resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('end', () => size > limit ? reject(new TooLarge()) : resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
 }
+const readBody = async (req: IncomingMessage): Promise<string> => (await readBytes(req, MAX_BODY)).toString('utf8');
 
-export function createApi(getStore: () => Promise<ScoreStore>) {
+const digest = (value: string): Buffer => createHash('sha256').update(value).digest();
+function authorised(req: IncomingMessage, token: string): boolean {
+  const header = req.headers.authorization ?? '';
+  const given = header.startsWith('Bearer ') ? header.slice(7) : '';
+  return given.length > 0 && timingSafeEqual(digest(given), digest(token));
+}
+
+function notAllowed(res: ServerResponse, allow: string): true {
+  res.setHeader('Allow', allow);
+  send(res, 405, { error: 'Method not allowed.' });
+  return true;
+}
+
+async function faces(req: IncomingMessage, res: ServerResponse, store: ScoreStore, path: string): Promise<boolean> {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return notAllowed(res, 'GET, HEAD');
+  if (path === '/api/faces') {
+    send(res, 200, { faces: await store.faces() });
+    return true;
+  }
+  const kind = path.slice('/api/faces/'.length);
+  const face = isFaceKind(kind) ? await store.face(kind) : undefined;
+  if (!face) {
+    send(res, 404, { error: 'No face uploaded.' });
+    return true;
+  }
+  res.writeHead(200, {
+    'Content-Type': face.mime,
+    'Content-Length': face.data.length,
+    'Cache-Control': 'no-cache',
+    'X-Content-Type-Options': 'nosniff',
+  });
+  res.end(req.method === 'HEAD' ? undefined : face.data);
+  return true;
+}
+
+async function admin(req: IncomingMessage, res: ServerResponse, store: ScoreStore, path: string, token?: string): Promise<boolean> {
+  if (!token) {
+    send(res, 503, { error: 'The admin page is switched off. Set ADMIN_TOKEN on the server to turn it on.' });
+    return true;
+  }
+  if (!authorised(req, token)) {
+    send(res, 401, { error: 'That admin password is not right.' });
+    return true;
+  }
+  const [, , , section, key = ''] = path.split('/');
+  if (section === 'check' && !key) {
+    send(res, 200, { ok: true });
+    return true;
+  }
+  if (section === 'scores' && !key) {
+    if (req.method !== 'GET') return notAllowed(res, 'GET');
+    send(res, 200, { scores: await store.top(ADMIN_LIST_SIZE) });
+    return true;
+  }
+  if (section === 'scores' && ENTRY_ID.test(key)) {
+    if (req.method === 'DELETE') {
+      const removed = await store.remove(key);
+      send(res, removed ? 200 : 404, removed ? { ok: true } : { error: 'That score has already gone.' });
+      return true;
+    }
+    if (req.method !== 'PATCH') return notAllowed(res, 'PATCH, DELETE');
+    let body: { name?: unknown };
+    try {
+      body = JSON.parse(await readBody(req)) as { name?: unknown };
+    } catch {
+      send(res, 400, { error: 'That request could not be read.' });
+      return true;
+    }
+    const name = cleanName(body?.name);
+    if (!name) {
+      send(res, 400, { error: `Names need 1 to ${NAME_MAX} letters, numbers or spaces.` });
+      return true;
+    }
+    if (isRude(name)) {
+      send(res, 400, { error: "Keep it clean, it's a wedding!" });
+      return true;
+    }
+    const renamed = await store.rename(key, name);
+    send(res, renamed ? 200 : 404, renamed ? { ok: true, name } : { error: 'That score has already gone.' });
+    return true;
+  }
+  if (section === 'faces' && isFaceKind(key)) {
+    if (req.method === 'DELETE') {
+      await store.removeFace(key);
+      send(res, 200, { ok: true });
+      return true;
+    }
+    if (req.method !== 'PUT') return notAllowed(res, 'PUT, DELETE');
+    let data: Buffer;
+    try {
+      data = await readBytes(req, MAX_FACE_BYTES);
+    } catch (error) {
+      send(res, error instanceof TooLarge ? 413 : 400, { error: error instanceof TooLarge ? 'That picture is too big.' : 'Upload failed.' });
+      return true;
+    }
+    const mime = imageType(data);
+    if (!mime) {
+      send(res, 415, { error: 'Upload a PNG, JPEG or WebP picture.' });
+      return true;
+    }
+    send(res, 200, { ok: true, version: await store.saveFace(key, mime, data) });
+    return true;
+  }
+  send(res, 404, { error: 'Not found.' });
+  return true;
+}
+
+export function createApi(getStore: () => Promise<ScoreStore>, options: { adminToken?: string } = {}) {
   const posts = new Map<string, number[]>();
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
     const url = new URL(req.url ?? '/', 'http://localhost');
-    if (url.pathname !== '/api/scores') return false;
+    const path = url.pathname;
+    const isFaces = path === '/api/faces' || path.startsWith('/api/faces/');
+    const isAdmin = path.startsWith('/api/admin/');
+    if (path !== '/api/scores' && !isFaces && !isAdmin) return false;
     try {
       const store = await getStore();
+      if (isFaces) return await faces(req, res, store, path);
+      if (isAdmin) return await admin(req, res, store, path, options.adminToken);
       if (req.method === 'GET') {
         const id = url.searchParams.get('you');
         const you = id && ENTRY_ID.test(id) ? await store.find(id) : undefined;
