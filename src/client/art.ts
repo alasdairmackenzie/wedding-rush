@@ -44,8 +44,9 @@ function person(scene: Phaser.Scene, kind: TemptationKind | 'groom' | 'bride'): 
     line(c, [38, 60, 32, 92]); line(c, [57, 60, 65, 92]);
     oval(c, 49, 33, 25, 29, '#ffffffaa');
   } else box(c, 29, 47, 36, 35, colours[kind]);
-  if (bride || kind === 'pingpong' || kind === 'deal') {
-    const headKey = `${kind}-head`;
+  const uploaded = scene.textures.exists(`${kind}-face`);
+  if (uploaded || bride || kind === 'pingpong' || kind === 'deal') {
+    const headKey = uploaded ? `${kind}-face` : `${kind}-head`;
     const head = scene.textures.get(headKey).getSourceImage();
     if (!(head instanceof HTMLImageElement)) throw new Error(`Head photo is not loaded: ${headKey}`);
     const height = 50, width = head.width / head.height * height;
@@ -87,8 +88,10 @@ function person(scene: Phaser.Scene, kind: TemptationKind | 'groom' | 'bride'): 
     line(c, [72, 78, 75, 62]); oval(c, 77, 57, 10, 13, '#e77379');
     oval(c, 87, 42, 4, 4, '#fff9e8');
   } else if (kind === 'hat') {
-    box(c, 27, 7, 37, 16, '#e9bf67');
-    oval(c, 46, 23, 28, 5, '#e9bf67');
+    if (!uploaded) {
+      box(c, 27, 7, 37, 16, '#e9bf67');
+      oval(c, 46, 23, 28, 5, '#e9bf67');
+    }
     oval(c, 77, 62, 10, 10, '#c1e9f0aa');
     line(c, [69, 70, 63, 82]);
   } else if (kind === 'pub') {
@@ -98,7 +101,7 @@ function person(scene: Phaser.Scene, kind: TemptationKind | 'groom' | 'bride'): 
   } else if (kind === 'karaoke') {
     line(c, [72, 71, 76, 52]); oval(c, 77, 49, 6, 8, '#69778c');
     c.fillStyle = INK; c.font = '22px serif'; c.fillText('♪', 80, 28);
-    box(c, 34, 25, 28, 7, '#352b3c');
+    if (!uploaded) box(c, 34, 25, 28, 7, '#352b3c');
   } else {
     c.fillStyle = '#f0ca81';
     c.beginPath(); c.moveTo(67, 55); c.lineTo(88, 55); c.lineTo(79, 85); c.closePath(); c.fill(); c.stroke();

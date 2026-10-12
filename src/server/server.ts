@@ -28,7 +28,7 @@ const types: Record<string, string> = {
 };
 const getStore = lazyStore(createStore);
 getStore().catch(error => console.error('Leaderboard store failed to start; will retry on the next request.', error));
-const api = createApi(getStore);
+const api = createApi(getStore, { adminToken: process.env.ADMIN_TOKEN || undefined });
 
 async function file(path: string): Promise<string | undefined> {
   try {
@@ -59,7 +59,10 @@ const server = createServer(async (req, res) => {
     res.writeHead(403).end();
     return;
   }
-  const found = await file(target) ?? (extname(pathname) ? undefined : await file(join(root, 'index.html')));
+  const clean = target.replace(/[\\/]+$/, '');
+  const page = async (): Promise<string | undefined> =>
+    extname(pathname) || clean === root ? undefined : file(`${clean}.html`);
+  const found = await file(target) ?? await page() ?? (extname(pathname) ? undefined : await file(join(root, 'index.html')));
   if (!found) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found');
     return;

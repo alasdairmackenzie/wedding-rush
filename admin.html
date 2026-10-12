@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Admin · WeddingRush featuring Sean and Becky</title>
+  </head>
+  <body class="admin">
+    <main>
+      <h1>Wedding<span>Rush</span> admin</h1>
+      <form id="login" class="panel">
+        <label for="token">Admin password</label>
+        <div class="row">
+          <input id="token" type="password" autocomplete="current-password" required />
+          <button type="submit">Sign in</button>
+        </div>
+        <p id="login-status" role="status"></p>
+      </form>
+      <div id="dashboard" hidden>
+        <p class="row links"><a href="/" target="_blank">Open the game ↗</a><a href="/live" target="_blank">Open the live screen ↗</a><button type="button" id="logout" class="link">Sign out</button></p>
+        <section class="panel" aria-labelledby="faces-title">
+          <h2 id="faces-title">Faces</h2>
+          <p class="hint">Pick a photo of a face. A cut-out PNG with a see-through background looks best; otherwise tick “Crop to a circle”. New faces show up the next time someone loads the game.</p>
+          <ul id="faces" class="faces"></ul>
+        </section>
+        <section class="panel" aria-labelledby="scores-title">
+          <h2 id="scores-title">Scores</h2>
+          <p id="scores-status" role="status"></p>
+          <table class="toplist">
+            <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Points</th><th scope="col">Squashed</th><th scope="col">Posted</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="scores"></tbody>
+          </table>
+        </section>
+      </div>
+    </main>
+    <script type="module" src="/src/client/admin.ts"></script>
+  </body>
+</html>

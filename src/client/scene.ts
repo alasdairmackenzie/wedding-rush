@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { isFaceKind } from '../shared/faces';
 import { beckyTexts, BRIDE, corks, daylightProgress, GROOM, hurdles, movers, moverStart, MOVER_TRIGGER, people, platforms,
   RING_VALUE, rings, Run, RUN_OBJECTIVE, runnerSpeed, SQUASH_BONUS, START, sweets, WORLD } from '../shared/level';
 import { drawCity, makeTextures } from './art';
@@ -68,6 +69,8 @@ export class WeddingScene extends Phaser.Scene {
 
   preload(): void {
     this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, (file: Phaser.Loader.File) => {
+      // Uploaded faces are optional; the drawn or bundled heads stand in if they fail.
+      if (file.key === 'faces' || file.key.endsWith('-face')) return;
       this.failedAssets = true;
       this.ui.error(`Could not load ${file.key}. Reload the page to try again.`);
     });
@@ -75,6 +78,12 @@ export class WeddingScene extends Phaser.Scene {
     this.load.image('bride-head', brideHeadUrl);
     this.load.image('pingpong-head', pingpongHeadUrl);
     this.load.image('deal-head', dealHeadUrl);
+    this.load.on('filecomplete-json-faces', (_key: string, _type: string, data: { faces?: Record<string, number> } | undefined) => {
+      for (const [kind, version] of Object.entries(data?.faces ?? {})) {
+        if (isFaceKind(kind)) this.load.image(`${kind}-face`, `/api/faces/${kind}?v=${version}`);
+      }
+    });
+    this.load.json('faces', '/api/faces');
   }
 
   create(): void {
