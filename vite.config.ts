@@ -1,9 +1,9 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { createApi, lazyStore } from './src/server/api.ts';
 import { memoryStore } from './src/server/store.ts';
 
-function leaderboard(): Plugin {
-  const api = createApi(lazyStore(async () => memoryStore()), { adminToken: process.env.ADMIN_TOKEN || undefined });
+function leaderboard(adminToken?: string): Plugin {
+  const api = createApi(lazyStore(async () => memoryStore()), { adminToken });
   const middleware = (req: Parameters<typeof api>[0], res: Parameters<typeof api>[1], next: () => void): void => {
     const page = req.url?.match(/^\/(live|admin)\/?(\?.*)?$/);
     if (page) req.url = `/${page[1]}.html${page[2] ?? ''}`;
@@ -16,8 +16,12 @@ function leaderboard(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [leaderboard()],
-  server: { port: 5200, strictPort: true },
-  build: { rolldownOptions: { input: { main: 'index.html', live: 'live.html', admin: 'admin.html' } } },
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const adminToken = process.env.ADMIN_TOKEN || env.ADMIN_TOKEN || undefined;
+  return {
+    plugins: [leaderboard(adminToken)],
+    server: { port: 5200, strictPort: true },
+    build: { rolldownOptions: { input: { main: 'index.html', live: 'live.html', admin: 'admin.html' } } },
+  };
 });
