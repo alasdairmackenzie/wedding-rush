@@ -16,6 +16,20 @@ npm run dev
 Open http://127.0.0.1:5200 and select **I'm coming!**
 The original game can continue running on port 5199.
 
+## Deploy to Railway
+
+Connect the GitHub repository and deploy the `main` branch with the repository
+root as the service's root directory. Commit the source, `package.json`,
+`package-lock.json` and Vite configuration, not just this README.
+
+Railpack detects this Vite app, runs `npm run build` and serves `dist/` with
+Caddy. Leave the start command unset; no `start.sh`, development server or
+custom Dockerfile is needed. Remove any `RAILPACK_NO_SPA` override. If static
+output detection is overridden, set `RAILPACK_SPA_OUTPUT_DIR=dist`.
+
+The build uses Node.js 24 or newer, as specified in `package.json`. Generate
+a public domain in Railway's service networking settings after deployment.
+
 ## How to play
 
 Sean automatically runs along a continuous city street towards Becky.
