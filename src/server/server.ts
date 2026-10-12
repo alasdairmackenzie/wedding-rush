@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { createApi, lazyStore } from './api.ts';
 import { createStore } from './store.ts';
 
+try { process.loadEnvFile(); } catch {}
+
 const root = resolve(fileURLToPath(new URL('../../dist', import.meta.url)));
 const port = Number(process.env.PORT) || 3000;
 const types: Record<string, string> = {
