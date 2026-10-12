@@ -25,7 +25,20 @@ npm start
 ```
 
 Open http://127.0.0.1:3000. Without `DATABASE_URL` the leaderboard is kept in
-memory and resets when the server restarts.
+memory and resets when the server restarts. To use the admin page locally, set
+a password when you start the server, for example
+`ADMIN_TOKEN=yourpassword npm run dev` or `ADMIN_TOKEN=yourpassword npm start`.
+
+## Live screen and admin
+
+- `/live` is a display-only top list for a TV or projector at the venue. It
+  shows the address to play at, has no buttons and refreshes every 15 seconds.
+  Add `?url=seanandbeckywedding.run` to override the address it shows.
+- `/admin` lets you upload faces for Becky and the mates, and rename or delete
+  scores. Sign in with the `ADMIN_TOKEN` password; without it the admin page is
+  turned off. Cut-out PNGs with a see-through background look best; otherwise
+  tick **Crop to a circle**. Faces are stored with the scores (in Postgres on
+  Railway) and appear the next time someone loads the game.
 
 ## Deploy to Railway
 
@@ -40,6 +53,7 @@ project and set the game service variable
 `DATABASE_URL=${{Postgres.DATABASE_URL}}`. The scores table is created
 automatically on first use. Node.js 24 or newer is required, as specified in
 `package.json`. Generate a public domain in the service networking settings.
+Set `ADMIN_TOKEN` to a long, unguessable password to turn on `/admin`.
 
 ## How to play
 
@@ -142,7 +156,10 @@ and floating-text movement, and makes squashes immediate.
 - `src/client/main.ts`: lifecycle, dialogs, HUD, Becky's texts, best score,
   leaderboard and top-list sharing.
 - `src/shared/leaderboard.ts`: score validation, name filter and top-list links.
-- `src/server/`: Node server, leaderboard API and Postgres/in-memory stores.
+- `src/shared/faces.ts`: characters that can have uploaded faces, and image checks.
+- `src/client/live.ts`, `src/client/admin.ts`: the `/live` screen and `/admin` page.
+- `src/server/`: Node server, leaderboard, faces and admin API, and
+  Postgres/in-memory stores.
 
 Instructions, status, progress and buttons are HTML outside the Phaser canvas.
 Large, screen-fixed event callouts celebrate sweets, squashes, cleared hurdles
