@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BRIDE, daylightProgress, GROOM, hurdles, people, platforms, Run, runnerSpeed, START, sweets,
-  temptations, TOTAL_SCORE, WORLD } from './level';
+import { beckyTexts, BRIDE, corks, daylightProgress, GROOM, hurdles, MAX_SCORE, movers, moverStart, MOVER_TRIGGER, people,
+  platforms, rings, RING_VALUE, Run, runnerSpeed, runTitle, START, sweets, temptations, TOTAL_SCORE, WORLD } from './level';
 
 function playing(): Run { const run = new Run(); run.phase = 'playing'; return run; }
 
@@ -154,9 +154,12 @@ describe('independent people', () => {
       expect(run.squashPerson(id)).toBe(true);
       expect(run.squashPerson(id)).toBe(false);
       expect(run.bonusScore).toBe((id + 1) * 5);
-      expect(run.score).toBe(3 + (id + 1) * 5);
+      expect(run.score).toBe(3 + (id + 1) * 5 + run.comboScore);
     });
     expect(run.sweetScore).toBe(3);
+    // Squashes 4-6 land at ×2 (+5 each) and the seventh at ×3 (+10).
+    expect(run.comboScore).toBe(25);
+    expect(run.score).toBe(63);
     const fresh = new Run();
     expect(fresh.bonusScore).toBe(0);
     expect(fresh.score).toBe(0);
@@ -185,5 +188,101 @@ describe('independent people', () => {
       expect(run.hitPerson(0)).toBe(false);
       expect(run.squashPerson(0)).toBe(false);
     }
+  });
+});
+
+describe('moving obstacles, corks and rings', () => {
+  it('gives every barrel and pigeon its own landing room', () => {
+    const airTime = 2 * GROOM.jump / GROOM.gravity;
+    const beats = [...hurdles.map(h => h.x), ...people.map(p => p.x), ...movers.map(m => m.x)].sort((a, b) => a - b);
+    for (let i = 1; i < beats.length; i++) expect(beats[i] - beats[i - 1]).toBeGreaterThan(airTime * GROOM.maxSpeed + 100);
+    expect(new Set(movers.map(m => m.kind))).toEqual(new Set(['barrel', 'pigeon']));
+    for (const mover of movers) {
+      expect(moverStart(mover)).toBeGreaterThan(mover.x);
+      expect(moverStart(mover) - mover.x).toBeLessThan(MOVER_TRIGGER);
+    }
+  });
+  it('puts pigeons at standing head height but above a ducking Sean', () => {
+    const standingTop = 610 - GROOM.height;
+    const duckingTop = 610 - GROOM.height / 2;
+    for (const pigeon of movers.filter(m => m.kind === 'pigeon')) {
+      expect(pigeon.y + pigeon.height / 2).toBeGreaterThan(standingTop);
+      expect(pigeon.y + pigeon.height / 2).toBeLessThan(duckingTop);
+    }
+  });
+  it('keeps rings above a normal jump but within a champagne cork launch', () => {
+    const normalTop = 610 - GROOM.height - GROOM.jump ** 2 / (2 * GROOM.gravity);
+    const doubleTop = normalTop - (GROOM.jump * .85) ** 2 / (2 * GROOM.gravity);
+    const corkTop = 610 - GROOM.height - (GROOM.jump * 1.5) ** 2 / (2 * GROOM.gravity);
+    expect(rings).toHaveLength(corks.length);
+    for (const ring of rings) {
+      expect(ring.y + 16).toBeLessThan(doubleTop);
+      expect(ring.y + 16).toBeGreaterThan(corkTop);
+    }
+  });
+  it('dodges or hits each mover once', () => {
+    const run = playing();
+    expect(run.dodgeMover(0)).toBe(true);
+    expect(run.dodgeMover(0)).toBe(false);
+    expect(run.hitMover(0)).toBe(false);
+    expect(run.hitMover(1)).toBe(true);
+    expect(run.hitMover(1)).toBe(false);
+    expect(run.lives).toBe(2);
+    for (const id of [-1, .5, movers.length]) expect(run.dodgeMover(id)).toBe(false);
+  });
+});
+
+describe('combo, rings and titles', () => {
+  it('builds a capped multiplier from clears, squashes and dodges and resets on a hit', () => {
+    const run = playing();
+    expect(run.multiplier).toBe(1);
+    run.clearHurdle(0); run.squashPerson(0); run.dodgeMover(0);
+    expect(run.multiplier).toBe(2);
+    run.collect(5);
+    expect(run.sweetScore).toBe(6);
+    expect(run.comboScore).toBe(6);
+    expect(run.score).toBe(5 + 6 + 6);
+    run.clearHurdle(1); run.clearHurdle(2); run.clearHurdle(3);
+    expect(run.multiplier).toBe(3);
+    run.clearHurdle(4); run.clearHurdle(5); run.clearHurdle(6);
+    expect(run.multiplier).toBe(3);
+    expect(run.bestStreak).toBe(9);
+    run.hitPerson(1);
+    expect(run.streak).toBe(0);
+    expect(run.multiplier).toBe(1);
+    expect(run.bestStreak).toBe(9);
+  });
+  it('scores each spinning ring once and remembers corks', () => {
+    const run = playing();
+    expect(run.collectRing(0)).toBe(true);
+    expect(run.collectRing(0)).toBe(false);
+    expect(run.ringScore).toBe(RING_VALUE);
+    expect(run.score).toBe(RING_VALUE);
+    expect(run.popCork(0)).toBe(true);
+    expect(run.popCork(0)).toBe(false);
+    expect(run.collectRing(rings.length)).toBe(false);
+  });
+  it('caps the maximum possible score for the leaderboard', () => {
+    const run = playing();
+    for (let id = 0; id < hurdles.length; id++) run.clearHurdle(id);
+    for (let id = 0; id < movers.length; id++) run.dodgeMover(id);
+    people.forEach((_p, id) => run.squashPerson(id));
+    rings.forEach((_r, id) => run.collectRing(id));
+    sweets.forEach((_s, id) => run.collect(id));
+    expect(run.score).toBeLessThanOrEqual(MAX_SCORE);
+  });
+  it('names the result after the most memorable thing that happened', () => {
+    const run = playing();
+    expect(runTitle(run)).toBe('Still at the pub');
+    people.forEach((_p, id) => run.squashPerson(id));
+    expect(runTitle(run)).toBe(`Squashed all ${people.length} mates`);
+    const clean = playing();
+    clean.finish();
+    expect(runTitle(clean)).toBe('Flawless groom');
+  });
+  it('sends Becky texts in route order', () => {
+    const points = beckyTexts.map(text => text.at);
+    expect(points).toEqual([...points].sort((a, b) => a - b));
+    expect(points.every(at => at > 0 && at < 1)).toBe(true);
   });
 });

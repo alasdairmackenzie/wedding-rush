@@ -2,7 +2,8 @@
 
 A side-scrolling hurdle runner built with TypeScript, Vite, Phaser 3 / Arcade
 Physics, Vitest and Playwright. This copy is independent of the original
-Wedding Rush platformer. No backend or external artwork/voice service is needed.
+Wedding Rush platformer. A small Node server serves the game and a guest
+leaderboard stored in Postgres.
 
 ## Play locally
 
@@ -16,19 +17,29 @@ npm run dev
 Open http://127.0.0.1:5200 and select **I'm coming!**
 The original game can continue running on port 5199.
 
+To try the production build and leaderboard locally:
+
+```sh
+npm run build
+npm start
+```
+
+Open http://127.0.0.1:3000. Without `DATABASE_URL` the leaderboard is kept in
+memory and resets when the server restarts.
+
 ## Deploy to Railway
 
 Connect the GitHub repository and deploy the `main` branch with the repository
-root as the service's root directory. Commit the source, `package.json`,
-`package-lock.json` and Vite configuration, not just this README.
+root as the service's root directory. Railway runs `npm run build`, then
+`npm start` (`node src/server/server.ts`), which serves `dist/`, the `/top`
+top-list page and the `/api/scores` leaderboard API on Railway's `PORT`.
+Remove any old `RAILPACK_SPA_OUTPUT_DIR` or static-site overrides.
 
-Railpack detects this Vite app, runs `npm run build` and serves `dist/` with
-Caddy. Leave the start command unset; no `start.sh`, development server or
-custom Dockerfile is needed. Remove any `RAILPACK_NO_SPA` override. If static
-output detection is overridden, set `RAILPACK_SPA_OUTPUT_DIR=dist`.
-
-The build uses Node.js 24 or newer, as specified in `package.json`. Generate
-a public domain in Railway's service networking settings after deployment.
+For a leaderboard that survives restarts, add a **Postgres** database to the
+project and set the game service variable
+`DATABASE_URL=${{Postgres.DATABASE_URL}}`. The scores table is created
+automatically on first use. Node.js 24 or newer is required, as specified in
+`package.json`. Generate a public domain in the service networking settings.
 
 ## How to play
 
@@ -68,6 +79,21 @@ character's line waits until the intro finishes. Later encounter spacing stays u
   hurdles and points. A clean run takes roughly 27 seconds.
   Sean and Becky meet with floating hearts, then the victory result appears
   after 3.2 seconds. Reduced motion uses a static reunion and hearts.
+- **Double jump**: press again in the air for a second, higher jump.
+- **Duck**: hold Down / S (or the mobile duck button) to slide under swooping pigeons.
+  Hop over rolling beer barrels.
+- **Champagne corks** launch a super jump up to **spinning wedding rings**
+  worth 25 points each.
+- **Combo multiplier**: clears, squashes and dodges build a capped multiplier;
+  any hit resets it.
+- **Becky's texts** pop up during the run and get more frantic near the end.
+- Squashes throw confetti and shake the screen (not with reduced motion), and
+  hits vibrate supporting phones.
+- Your **best score** and name are remembered on this device.
+- After a run, post your name and score to the guest **leaderboard**. Names are
+  checked for rude words and posting is rate-limited. **Share my place on the
+  top list** shares (or copies) a `/top?you=<id>` link that opens the top 10
+  with your row highlighted, plus your rank if you are outside the top 10.
 - Replay resets the route, chances, hurdle and person states, lighting and score.
   The sound preference is preserved.
 
@@ -105,7 +131,10 @@ and floating-text movement, and makes squashes immediate.
 - `src/client/art.ts`: original procedural characters and tiled city artwork.
 - `src/client/input.ts`: focus-scoped keyboard, game taps and jump button input.
 - `src/client/audio.ts`: local sound effects and bundled voice playback.
-- `src/client/main.ts`: lifecycle, dialogs, HUD and accessibility text.
+- `src/client/main.ts`: lifecycle, dialogs, HUD, Becky's texts, best score,
+  leaderboard and top-list sharing.
+- `src/shared/leaderboard.ts`: score validation, name filter and top-list links.
+- `src/server/`: Node server, leaderboard API and Postgres/in-memory stores.
 
 Instructions, status, progress and buttons are HTML outside the Phaser canvas.
 Large, screen-fixed event callouts celebrate sweets, squashes, cleared hurdles
@@ -124,4 +153,3 @@ npm run test:e2e
 If Chromium is missing: `npx playwright install chromium`.
 The browser tests run their own server on port 5300 and cover a complete
 seven-hurdle run using real keyboard jumps. Production output is in `dist/`.
-# wedding-rush

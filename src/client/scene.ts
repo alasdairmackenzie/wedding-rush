@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { BRIDE, daylightProgress, GROOM, hurdles, people, platforms, Run, RUN_OBJECTIVE, runnerSpeed, SQUASH_BONUS, START,
-  sweets, WORLD } from '../shared/level';
+import { beckyTexts, BRIDE, corks, daylightProgress, GROOM, hurdles, movers, moverStart, MOVER_TRIGGER, people, platforms,
+  RING_VALUE, rings, Run, RUN_OBJECTIVE, runnerSpeed, SQUASH_BONUS, START, sweets, WORLD } from '../shared/level';
 import { drawCity, makeTextures } from './art';
 import { RunnerInput } from './input';
 import { GameAudio } from './audio';
@@ -19,12 +19,18 @@ interface Person {
   bubble: Phaser.GameObjects.Text;
   nearby: boolean;
 }
+interface Mover {
+  art: Phaser.GameObjects.Image;
+  x: number;
+  active: boolean;
+}
 export interface GameUI {
   arena: HTMLElement;
   touch: HTMLElement;
   audio: GameAudio;
   update(run: Run, x: number): void;
   notice(message: string): void;
+  text(message: string): void;
   end(run: Run): void;
   ready(scene: WeddingScene): void;
   error(message: string): void;
@@ -44,6 +50,14 @@ export class WeddingScene extends Phaser.Scene {
   private readonly characters: Person[] = [];
   private lightCity!: (daylight: number) => void;
   private eventOverlay?: Phaser.GameObjects.Text;
+  private readonly moving: Mover[] = [];
+  private readonly ringArt: Phaser.GameObjects.Image[] = [];
+  private readonly corkArt: Phaser.GameObjects.Image[] = [];
+  private playerScale = 1;
+  private ducking = false;
+  private doubleJumped = false;
+  private textsSent = 0;
+  private lastMultiplier = 1;
   private invulnerableUntil = 0;
   private groundedAt = -1000;
   private jumpUntil = -1000;
@@ -83,7 +97,8 @@ export class WeddingScene extends Phaser.Scene {
     this.player.setSize(GROOM.width, GROOM.height).setOffset(31, 40);
     this.playerArt = this.add.image(START.x, START.y + 40, 'groom-photo').setOrigin(.5, 1).setDepth(5);
     const photo = this.textures.get('groom-photo').getSourceImage();
-    this.playerArt.setScale(Math.min(90 / photo.width, 120 / photo.height));
+    this.playerScale = Math.min(90 / photo.width, 120 / photo.height);
+    this.playerArt.setScale(this.playerScale);
     this.physics.add.collider(this.player, ground);
     this.pickups = this.physics.add.staticGroup();
     sweets.forEach((sweet, id) => {
@@ -135,6 +150,19 @@ export class WeddingScene extends Phaser.Scene {
       }).setOrigin(.5, 1).setDepth(10).setVisible(false);
       this.characters.push({ body, art, bubble, nearby: false });
       this.physics.add.overlap(this.player, body, () => this.contactPerson(id));
+    });
+    movers.forEach((definition, id) => {
+      const art = this.add.image(moverStart(definition), definition.y, definition.kind)
+        .setDepth(6).setName(`${definition.kind}-${id}`);
+      this.moving.push({ art, x: moverStart(definition), active: false });
+    });
+    corks.forEach((cork, id) => {
+      this.corkArt.push(this.add.image(cork.x, cork.y, 'champagne').setDepth(5).setName(`champagne-${id}`));
+    });
+    rings.forEach((ring, id) => {
+      const art = this.add.image(ring.x, ring.y, 'ring').setDepth(5).setName(`ring-${id}`);
+      this.ringArt.push(art);
+      if (!this.reducedMotion.matches) this.tweens.add({ targets: art, scaleX: .15, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     });
     this.brideArt = this.add.image(BRIDE.x, 610, 'bride').setOrigin(.5, 102 / 112).setScale(1.3).setDepth(4).setName('bride');
     this.add.text(BRIDE.x, 390, 'THE WEDDING / THIS WAY', {
@@ -224,6 +252,17 @@ export class WeddingScene extends Phaser.Scene {
         character.bubble.setVisible(false);
         if (character.body.body instanceof Phaser.Physics.Arcade.StaticBody) character.body.body.enable = true;
       });
+      this.moving.forEach((mover, id) => {
+        mover.x = moverStart(movers[id]);
+        mover.active = false;
+        mover.art.setPosition(mover.x, movers[id].y).setAlpha(1).setAngle(0);
+      });
+      this.corkArt.forEach(art => art.setVisible(true));
+      this.ringArt.forEach(art => art.setVisible(true));
+      this.textsSent = 0;
+      this.lastMultiplier = 1;
+      this.cameras.main.resetFX();
+      this.setDucking(false);
       this.player.body?.reset(START.x, START.y);
       this.lightCity(0);
       this.invulnerableUntil = 0;
@@ -231,6 +270,7 @@ export class WeddingScene extends Phaser.Scene {
     if (newRun) {
       this.player.setVelocity(0);
       this.groundedAt = this.jumpUntil = -1000;
+      this.doubleJumped = false;
     }
     this.run.phase = 'playing';
     this.physics.resume();
@@ -263,15 +303,54 @@ export class WeddingScene extends Phaser.Scene {
       onComplete: () => { this.effects.remove(label); label.destroy(); },
     });
   }
+  private buzz(pattern: number | number[]): void {
+    if ('vibrate' in navigator) navigator.vibrate(pattern);
+  }
+  private confetti(x: number, y: number): void {
+    if (this.reducedMotion.matches) return;
+    const colours = [0xe9799b, 0xffd98a, 0x91cbbb, 0x9ec4eb, 0xb9a1e3, 0xfff8e8];
+    for (let id = 0; id < 22; id++) {
+      const piece = this.add.rectangle(x, y, 8, 12, colours[id % colours.length]).setDepth(12).setName('confetti');
+      this.effects.add(piece);
+      const angle = -Math.PI / 2 + (id / 21 - .5) * 2.4;
+      const distance = 70 + id % 4 * 30;
+      this.tweens.add({
+        targets: piece, x: x + Math.cos(angle) * distance, y: y + Math.sin(angle) * distance + 70,
+        angle: 360 + id * 25, alpha: 0, duration: 900 + id % 5 * 80, ease: 'Quad.easeOut',
+        onComplete: () => { this.effects.remove(piece); piece.destroy(); },
+      });
+    }
+  }
+  private setDucking(ducking: boolean): void {
+    if (this.ducking === ducking || !this.player) return;
+    this.ducking = ducking;
+    if (ducking) this.player.setSize(GROOM.width, GROOM.height / 2).setOffset(31, 40 + GROOM.height / 2);
+    else this.player.setSize(GROOM.width, GROOM.height).setOffset(31, 40);
+  }
+  private comboCheck(): void {
+    const multiplier = this.run.multiplier;
+    if (multiplier > this.lastMultiplier) {
+      this.announceEvent(`COMBO ×${multiplier}!`, `${this.run.streak} IN A ROW`, '#7b4bb3');
+      this.ui.audio.tone('sweet');
+    } else if (multiplier < this.lastMultiplier) {
+      this.floatText(this.player.x, this.player.y - 85, 'COMBO LOST', '#b52f44');
+    }
+    this.lastMultiplier = multiplier;
+  }
+  private bump(title: string, message: string): void {
+    this.invulnerableUntil = this.run.elapsed + 900;
+    this.ui.audio.effect('splat');
+    this.buzz(120);
+    this.floatText(this.player.x, this.player.y - 55, '-1 chance!', '#b52f44');
+    this.announceEvent(title, '-1 CHANCE', '#b52f44');
+    this.ui.notice(message);
+    this.comboCheck();
+    if (this.run.lives === 0) this.end();
+  }
   private contact(id: number): void {
     if (this.run.hitHurdle(id)) {
-      this.invulnerableUntil = this.run.elapsed + 900;
       this.obstacles[id].rail.setAlpha(.35);
-      this.ui.audio.effect('splat');
-      this.floatText(this.player.x, this.player.y - 55, '-1 chance!', '#b52f44');
-      this.announceEvent('OUCH!', '-1 CHANCE', '#b52f44');
-      this.ui.notice('Hurdle hit! One chance lost. Jump the next hurdle!');
-      if (this.run.lives === 0) this.end();
+      this.bump('OUCH!', 'Hurdle hit! One chance lost. Jump the next hurdle!');
     }
   }
   private contactPerson(id: number): void {
@@ -290,20 +369,20 @@ export class WeddingScene extends Phaser.Scene {
       else this.tweens.add({ targets: character.art, scaleX: 1.4, scaleY: .25, duration: 160, ease: 'Sine.easeOut' });
       this.player.setVelocityY(-GROOM.jump * .65);
       this.groundedAt = this.jumpUntil = -1000;
+      this.doubleJumped = false;
       this.ui.audio.effect('splat');
+      this.buzz(40);
+      this.confetti(character.art.x, 540);
+      if (!this.reducedMotion.matches) this.cameras.main.shake(180, .008);
       this.floatText(character.art.x, 490, `+${SQUASH_BONUS}`, '#42735a');
       this.announceEvent('SQUASH!', `+${SQUASH_BONUS} BONUS POINTS`, '#42735a');
+      this.comboCheck();
       this.ui.notice(`${people[id].temptation.name} squashed! +${SQUASH_BONUS} bonus points. No chance or time lost.`);
     } else if (this.run.hitPerson(id)) {
       target.enable = false;
       character.art.setAlpha(.5);
       character.bubble.setVisible(false);
-      this.invulnerableUntil = this.run.elapsed + 900;
-      this.ui.audio.effect('splat');
-      this.floatText(this.player.x, this.player.y - 55, '-1 chance!', '#b52f44');
-      this.announceEvent('DISTRACTED!', '-1 CHANCE', '#b52f44');
-      this.ui.notice(`Distracted by ${people[id].temptation.name.toLowerCase()}! One chance lost. Land on their head or jump over them!`);
-      if (this.run.lives === 0) this.end();
+      this.bump('DISTRACTED!', `Distracted by ${people[id].temptation.name.toLowerCase()}! One chance lost. Land on their head or jump over them!`);
     }
     this.syncUI();
   }
@@ -362,6 +441,10 @@ export class WeddingScene extends Phaser.Scene {
     this.ui.arena.dataset.y = this.player.y.toFixed(1);
     this.ui.arena.dataset.grounded = String(this.player.body?.blocked.down ?? false);
     this.ui.arena.dataset.squashed = String(this.run.squashed.size);
+    this.ui.arena.dataset.rings = String(this.run.rings.size);
+    this.ui.arena.dataset.dodged = String(this.run.dodged.size);
+    this.ui.arena.dataset.combo = String(this.run.multiplier);
+    this.ui.arena.dataset.ducking = String(this.ducking);
     this.ui.arena.dataset.daylight = (this.run.phase === 'won' ? 1 : daylightProgress(this.player.x)).toFixed(3);
     this.ui.update(this.run, this.player.x);
   }
@@ -372,14 +455,33 @@ export class WeddingScene extends Phaser.Scene {
       const body = this.player.body;
       if (!(body instanceof Phaser.Physics.Arcade.Body)) throw new Error('Sean physics body missing.');
       const input = this.controls.read();
-      if (body.blocked.down) this.groundedAt = this.run.elapsed;
-      if (input.jump) this.jumpUntil = this.run.elapsed + 120;
+      if (body.blocked.down) {
+        this.groundedAt = this.run.elapsed;
+        this.doubleJumped = false;
+      }
+      this.setDucking(input.duck);
+      if (input.duck && !body.blocked.down && body.velocity.y < 750) this.player.setVelocityY(body.velocity.y + 45);
+      if (input.jump) {
+        const canGroundJump = this.run.elapsed - this.groundedAt <= 100;
+        const landingSoon = body.velocity.y > 0 && body.bottom > 560;
+        if (!canGroundJump && !landingSoon && !this.doubleJumped) {
+          this.doubleJumped = true;
+          this.setDucking(false);
+          this.player.setVelocityY(-GROOM.jump * .85);
+          this.ui.audio.tone('jump');
+          this.floatText(this.player.x, this.player.y - 70, 'DOUBLE JUMP!', '#2d6c9c');
+        } else {
+          this.jumpUntil = this.run.elapsed + 120;
+        }
+      }
       this.player.setVelocityX(runnerSpeed(this.player.x));
       if (this.jumpUntil >= this.run.elapsed && this.run.elapsed - this.groundedAt <= 100) {
+        this.setDucking(false);
         this.player.setVelocityY(-GROOM.jump);
         this.jumpUntil = this.groundedAt = -1000;
         this.ui.audio.tone('jump');
       }
+      this.updateExtras(delta, body);
       this.player.x = Phaser.Math.Clamp(this.player.x, GROOM.width / 2, WORLD.width - GROOM.width / 2);
       this.lightCity(daylightProgress(this.player.x));
       this.obstacles.forEach((_obstacle, id) => {
@@ -389,6 +491,7 @@ export class WeddingScene extends Phaser.Scene {
           this.floatText(definition.x, 485, 'NOT TODAY!', '#42735a');
           this.announceEvent('CLEARED!', `${this.run.cleared.size} / ${hurdles.length} HURDLES`, '#42735a');
           this.ui.notice(`Hurdle cleared! ${this.run.cleared.size} / ${hurdles.length} hurdles cleared.`);
+          this.comboCheck();
         }
       });
       this.characters.forEach((character, id) => {
@@ -408,6 +511,67 @@ export class WeddingScene extends Phaser.Scene {
     const bob = !this.reducedMotion.matches && this.run.phase === 'playing' && this.player.body?.blocked.down
       ? Math.sin(this.run.elapsed / 65) * 2 : 0;
     this.playerArt.setPosition(this.player.x, this.player.y + 40 + bob);
+    this.playerArt.setScale(this.playerScale, this.playerScale * (this.ducking ? .55 : 1));
     this.playerArt.setAlpha(this.run.elapsed < this.invulnerableUntil ? .5 : 1);
+  }
+  private updateExtras(delta: number, body: Phaser.Physics.Arcade.Body): void {
+    const overlaps = (x: number, y: number, width: number, height: number): boolean =>
+      body.right > x - width / 2 && body.left < x + width / 2 && body.bottom > y - height / 2 && body.top < y + height / 2;
+    this.moving.forEach((mover, id) => {
+      const definition = movers[id];
+      if (!mover.active && moverStart(definition) - this.player.x <= MOVER_TRIGGER) {
+        mover.active = true;
+        if (definition.kind === 'pigeon') {
+          this.announceEvent('PIGEON!', 'DUCK! ↓', '#2d6c9c');
+          this.ui.notice('A pigeon is swooping at head height. Hold DUCK, S or the down arrow!');
+        } else {
+          this.announceEvent('BARREL!', 'JUMP IT!', '#a8693c');
+          this.ui.notice('A beer barrel is rolling your way. Jump it!');
+        }
+      }
+      if (mover.active) mover.x -= definition.speed * delta / 1000;
+      const flap = definition.kind === 'pigeon' && !this.reducedMotion.matches ? Math.sin(this.run.elapsed / 90) * 4 : 0;
+      mover.art.setPosition(mover.x, definition.y + flap);
+      if (definition.kind === 'barrel' && mover.active && !this.reducedMotion.matches) {
+        mover.art.angle -= definition.speed * delta / 1000 / (definition.width / 2) * 180 / Math.PI;
+      }
+      if (this.run.hitMovers.has(id) || this.run.dodged.has(id)) return;
+      if (overlaps(mover.x, definition.y, definition.width, definition.height)) {
+        if (this.run.hitMover(id)) {
+          mover.art.setAlpha(.4);
+          this.bump(definition.kind === 'pigeon' ? 'PIGEONED!' : 'BARRELLED!',
+            definition.kind === 'pigeon' ? 'Hit by a pigeon! Duck next time.' : 'Flattened by a beer barrel! Jump it next time.');
+        }
+      } else if (body.left > mover.x + definition.width / 2 && this.run.dodgeMover(id)) {
+        this.ui.audio.tone('sweet');
+        this.announceEvent(definition.kind === 'pigeon' ? 'DUCKED!' : 'DODGED!', 'NICE MOVES', '#42735a');
+        this.comboCheck();
+      }
+    });
+    corks.forEach((cork, id) => {
+      if (this.run.corks.has(id) || !overlaps(cork.x, cork.y, 28, 60)) return;
+      this.run.popCork(id);
+      this.corkArt[id].setVisible(false);
+      this.setDucking(false);
+      this.player.setVelocityY(-GROOM.jump * 1.5);
+      this.groundedAt = this.jumpUntil = -1000;
+      this.doubleJumped = false;
+      this.ui.audio.tone('jump');
+      this.confetti(cork.x, cork.y - 30);
+      this.announceEvent('POP!', 'CHAMPAGNE SUPER JUMP', '#c9952a');
+      this.ui.notice('Champagne cork! Grab the spinning ring up high.');
+    });
+    rings.forEach((ring, id) => {
+      if (this.run.rings.has(id) || !overlaps(ring.x, ring.y, 34, 34)) return;
+      this.run.collectRing(id);
+      this.ringArt[id].setVisible(false);
+      this.ui.audio.tone('sweet');
+      this.floatText(ring.x, ring.y - 30, `+${RING_VALUE * this.run.multiplier}`, '#c9952a');
+      this.announceEvent('RING!', `+${RING_VALUE * this.run.multiplier} POINTS`, '#c9952a');
+    });
+    const progress = (this.player.x - START.x) / (BRIDE.x - START.x);
+    while (this.textsSent < beckyTexts.length && progress >= beckyTexts[this.textsSent].at) {
+      this.ui.text(beckyTexts[this.textsSent++].text);
+    }
   }
 }

@@ -19,23 +19,26 @@
           <div><span class="label">HURDLES CLEARED</span><strong id="cleared">0 / 7</strong></div>
           <div class="cash"><span class="label">POINTS</span><strong id="score">0 points</strong></div>
           <div><span class="label">CHANCES</span><strong id="lives">3 / 3</strong></div>
+          <div class="combo"><span class="label">COMBO</span><strong id="combo">×1</strong></div>
           <div class="speed"><span class="label">RUN SPEED</span><strong id="speed">300</strong></div>
           <div class="route"><label for="route">BECKY</label><progress id="route" value="0" max="100"></progress></div>
         </div>
         <div id="game" tabindex="0" role="region" aria-label="Sean's wedding hurdle runner. Tap to jump." aria-describedby="controls objective"></div>
+        <div id="becky-text" class="becky-text" aria-live="polite" hidden><span class="from">BECKY 💍</span><span id="becky-message"></span></div>
         <p id="notice" role="status">The cake is ready. Becky is ready. Sean is absolutely not ready.</p>
         <div class="touch-controls" aria-label="Touch controls">
           <span>HE RUNS. YOU JUMP.</span>
+          <button type="button" data-control="duck" aria-label="Duck">DUCK ↓</button>
           <button type="button" data-control="jump" aria-label="Jump">JUMP ↗</button>
         </div>
       </section>
-      <footer><span>JUMP THE HURDLES. IGNORE THE LADS. MAKE THE WEDDING.</span><span>SPACE OR TAP TO JUMP.</span></footer>
+      <footer><span>JUMP THE HURDLES. IGNORE THE LADS. MAKE THE WEDDING.</span><span>SPACE OR TAP TO JUMP. ↓ TO DUCK.</span></footer>
       <dialog id="menu" aria-labelledby="menu-title">
         <span class="stamp">YOU HAD ONE JOB / BE ON TIME</span>
         <h1 id="menu-title">Wedding<span>Rush</span><small>featuring Sean and Becky</small></h1>
         <p class="intro">Becky is waiting for Sean.<br />Unfortunately, so are his mates.</p>
-        <p id="objective">Sean runs. You jump. Get Sean to Becky by clearing seven hurdles through a city that brightens from night to day. Each mate appears once, separately from the hurdles. The pace picks up as the altar gets closer. Collect dice sweets along the way for extra points.</p>
-        <p id="controls"><kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd> jump · <kbd>Esc</kbd> pause<br />Tap the game or the JUMP button on mobile. One press, one full jump. Jump the hurdles. Jump over your mates or land on their heads to squash them and bounce for 5 bonus points! Hurdle hits and side hits on mates cost a chance; squashing is harmless. Three hits end your run.</p>
+        <p id="objective">Sean runs. You jump. Get Sean to Becky by clearing seven hurdles through a city that brightens from night to day.</p>
+        <p id="controls"><kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd> jump · <kbd>S</kbd> / <kbd>↓</kbd> duck · <kbd>Esc</kbd> pause<br />Tap the game or the JUMP button on mobile, and hold DUCK to duck. One press, one full jump; press again in the air to double jump. Jump the rolling beer barrels and duck the swooping pigeons. Run into a champagne bottle for a super jump to grab the spinning wedding rings. Clear things in a row to build a combo of up to ×3. Jump the hurdles. Jump over your mates or land on their heads to squash them and bounce for 5 bonus points! Hurdle hits and side hits on mates cost a chance; squashing is harmless. Three hits end your run.</p>
         <button id="play" class="primary" type="button" autofocus>I'm coming! ↗</button>
         <button id="restart" type="button" hidden>Start a fresh run</button>
         <button id="sound-toggle" type="button" aria-pressed="false">Sound: on</button>
@@ -43,9 +46,39 @@
       <dialog id="result" aria-labelledby="result-title">
         <span class="stamp" id="result-kicker">THE BIG DAY</span>
         <h2 id="result-title">You made it!</h2>
+        <p id="result-badge" class="badge"></p>
         <p id="result-detail"></p>
+        <p id="result-best" class="best"></p>
         <button id="again" type="button" class="primary" autofocus>One more big day ↗</button>
+        <section class="leaderboard" aria-labelledby="leaderboard-title">
+          <h3 id="leaderboard-title">Wedding guest top list</h3>
+          <form id="score-form">
+            <label for="player-name">Your name</label>
+            <div class="score-row">
+              <input id="player-name" name="name" maxlength="16" autocomplete="nickname" required />
+              <button id="submit-score" type="submit">Post score</button>
+            </div>
+            <p id="score-status" role="status"></p>
+          </form>
+          <button id="share" type="button" class="share">Share my place on the top list ↗</button>
+          <table class="toplist">
+            <caption class="visually-hidden">Top wedding guest scores</caption>
+            <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Points</th><th scope="col">Squashed</th></tr></thead>
+            <tbody id="leaderboard"></tbody>
+          </table>
+        </section>
         <button id="result-menu" type="button">Back to menu</button>
+      </dialog>
+      <dialog id="top-list" aria-labelledby="top-list-title">
+        <span class="stamp">WEDDINGRUSH / TOP LIST</span>
+        <h2 id="top-list-title">Wedding guest top list</h2>
+        <p id="top-list-intro" role="status">Loading the top list…</p>
+        <table class="toplist">
+          <caption class="visually-hidden">Top wedding guest scores</caption>
+          <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Points</th><th scope="col">Squashed</th></tr></thead>
+          <tbody id="top-list-rows"></tbody>
+        </table>
+        <button id="top-list-play" type="button" class="primary" autofocus>Beat them! Play WeddingRush ↗</button>
       </dialog>
       <dialog id="error-dialog" aria-labelledby="error-title">
         <h2 id="error-title">A bump in the road</h2>

@@ -1,10 +1,23 @@
 import { expect, test, type Page } from '@playwright/test';
-import { BRIDE, GROOM, hurdles, people, RUN_OBJECTIVE, runnerSpeed, START, sweets } from '../src/shared/level';
+import { BRIDE, corks, GROOM, hurdles, movers, people, rings, RING_VALUE, RUN_OBJECTIVE, runnerSpeed, START, sweets } from '../src/shared/level';
 
 async function start(page: Page): Promise<void> {
   await page.goto('/');
   await page.getByRole('button', { name: "I'm coming!" }).click();
   await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+}
+async function exposeScene(page: Page): Promise<void> {
+  await page.evaluate(`(async () => {
+    const { game } = await import('/src/client/main.ts');
+    window.__scene = game.scene.getScene('wedding');
+  })()`);
+}
+async function teleport(page: Page, x: number, y = 570): Promise<void> {
+  await page.evaluate(`(() => {
+    const scene = window.__scene;
+    scene.player.body.reset(${x}, ${y});
+    scene.player.setVelocityY(0);
+  })()`);
 }
 async function state(page: Page): Promise<{ x: number; y: number; grounded: boolean }> {
   return page.evaluate(() => {
@@ -171,14 +184,37 @@ test('there is no countdown or time-up loss', async ({ page }) => {
   await expect(page.locator('#controls')).not.toContainText('minutes');
 });
 
-test('the complete runner course is winnable with real timed jumps', async ({ page }) => {
-  test.setTimeout(50_000);
+test('the complete runner course is winnable with real timed jumps, ducks and barrel hops', async ({ page }) => {
+  test.setTimeout(60_000);
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await start(page);
-  const encounters = [...hurdles.map((hurdle, id) => ({ x: hurdle.x, hurdleId: id })),
-    ...people.map(person => ({ x: person.x, hurdleId: null }))].sort((a, b) => a.x - b.x);
+  await exposeScene(page);
+  type Encounter = { x: number; hurdleId?: number; mover?: number; kind?: 'barrel' | 'pigeon' };
+  const encounters: Encounter[] = [...hurdles.map((hurdle, id) => ({ x: hurdle.x, hurdleId: id })),
+    ...people.map(person => ({ x: person.x })),
+    ...movers.map((mover, id) => ({ x: mover.x, mover: id, kind: mover.kind }))].sort((a, b) => a.x - b.x);
   for (const encounter of encounters) {
+    if (encounter.kind === 'pigeon') {
+      await page.waitForFunction(id => {
+        const scene = (window as any).__scene;
+        return scene.moving[id].x - scene.player.x <= 220 && scene.player.body.blocked.down;
+      }, encounter.mover as number);
+      await page.keyboard.down('ArrowDown');
+      await expect(page.locator('#game')).toHaveAttribute('data-dodged', String(encounter.mover! + 1));
+      await page.keyboard.up('ArrowDown');
+      continue;
+    }
+    if (encounter.kind === 'barrel') {
+      await page.waitForFunction(({ id, speed }) => {
+        const scene = (window as any).__scene;
+        const closing = scene.player.body.velocity.x + speed;
+        return scene.moving[id].x - scene.player.x <= closing * .36 && scene.player.body.blocked.down;
+      }, { id: encounter.mover as number, speed: movers[encounter.mover as number].speed });
+      await page.keyboard.press('Space');
+      await expect(page.locator('#game')).toHaveAttribute('data-dodged', String(encounter.mover! + 1));
+      continue;
+    }
     await page.waitForFunction(({ x, speed, maxSpeed, finish }) => {
       const game = document.getElementById('game');
       const position = Number(game?.dataset.x);
@@ -186,7 +222,7 @@ test('the complete runner course is winnable with real timed jumps', async ({ pa
       return x - position <= pace * .39 && game?.dataset.grounded === 'true';
     }, { x: encounter.x, speed: GROOM.speed, maxSpeed: GROOM.maxSpeed, finish: BRIDE.x });
     await page.keyboard.press('Space');
-    if (encounter.hurdleId !== null) {
+    if (encounter.hurdleId !== undefined) {
       await expect(page.locator('#game')).toHaveAttribute('data-cleared', String(encounter.hurdleId + 1));
     } else {
       await page.waitForFunction(x => Number(document.getElementById('game')?.dataset.x) > x + 60, encounter.x);
@@ -195,6 +231,7 @@ test('the complete runner course is winnable with real timed jumps', async ({ pa
   await expect(page.locator('#game')).toHaveAttribute('data-phase', 'won', { timeout: 5000 });
   await expect(page.locator('#result-title')).toHaveText('Sean, you may kiss Becky.');
   await expect(page.locator('#lives')).toHaveText('3 / 3');
+  await expect(page.locator('#game')).toHaveAttribute('data-dodged', String(movers.length));
   await expect(page.locator('#result-detail')).toContainText(`${hurdles.length} / ${hurdles.length} hurdles cleared`);
   expect(Number(await page.locator('#game').getAttribute('data-speed'))).toBeGreaterThan(runnerSpeed(9000));
   expect(errors).toEqual([]);
@@ -743,3 +780,142 @@ test('reduced-motion squashes are immediate and freeze on pause', async ({ page 
   await page.waitForTimeout(150);
   expect(await state(page)).toEqual(paused);
 });
+
+test('a second press in the air double jumps higher than a single jump', async ({ page }) => {
+  await start(page);
+  await exposeScene(page);
+  await teleport(page, 2000);
+  await page.waitForFunction(() => document.getElementById('game')?.dataset.grounded === 'true');
+  await page.keyboard.press('Space');
+  await page.waitForFunction(() => (window as any).__scene.player.body.velocity.y > -250);
+  await page.keyboard.press('Space');
+  await page.waitForFunction(() => Number(document.getElementById('game')?.dataset.y) < 566 - 150);
+  await page.keyboard.press('Space');
+  await page.waitForFunction(() => document.getElementById('game')?.dataset.grounded === 'true');
+  await expect(page.locator('#game')).toHaveAttribute('data-distractions', '0');
+});
+
+test('a champagne cork super jump reaches a spinning wedding ring', async ({ page }) => {
+  await start(page);
+  await exposeScene(page);
+  await teleport(page, corks[0].x - 60);
+  await expect(page.locator('#game')).toHaveAttribute('data-rings', '1');
+  await expect(page.locator('#game')).toHaveAttribute('data-score', String(RING_VALUE));
+  expect(rings[0].y).toBeLessThan(566 - 200);
+});
+
+test('ducking under a swooping pigeon dodges it; running upright is a hit', async ({ page }) => {
+  const pigeon = movers.findIndex(mover => mover.kind === 'pigeon');
+  expect(people.some(person => person.x > movers[pigeon].x - 640 && person.x < movers[pigeon].x + 120)).toBe(false);
+  for (const duck of [true, false]) {
+    await start(page);
+    await exposeScene(page);
+    await teleport(page, movers[pigeon].x - 560);
+    if (duck) await page.keyboard.down('ArrowDown');
+    await expect(page.locator('#game')).toHaveAttribute('data-ducking', String(duck));
+    await page.waitForFunction(x => Number(document.getElementById('game')?.dataset.x) > x + 80, movers[pigeon].x);
+    if (duck) await page.keyboard.up('ArrowDown');
+    expect(await page.evaluate(id => (window as any).__scene.run.dodged.has(id), pigeon)).toBe(duck);
+    await expect(page.locator('#game')).toHaveAttribute('data-distractions', duck ? '0' : '1');
+  }
+});
+
+test("Becky's texts arrive as the run goes on and get frantic", async ({ page }) => {
+  await start(page);
+  await expect(page.locator('#becky-message')).toHaveText('Where are you?? x', { timeout: 8000 });
+  await expect(page.locator('#becky-text')).toBeVisible();
+  await expect(page.locator('#becky-text')).not.toHaveAttribute('data-frantic');
+  await exposeScene(page);
+  await teleport(page, START.x + .59 * (BRIDE.x - START.x));
+  await expect(page.locator('#becky-message')).toHaveText("I'm sending my bridesmaids to find you!!");
+  await expect(page.locator('#becky-text')).toHaveAttribute('data-frantic', '');
+  await expect(page.locator('#becky-text')).toBeHidden({ timeout: 4000 });
+});
+
+async function ringThenCrash(page: Page): Promise<void> {
+  await exposeScene(page);
+  await teleport(page, corks[0].x - 60);
+  await expect(page.locator('#game')).toHaveAttribute('data-rings', '1');
+  for (let id = 0; id < 3; id++) {
+    await teleport(page, hurdles[id].x - 60);
+    await expect(page.locator('#game')).toHaveAttribute('data-distractions', String(id + 1));
+  }
+  await expect(page.locator('#result')).toBeVisible();
+}
+
+test('best score, name filter and share link to a highlighted top list', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: async (data: ShareData) => { (window as any).__shared = data; },
+    });
+  });
+  await start(page);
+  await ringThenCrash(page);
+  await expect(page.locator('#result-best')).toHaveText(`NEW RECORD! ${RING_VALUE} beats your old best of 0.`);
+
+  await page.locator('#player-name').fill('');
+  await page.getByRole('button', { name: /Share my place/ }).click();
+  await expect(page.locator('#score-status')).toContainText('Add your name');
+  await expect(page.locator('#player-name')).toBeFocused();
+
+  await page.locator('#player-name').fill('Bell End');
+  await page.getByRole('button', { name: 'Post score' }).click();
+  await expect(page.locator('#score-status')).toContainText('Keep it clean');
+
+  const name = `Aunt ${Date.now().toString(36).slice(-6)}`;
+  await page.locator('#player-name').fill(name);
+  await page.getByRole('button', { name: /Share my place/ }).click();
+  await expect(page.locator('#score-status')).toContainText('Shared!');
+  const shared = await page.evaluate(() => (window as any).__shared as ShareData);
+  expect(shared.url).toMatch(/\/top\?you=[a-z0-9]{12}$/);
+  expect(shared.text).toContain(name);
+  await expect(page.locator('#leaderboard tr[data-you]')).toContainText(name);
+  await expect(page.locator('#player-name')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Post score' })).toBeHidden();
+  await expect(page.locator('#score-status')).toBeVisible();
+
+  await page.goto(new URL(shared.url!).pathname + new URL(shared.url!).search);
+  const topList = page.getByRole('dialog', { name: 'Wedding guest top list' });
+  await expect(topList).toBeVisible();
+  await expect(page.locator('#menu')).not.toBeVisible();
+  const you = topList.locator('tr[data-you]');
+  await expect(you).toHaveCount(1);
+  await expect(you).toContainText(name);
+  await expect(you).toContainText(String(RING_VALUE));
+  await expect(you).toHaveAttribute('aria-current', 'true');
+  await expect(page.locator('#top-list-intro')).toContainText(`${name} is #`);
+  const overflow = await topList.evaluate(dialog => dialog.scrollWidth - dialog.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  await page.getByRole('button', { name: /Play WeddingRush/ }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('#menu')).toBeVisible();
+
+  await page.getByRole('button', { name: "I'm coming!" }).click();
+  for (let id = 0; id < 3; id++) {
+    await exposeScene(page);
+    await teleport(page, hurdles[id].x - 60);
+    await expect(page.locator('#game')).toHaveAttribute('data-distractions', String(id + 1));
+  }
+  await expect(page.locator('#result-best')).toHaveText(`Your best: ${RING_VALUE} points.`);
+  await expect(page.locator('#player-name')).toHaveValue(name);
+  await expect(page.locator('#player-name')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Post score' })).toBeEnabled();
+});
+
+test('an unknown top list link still shows the table and copies links without native share', async ({ page }) => {
+  await page.goto('/top?you=zzzzzzzzzzzz');
+  await expect(page.locator('#top-list-intro')).toContainText("couldn't find that score");
+  await expect(page.locator('#top-list tr[data-you]')).toHaveCount(0);
+});
+
+for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }, { width: 390, height: 650 }]) {
+  test(`result top list fits without sideways scrolling at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await start(page);
+    await ringThenCrash(page);
+    const overflow = await page.locator('#result').evaluate(dialog => dialog.scrollWidth - dialog.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    await expect(page.getByRole('button', { name: /Share my place/ })).toBeVisible();
+  });
+}

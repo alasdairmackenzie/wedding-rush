@@ -135,6 +135,50 @@ export function makeTextures(scene: Phaser.Scene): void {
     for (const [x, y] of dots) { c.beginPath(); c.arc(x, y, 2.4, 0, Math.PI * 2); c.fill(); }
     scene.textures.addCanvas(`sweet-${value}`, image);
   }
+  extras(scene);
+}
+
+function extras(scene: Phaser.Scene): void {
+  {
+    const [image, c] = canvas(52, 52);
+    oval(c, 26, 26, 23, 23, '#a8693c');
+    c.strokeStyle = '#5b3a22'; c.lineWidth = 4;
+    for (const r of [8, 16]) { c.beginPath(); c.arc(26, 26, r, 0, Math.PI * 2); c.stroke(); }
+    c.strokeStyle = INK; c.lineWidth = 2.5;
+    line(c, [6, 26, 46, 26]); line(c, [26, 6, 26, 46]);
+    c.fillStyle = '#fff8e8'; c.font = 'bold 11px monospace'; c.textAlign = 'center';
+    c.fillText('ALE', 26, 30);
+    scene.textures.addCanvas('barrel', image);
+  }
+  {
+    const [image, c] = canvas(64, 44);
+    oval(c, 30, 26, 18, 11, '#8e98a8');
+    oval(c, 47, 18, 9, 8, '#8e98a8');
+    c.fillStyle = '#6f9a7c'; c.beginPath(); c.arc(44, 24, 5, 0, Math.PI); c.fill();
+    c.fillStyle = '#e8a03c'; c.beginPath(); c.moveTo(55, 17); c.lineTo(63, 20); c.lineTo(55, 22); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = INK; c.beginPath(); c.arc(49, 16, 1.8, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#6c7585'; c.beginPath(); c.moveTo(20, 22); c.lineTo(34, 4); c.lineTo(38, 22); c.closePath(); c.fill(); c.stroke();
+    line(c, [12, 26, 2, 22]); line(c, [12, 28, 2, 32]);
+    scene.textures.addCanvas('pigeon', image);
+  }
+  {
+    const [image, c] = canvas(40, 40);
+    c.strokeStyle = '#c9952a'; c.lineWidth = 6;
+    c.beginPath(); c.arc(20, 23, 12, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = INK; c.lineWidth = 1.5;
+    c.beginPath(); c.arc(20, 23, 15, 0, Math.PI * 2); c.stroke();
+    c.beginPath(); c.arc(20, 23, 9, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = '#d9f4ff'; c.beginPath(); c.moveTo(20, 2); c.lineTo(27, 9); c.lineTo(20, 14); c.lineTo(13, 9); c.closePath(); c.fill(); c.stroke();
+    scene.textures.addCanvas('ring', image);
+  }
+  {
+    const [image, c] = canvas(28, 60);
+    box(c, 8, 22, 12, 34, '#2f6b4c');
+    box(c, 11, 8, 6, 16, '#2f6b4c');
+    box(c, 10, 2, 8, 8, '#d9b25a');
+    box(c, 8, 32, 12, 12, '#f3e6c2');
+    scene.textures.addCanvas('champagne', image);
+  }
 }
 
 export function drawCity(scene: Phaser.Scene): (daylight: number) => void {

@@ -28,7 +28,7 @@ progress::-moz-progress-bar { background: #b84b64; }
 #game canvas { display: block; }
 #notice { min-height: 38px; margin: 0; padding: 10px 18px; border-top: 2px solid #302825; font: bold 12px/1.5 monospace; background: #f8f0df; }
 footer { display: flex; justify-content: space-between; gap: 12px; padding-top: 20px; color: #756553; font-size: 9px; }
-dialog { background: #f8f0df; color: #302825; border: 3px solid #302825; padding: 30px; width: min(500px, calc(100% - 32px)); max-height: calc(100dvh - 32px); box-shadow: 9px 9px 0 #302825; }
+dialog { overflow: auto; overscroll-behavior: contain; background: #f8f0df; color: #302825; border: 3px solid #302825; padding: 30px; width: min(500px, calc(100% - 32px)); max-height: calc(100dvh - 32px); box-shadow: 9px 9px 0 #302825; }
 dialog::backdrop { background: #272130aa; }
 dialog h1 { font-size: clamp(42px, 8vw, 62px); line-height: 1; letter-spacing: -4px; margin: 20px 0 14px; transform: rotate(-2deg); }
 dialog h2 { font-size: 38px; line-height: 1.05; letter-spacing: -2px; }
@@ -99,4 +99,47 @@ button:disabled { opacity: .6; cursor: wait; }
   }
   .touch-controls span { display: none; }
   .touch-controls button { width: auto; min-width: 112px; min-height: 56px; background: #ffd465ee; }
+}
+
+.combo strong { color: #7b4bb3; }
+.combo strong[data-hot] { animation: combo-pop .3s ease-out; }
+@keyframes combo-pop { from { scale: 1.6; } }
+.becky-text {
+  position: absolute; z-index: 4; top: 96px; right: 16px; max-width: min(260px, 70%);
+  display: grid; gap: 3px; padding: 9px 12px; border: 2px solid #302825; border-radius: 16px 16px 4px 16px;
+  background: #fff; box-shadow: 4px 4px 0 #302825; font: bold 13px/1.35 'Trebuchet MS', sans-serif; pointer-events: none;
+  animation: text-in .25s ease-out;
+}
+.becky-text .from { font: bold 9px monospace; letter-spacing: 1px; color: #b84b64; }
+.becky-text[data-frantic] { background: #ffe1e8; rotate: -2deg; }
+@keyframes text-in { from { translate: 0 -12px; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .becky-text, .combo strong[data-hot] { animation: none; } }
+.badge { display: inline-block; margin: 0; padding: 4px 10px; background: #302825; color: #ffd465; font: bold 13px monospace; letter-spacing: 1px; }
+.badge:empty, .best:empty { display: none; }
+.best { font-weight: 800; color: #7b4bb3; }
+.leaderboard { border-top: 1px dashed #ac9c83; margin-top: 18px; padding-top: 6px; }
+.leaderboard h3 { margin: 8px 0; font-size: 18px; }
+.leaderboard label { font: bold 10px monospace; letter-spacing: 1px; }
+.score-row { display: flex; gap: 8px; margin-top: 4px; }
+.score-row input { flex: 1; min-width: 0; padding: 10px; border: 2px solid #302825; background: #fff; }
+.score-row button { white-space: nowrap; }
+#score-status { min-height: 1.6em; margin: 6px 0; font-size: 12px; }
+#score-status[data-error] { color: #b52f44; }
+.leaderboard .share { width: 100%; margin: 0 0 12px; }
+.toplist { width: 100%; border-collapse: collapse; font: 13px/1.5 monospace; margin-top: 4px; }
+.toplist th { text-align: left; font-size: 10px; letter-spacing: 1px; border-bottom: 2px solid #302825; padding: 4px 6px; }
+.toplist td { padding: 5px 6px; border-bottom: 1px dashed #ac9c83; overflow-wrap: anywhere; }
+.toplist th:nth-child(n+3), .toplist td:nth-child(n+3) { text-align: right; }
+.toplist tr[data-you] td { background: #f6d4dc; color: #8f2f47; font-weight: bold; }
+.toplist tr.gap td { text-align: center; border-bottom: 0; color: #756553; }
+.toplist td.empty { text-align: center; color: #756553; }
+#top-list-intro strong { color: #b84b64; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.touch-controls { gap: 10px; }
+.touch-controls [data-control="duck"] { width: 30%; background: #cfe4f6; }
+@media (max-width: 700px), (pointer: coarse) and (max-width: 1024px) {
+  .becky-text { top: calc(max(10px, env(safe-area-inset-top)) + 110px); right: max(10px, env(safe-area-inset-right)); }
+  .touch-controls { left: max(16px, env(safe-area-inset-left)); justify-content: space-between; }
+  .touch-controls [data-control="duck"] { width: auto; min-width: 112px; background: #cfe4f6ee; }
+  .label { font-size: 8px; }
 }
