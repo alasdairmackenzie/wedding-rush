@@ -120,6 +120,21 @@ test('a quick press gives a full jump; holding cannot repeatedly jump; arrows do
   await page.keyboard.up('Space');
 });
 
+test('hits keep running on browsers without vibration support, like Safari', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'vibrate', { configurable: true, writable: true, value: undefined });
+  });
+  await start(page);
+  await exposeScene(page);
+  await teleport(page, hurdles[0].x - 60);
+  await expect(page.locator('#lives')).toHaveText('2 / 3');
+  await page.waitForTimeout(300);
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+  expect(errors).toEqual([]);
+});
+
 test('hurdle contact costs one chance per hurdle and the third hit ends the run', async ({ page }) => {
   await start(page);
   for (let id = 0; id < 3; id++) {

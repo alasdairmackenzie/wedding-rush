@@ -304,7 +304,9 @@ export class WeddingScene extends Phaser.Scene {
     });
   }
   private buzz(pattern: number | number[]): void {
-    if ('vibrate' in navigator) navigator.vibrate(pattern);
+    // Phaser sets navigator.vibrate to undefined on browsers without it (Safari/iOS), so check it is callable.
+    if (typeof navigator.vibrate !== 'function') return;
+    try { navigator.vibrate(pattern); } catch { /* vibration unsupported or blocked */ }
   }
   private confetti(x: number, y: number): void {
     if (this.reducedMotion.matches) return;
