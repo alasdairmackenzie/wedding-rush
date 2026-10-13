@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { isFaceKind } from '../shared/faces';
-import { beckyTexts, BRIDE, corks, daylightProgress, GROOM, hurdles, movers, moverStart, MOVER_TRIGGER, people, platforms,
+import { beckyTexts, BRIDE, BUCKET_HAT, BUCKET_HAT_VALUE, concentrates, corks, daylightProgress, GROOM, hurdles, movers, moverStart, MOVER_TRIGGER, people, platforms,
   RING_VALUE, rings, Run, RUN_OBJECTIVE, runnerSpeed, SQUASH_BONUS, START, sweets, WORLD } from '../shared/level';
 import { drawCity, makeTextures } from './art';
 import { RunnerInput } from './input';
@@ -11,6 +11,10 @@ import brideHeadUrl from '../assets/art/bride-head.png';
 import pingpongHeadUrl from '../assets/art/pingpong-head.png';
 import dealHeadUrl from '../assets/art/deal-head.png';
 import hatHeadUrl from '../assets/art/hat-head.png';
+import karaokeHeadUrl from '../assets/art/karaoke-head.png';
+import kebabHeadUrl from '../assets/art/kebab-head.png';
+import pubHeadUrl from '../assets/art/pub-head.png';
+import bucketHatUrl from '../assets/art/bucket-hat.png';
 
 interface Hurdle {
   body: Phaser.GameObjects.Rectangle;
@@ -56,6 +60,10 @@ export class WeddingScene extends Phaser.Scene {
   private readonly moving: Mover[] = [];
   private readonly ringArt: Phaser.GameObjects.Image[] = [];
   private readonly corkArt: Phaser.GameObjects.Image[] = [];
+  private readonly concentrateArt: Phaser.GameObjects.Image[] = [];
+  private concentrateGlow!: Phaser.GameObjects.Ellipse;
+  private bucketHatArt!: Phaser.GameObjects.Image;
+  private bucketHatLabel!: Phaser.GameObjects.Text;
   private playerScale = 1;
   private ducking = false;
   private doubleJumped = false;
@@ -84,6 +92,10 @@ export class WeddingScene extends Phaser.Scene {
     this.load.image('pingpong-head', pingpongHeadUrl);
     this.load.image('deal-head', dealHeadUrl);
     this.load.image('hat-head', hatHeadUrl);
+    this.load.image('karaoke-head', karaokeHeadUrl);
+    this.load.image('kebab-head', kebabHeadUrl);
+    this.load.image('pub-head', pubHeadUrl);
+    this.load.image('bucket-hat', bucketHatUrl);
     this.load.on('filecomplete-json-faces', (_key: string, _type: string, data: { faces?: Record<string, number> } | undefined) => {
       for (const [kind, version] of Object.entries(data?.faces ?? {})) {
         if (isFaceKind(kind)) this.load.image(`${kind}-face`, `/api/faces/${kind}?v=${version}`);
@@ -113,6 +125,8 @@ export class WeddingScene extends Phaser.Scene {
     this.playerArt = this.add.image(START.x, START.y + 40, 'groom-photo').setOrigin(.5, 1).setDepth(5);
     this.setPlayerPhoto('groom-photo');
     this.playerArt.setScale(this.playerScale);
+    this.concentrateGlow = this.add.ellipse(START.x, START.y, 90, 150, 0xff8c24, .22)
+      .setStrokeStyle(3, 0xffa53b, .8).setDepth(4).setVisible(false).setName('concentrate-glow');
     this.physics.add.collider(this.player, ground);
     this.pickups = this.physics.add.staticGroup();
     sweets.forEach((sweet, id) => {
@@ -173,11 +187,21 @@ export class WeddingScene extends Phaser.Scene {
     corks.forEach((cork, id) => {
       this.corkArt.push(this.add.image(cork.x, cork.y, 'champagne').setDepth(5).setName(`champagne-${id}`));
     });
+    concentrates.forEach((bottle, id) => {
+      this.concentrateArt.push(this.add.image(bottle.x, bottle.y, 'concentrate')
+        .setOrigin(.5, 104 / 144).setDepth(5).setName(`concentrate-${id}`));
+    });
     rings.forEach((ring, id) => {
       const art = this.add.image(ring.x, ring.y, 'ring').setDepth(5).setName(`ring-${id}`);
       this.ringArt.push(art);
       if (!this.reducedMotion.matches) this.tweens.add({ targets: art, scaleX: .15, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     });
+    this.bucketHatArt = this.add.image(BUCKET_HAT.x, BUCKET_HAT.y, 'bucket-hat')
+      .setDisplaySize(BUCKET_HAT.width, BUCKET_HAT.height).setDepth(5).setName('bucket-hat');
+    this.bucketHatLabel = this.add.text(BUCKET_HAT.x, BUCKET_HAT.y - 65, 'MY BUCKET HAT!\nJUMP FOR +50 POINTS', {
+      fontFamily: 'monospace', fontSize: '16px', fontStyle: 'bold', color: '#352b3c',
+      backgroundColor: '#fff8e8', padding: { x: 10, y: 8 }, align: 'center',
+    }).setOrigin(.5, 1).setDepth(5).setName('bucket-hat-label');
     this.brideArt = this.add.image(BRIDE.x, 610, 'bride').setOrigin(.5, 102 / 112).setScale(1.3).setDepth(4).setName('bride');
     this.add.text(BRIDE.x, 390, 'THE WEDDING / THIS WAY', {
       fontFamily: 'monospace', fontSize: '16px', fontStyle: 'bold', color: '#9d4d6a',
@@ -272,7 +296,10 @@ export class WeddingScene extends Phaser.Scene {
         mover.art.setPosition(mover.x, movers[id].y).setAlpha(1).setAngle(0);
       });
       this.corkArt.forEach(art => art.setVisible(true));
+      this.concentrateArt.forEach(art => art.setVisible(true));
       this.ringArt.forEach(art => art.setVisible(true));
+      this.bucketHatArt.setVisible(true);
+      this.bucketHatLabel.setVisible(true);
       this.textsSent = 0;
       this.lastMultiplier = 1;
       this.cameras.main.resetFX();
@@ -411,11 +438,13 @@ export class WeddingScene extends Phaser.Scene {
     if (this.run.lives === 0) this.end();
   }
   private contact(id: number): void {
-    if (this.discoMode) {
+    if (this.run.phase !== 'playing') return;
+    if (this.discoMode || this.run.concentrateRemaining) {
       if (this.run.clearHurdle(id)) {
         this.sparkle(this.player.x, this.player.y);
-        this.floatText(this.player.x, 485, 'DISCO DASH!', '#b84b64');
-        this.announceEvent('DISCO CLEARED!', `${this.run.cleared.size} / ${hurdles.length} HURDLES`, '#b84b64');
+        this.floatText(this.player.x, 485, this.discoMode ? 'DISCO DASH!' : 'ORANGE RUSH!', '#b84b64');
+        this.announceEvent(this.discoMode ? 'DISCO CLEARED!' : 'POWERED THROUGH!',
+          `${this.run.cleared.size} / ${hurdles.length} HURDLES`, this.discoMode ? '#b84b64' : '#a34710');
         this.comboCheck();
       }
       return;
@@ -450,6 +479,12 @@ export class WeddingScene extends Phaser.Scene {
       this.announceEvent('SQUASH!', `+${SQUASH_BONUS} BONUS POINTS`, '#42735a');
       this.comboCheck();
       this.ui.notice(`${people[id].temptation.name} squashed! +${SQUASH_BONUS} bonus points. No chance or time lost.`);
+    } else if (this.run.passPerson(id)) {
+      target.enable = false;
+      character.art.setAlpha(.6);
+      character.bubble.setVisible(false);
+      this.floatText(character.art.x, 490, 'NO DISTRACTIONS!', '#a34710');
+      this.ui.audio.tone('sweet');
     } else if (this.discoMode) {
       if (!this.run.hitPeople.has(id) && !this.run.squashed.has(id)) {
         this.run.hitPeople.add(id);
@@ -578,7 +613,7 @@ export class WeddingScene extends Phaser.Scene {
       });
       this.characters.forEach((character, id) => {
         const definition = people[id];
-        const resolved = this.run.hitPeople.has(id) || this.run.squashed.has(id);
+        const resolved = this.run.hitPeople.has(id) || this.run.squashed.has(id) || this.run.passedPeople.has(id);
         const near = !resolved && definition.x - this.player.x < 430 && definition.x > this.player.x;
         if (near && !character.nearby) {
           this.ui.notice(`${definition.temptation.name}: "${definition.temptation.line}" Jump over them or land on their head!`);
@@ -601,6 +636,11 @@ export class WeddingScene extends Phaser.Scene {
     this.playerArt.setPosition(this.player.x, this.player.y + 40 + bob);
     this.playerArt.setScale(this.playerScale, this.playerScale * (this.ducking ? .55 : 1));
     this.playerArt.setAlpha(this.run.elapsed < this.invulnerableUntil ? .5 : 1);
+    const powered = this.run.concentrateRemaining > 0;
+    this.concentrateGlow.setVisible(powered).setPosition(this.playerArt.x, this.playerArt.y - this.playerArt.displayHeight / 2);
+    this.concentrateGlow.setSize(this.playerArt.displayWidth + 24, this.playerArt.displayHeight + 18);
+    if (powered) this.playerArt.setTint(0xffbd72);
+    else this.playerArt.clearTint();
     if (this.discoMode && this.run.phase === 'playing') {
       this.discoSparkleTimer += delta;
       if (this.discoSparkleTimer >= 80) {
@@ -617,6 +657,21 @@ export class WeddingScene extends Phaser.Scene {
   private updateExtras(delta: number, body: Phaser.Physics.Arcade.Body): void {
     const overlaps = (x: number, y: number, width: number, height: number): boolean =>
       body.right > x - width / 2 && body.left < x + width / 2 && body.bottom > y - height / 2 && body.top < y + height / 2;
+    if (overlaps(BUCKET_HAT.x, BUCKET_HAT.y, BUCKET_HAT.width, BUCKET_HAT.height) && this.run.collectHat()) {
+      this.bucketHatArt.setVisible(false);
+      this.bucketHatLabel.setVisible(false);
+      this.ui.audio.effect('sparkle');
+      this.floatText(BUCKET_HAT.x, BUCKET_HAT.y - 30, `+${BUCKET_HAT_VALUE}`, '#42735a');
+      this.announceEvent('FOUND MY BUCKET HAT!', `+${BUCKET_HAT_VALUE} BONUS POINTS`, '#42735a');
+      this.ui.notice('Found my bucket hat! +50 points. Now get to Becky!');
+    }
+    concentrates.forEach((bottle, id) => {
+      if (!overlaps(bottle.x, bottle.y, 40, 64) || !this.run.drinkConcentrate(id)) return;
+      this.concentrateArt[id].setVisible(false);
+      this.ui.audio.effect('sparkle');
+      this.announceEvent('4× ORANGE SQUASH!', '4 SECONDS OF INVINCIBILITY', '#a34710');
+      this.ui.notice('Four parts squash. No parts water. Invincible for four seconds!');
+    });
     this.moving.forEach((mover, id) => {
       const definition = movers[id];
       if (!mover.active && moverStart(definition) - this.player.x <= MOVER_TRIGGER) {
@@ -638,7 +693,12 @@ export class WeddingScene extends Phaser.Scene {
       }
       if (this.run.hitMovers.has(id) || this.run.dodged.has(id)) return;
       if (overlaps(mover.x, definition.y, definition.width, definition.height)) {
-        if (this.run.hitMover(id)) {
+        if ((this.run.concentrateRemaining || this.discoMode) && this.run.dodgeMover(id)) {
+          mover.art.setAlpha(.4);
+          this.floatText(mover.x, definition.y - 50, 'POWERED THROUGH!', '#a34710');
+          this.ui.audio.tone('sweet');
+          this.comboCheck();
+        } else if (this.run.hitMover(id)) {
           mover.art.setAlpha(.4);
           this.bump(definition.kind === 'pigeon' ? 'PIGEONED!' : 'BARRELLED!',
             definition.kind === 'pigeon' ? 'Hit by a pigeon! Duck next time.' : 'Flattened by a beer barrel! Jump it next time.');

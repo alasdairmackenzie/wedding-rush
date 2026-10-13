@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { beckyTexts, BRIDE, corks, daylightProgress, GROOM, hurdles, MAX_SCORE, movers, moverStart, MOVER_TRIGGER, people,
+import { beckyTexts, BRIDE, BUCKET_HAT, BUCKET_HAT_VALUE, concentrates, CONCENTRATE_DURATION, corks, daylightProgress, GROOM, hurdles, MAX_SCORE, movers, moverStart, MOVER_TRIGGER, people,
   platforms, rings, RING_VALUE, Run, runnerSpeed, runTitle, START, sweets, temptations, TOTAL_SCORE, WORLD } from './level';
 
 function playing(): Run { const run = new Run(); run.phase = 'playing'; return run; }
@@ -232,6 +232,106 @@ describe('moving obstacles, corks and rings', () => {
   });
 });
 
+describe('4x orange concentrate', () => {
+  it('has two reachable bottles before busy stretches and a roughly 39-second route', () => {
+    expect(concentrates).toHaveLength(2);
+    concentrates.forEach((bottle, id) => {
+      const hurdle = hurdles[id === 0 ? 3 : 6];
+      expect(hurdle.x - bottle.x).toBe(300);
+      expect(bottle.y + 32).toBeGreaterThan(610 - GROOM.height);
+      expect(bottle.y - 32).toBeLessThan(610);
+      expect(Math.min(...corks.map(cork => Math.abs(cork.x - bottle.x)))).toBeGreaterThan(300);
+    });
+    let seconds = 0;
+    for (let x = START.x; x < BRIDE.x - 54; x++) seconds += 1 / runnerSpeed(x);
+    expect(seconds).toBeGreaterThan(38);
+    expect(seconds).toBeLessThan(40);
+    expect(corks).toHaveLength(3);
+    expect(rings).toHaveLength(3);
+  });
+  it('lasts exactly four seconds of active play, freezes when paused and collects each bottle once', () => {
+    const run = playing();
+    expect(run.drinkConcentrate(0)).toBe(true);
+    expect(run.concentrateRemaining).toBe(CONCENTRATE_DURATION);
+    run.tick(1000);
+    expect(run.drinkConcentrate(0)).toBe(false);
+    expect(run.concentrateRemaining).toBe(3000);
+    run.phase = 'paused';
+    run.tick(10000);
+    expect(run.concentrateRemaining).toBe(3000);
+    expect(run.drinkConcentrate(1)).toBe(false);
+    run.phase = 'playing';
+    run.tick(2999);
+    expect(run.concentrateRemaining).toBe(1);
+    run.tick(1);
+    expect(run.concentrateRemaining).toBe(0);
+    expect(run.drinkConcentrate(1)).toBe(true);
+    expect(run.concentrateRemaining).toBe(4000);
+    run.finish();
+    expect(run.concentrateRemaining).toBe(0);
+    const fresh = new Run();
+    expect(fresh.concentrates.size).toBe(0);
+    expect(fresh.concentrateRemaining).toBe(0);
+    for (const id of [-1, .5, NaN, concentrates.length]) expect(playing().drinkConcentrate(id)).toBe(false);
+  });
+  it('blocks all damage without resetting the combo or giving a score multiplier', () => {
+    const run = playing();
+    run.clearHurdle(0); run.clearHurdle(1); run.clearHurdle(2);
+    expect(run.multiplier).toBe(2);
+    run.drinkConcentrate(0);
+    expect(run.multiplier).toBe(2);
+    expect(run.score).toBe(0);
+    expect(run.hitHurdle(3)).toBe(false);
+    expect(run.hitPerson(3)).toBe(false);
+    expect(run.hitMover(0)).toBe(false);
+    expect(run.lives).toBe(3);
+    expect(run.distractions).toBe(0);
+    expect(run.streak).toBe(3);
+    expect(run.passPerson(3)).toBe(true);
+    expect(run.passPerson(3)).toBe(false);
+    expect(run.squashPerson(3)).toBe(false);
+    expect(run.bonusScore).toBe(0);
+    expect(run.squashPerson(4)).toBe(true);
+    expect(run.bonusScore).toBe(5);
+    run.tick(CONCENTRATE_DURATION);
+    expect(run.hitPerson(3)).toBe(false);
+    expect(run.hitHurdle(4)).toBe(true);
+    expect(run.lives).toBe(2);
+    expect(run.streak).toBe(0);
+  });
+});
+
+describe('final bucket hat', () => {
+  it('extends the finish and places the hat within a normal jump but above a grounded runner', () => {
+    expect(BRIDE.x).toBe(14200);
+    expect(WORLD.width - BRIDE.x).toBeGreaterThanOrEqual(300);
+    expect(BUCKET_HAT.x).toBeGreaterThan(rings.at(-1)!.x + 500);
+    expect(BUCKET_HAT.x).toBeLessThan(BRIDE.x - 300);
+    const groundedTop = 610 - GROOM.height;
+    expect(BUCKET_HAT.y + BUCKET_HAT.height / 2).toBeLessThan(groundedTop);
+    expect(BUCKET_HAT.y + BUCKET_HAT.height / 2).toBeGreaterThan(groundedTop - GROOM.jump ** 2 / (2 * GROOM.gravity));
+  });
+  it('awards exactly 50 once regardless of combo, only while playing, and resets in a fresh run', () => {
+    const run = new Run();
+    expect(run.collectHat()).toBe(false);
+    run.phase = 'playing';
+    run.streak = 12;
+    expect(run.multiplier).toBe(3);
+    expect(run.collectHat()).toBe(true);
+    expect(run.score).toBe(BUCKET_HAT_VALUE);
+    expect(run.hatScore).toBe(50);
+    expect(run.comboScore).toBe(0);
+    expect(run.collectHat()).toBe(false);
+    expect(run.score).toBe(50);
+    expect(new Run().hatCollected).toBe(false);
+    for (const phase of ['paused', 'won', 'late'] as const) {
+      const inactive = new Run();
+      inactive.phase = phase;
+      expect(inactive.collectHat()).toBe(false);
+    }
+  });
+});
+
 describe('combo, rings and titles', () => {
   it('builds a capped multiplier from clears, squashes and dodges and resets on a hit', () => {
     const run = playing();
@@ -269,6 +369,7 @@ describe('combo, rings and titles', () => {
     people.forEach((_p, id) => run.squashPerson(id));
     rings.forEach((_r, id) => run.collectRing(id));
     sweets.forEach((_s, id) => run.collect(id));
+    run.collectHat();
     expect(run.score).toBeLessThanOrEqual(MAX_SCORE);
   });
   it('names the result after the most memorable thing that happened', () => {

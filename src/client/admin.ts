@@ -4,6 +4,9 @@ import brideHeadUrl from '../assets/art/bride-head.png';
 import dealHeadUrl from '../assets/art/deal-head.png';
 import pingpongHeadUrl from '../assets/art/pingpong-head.png';
 import hatHeadUrl from '../assets/art/hat-head.png';
+import karaokeHeadUrl from '../assets/art/karaoke-head.png';
+import kebabHeadUrl from '../assets/art/kebab-head.png';
+import pubHeadUrl from '../assets/art/pub-head.png';
 import './style.css';
 import './admin.css';
 
@@ -11,6 +14,9 @@ const KEY = 'wedding-rush-admin';
 const FACE_HEIGHT = 160;
 const defaultFaces: Partial<Record<FaceKind, string>> = {
   bride: brideHeadUrl, deal: dealHeadUrl, pingpong: pingpongHeadUrl, hat: hatHeadUrl,
+  karaoke: karaokeHeadUrl,
+  kebab: kebabHeadUrl,
+  pub: pubHeadUrl,
 };
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const login = $<HTMLFormElement>('login');

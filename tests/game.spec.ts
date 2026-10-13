@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { BRIDE, corks, GROOM, hurdles, movers, people, rings, RING_VALUE, RUN_OBJECTIVE, runnerSpeed, START, sweets } from '../src/shared/level';
+import { BRIDE, BUCKET_HAT, concentrates, CONCENTRATE_DURATION, corks, GROOM, hurdles, movers, people, rings, RING_VALUE, RUN_OBJECTIVE, runnerSpeed, START, sweets } from '../src/shared/level';
 
 async function start(page: Page): Promise<void> {
   await page.goto('/');
@@ -202,7 +202,7 @@ test('retains photo artwork and the distraction cast without platformer controls
     return {
       key: scene.playerArt.texture.key, height: scene.playerArt.displayHeight,
       hitbox: [scene.player.body.width, scene.player.body.height],
-      heads: ['bride-head', 'deal-head', 'pingpong-head', 'hat-head'].every(key => scene.textures.exists(key)),
+      heads: ['bride-head', 'deal-head', 'pingpong-head', 'hat-head', 'karaoke-head', 'kebab-head', 'pub-head'].every(key => scene.textures.exists(key)),
       obstacles: scene.obstacles.length
     };
   })()`);
@@ -210,7 +210,7 @@ test('retains photo artwork and the distraction cast without platformer controls
   const cutouts = await page.evaluate<{ transparent: number; opaque: number; cornerAlpha: number[] }[]>(`(async () => {
     const { game } = await import('/src/client/main.ts');
     const scene = game.scene.getScene('wedding');
-    return ['groom-photo', 'groom-photo-alt', 'hat-head'].map(key => {
+    return ['groom-photo', 'groom-photo-alt', 'bride-head', 'hat-head', 'karaoke-head', 'kebab-head', 'pub-head', 'bucket-hat'].map(key => {
       const image = scene.textures.get(key).getSourceImage();
       const canvas = document.createElement('canvas');
       canvas.width = image.width;
@@ -268,6 +268,8 @@ test('bucket-hat character uses the bundled cutout by default and accepts an upl
     return Array.from(image.getContext('2d').getImageData(0, 2, 96, 40).data);
   })()`;
   const defaultHead = await page.evaluate<number[]>(headPixels);
+  expect(defaultHead.slice(0, 96 * 20 * 4).filter((_, index) => index % 4 === 3).every(alpha => alpha === 0)).toBe(true);
+  expect(defaultHead.filter((_, index) => index % 4 === 3).some(alpha => alpha > 0)).toBe(true);
   expect(await page.evaluate(`(async () => {
     const { game } = await import('/src/client/main.ts');
     return game.textures.exists('hat-head') && !game.textures.exists('hat-face');
@@ -322,6 +324,90 @@ test('Sean changes photo on jump, restores it on landing and does not cycle with
   await expect.poll(photo).toBe('groom-photo');
 });
 
+for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+  test(`orange squash protects against all obstacles, pauses and resets at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await start(page);
+    await exposeScene(page);
+    await teleport(page, concentrates[0].x);
+    await expect(page.locator('#game')).toHaveAttribute('data-concentrates', '1');
+    await expect(page.locator('#concentrate-power')).toBeVisible();
+    await expect(page.locator('#concentrate-power')).toContainText('4× ORANGE SQUASH');
+    if (viewport.width === 390) {
+      const badge = await page.locator('#concentrate-power').boundingBox();
+      const controls = await page.locator('.touch-controls').boundingBox();
+      if (!badge || !controls) throw new Error('Missing mobile concentrate badge or touch controls.');
+      expect(badge.y + badge.height).toBeLessThanOrEqual(controls.y);
+    }
+    expect(await page.evaluate(`window.__scene.concentrateGlow.visible`)).toBe(true);
+    await page.keyboard.press('Escape');
+    const remaining = await page.locator('#game').getAttribute('data-concentrate-remaining');
+    if (remaining === null) throw new Error('Missing concentrate countdown.');
+    await page.waitForTimeout(250);
+    await expect(page.locator('#game')).toHaveAttribute('data-concentrate-remaining', remaining);
+    await page.getByRole('button', { name: 'Back to Becky' }).click();
+    await teleport(page, hurdles[3].x);
+    await expect.poll(() => page.evaluate<boolean>('window.__scene.run.cleared.has(3)')).toBe(true);
+    await teleport(page, people[3].x);
+    await expect.poll(() => page.evaluate<boolean>('window.__scene.run.passedPeople.has(3)')).toBe(true);
+    for (const id of [0, 1]) {
+      await page.evaluate(`(() => {
+        const scene = window.__scene;
+        scene.run.dodged.delete(${id});
+        scene.player.body.reset(scene.moving[${id}].x, 570);
+        scene.player.setVelocityY(0);
+      })()`);
+      await expect.poll(() => page.evaluate<boolean>(`window.__scene.run.dodged.has(${id})`)).toBe(true);
+    }
+    await expect(page.locator('#lives')).toHaveText('3 / 3');
+    await expect(page.locator('#game')).toHaveAttribute('data-distractions', '0');
+    await expect(page.locator('#game')).toHaveAttribute('data-bonus', '0');
+    await teleport(page, 600);
+    await page.evaluate(`window.__scene.run.tick(${CONCENTRATE_DURATION})`);
+    await expect(page.locator('#concentrate-power')).toBeHidden();
+    expect(await page.evaluate(`window.__scene.concentrateGlow.visible`)).toBe(false);
+    await teleport(page, hurdles[4].x);
+    await expect(page.locator('#lives')).toHaveText('2 / 3');
+    await teleport(page, concentrates[1].x);
+    await expect(page.locator('#game')).toHaveAttribute('data-concentrates', '2');
+    await expect(page.locator('#concentrate-power')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Start a fresh run' }).click();
+    await expect(page.locator('#game')).toHaveAttribute('data-concentrates', '0');
+    await expect(page.locator('#concentrate-power')).toBeHidden();
+    expect(await page.evaluate(`window.__scene.concentrateArt.every(art => art.visible)`)).toBe(true);
+    await expect(page.locator('#lives')).toHaveText('3 / 3');
+  });
+}
+
+for (const width of [1280, 390]) {
+  test(`final bucket hat is a normal-jump +50 pickup and restores on replay at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await start(page);
+    await exposeScene(page);
+    await teleport(page, BUCKET_HAT.x - 155);
+    await expect(page.locator('#game')).toHaveAttribute('data-grounded', 'true');
+    const before = await page.evaluate<number>('window.__scene.run.score');
+    await page.keyboard.press('Space');
+    await expect(page.locator('#game')).toHaveAttribute('data-hat-collected', 'true');
+    expect(await page.evaluate<number>('window.__scene.run.score')).toBe(before + 50);
+    expect(await page.evaluate<boolean>('window.__scene.bucketHatArt.visible || window.__scene.bucketHatLabel.visible')).toBe(false);
+    await teleport(page, BUCKET_HAT.x, BUCKET_HAT.y - 12);
+    await page.waitForTimeout(100);
+    expect(await page.evaluate<number>('window.__scene.run.hatScore')).toBe(50);
+    await teleport(page, BRIDE.x - 50);
+    await expect(page.locator('#result-detail')).toContainText('Bucket hat found! +50 points');
+    await page.getByRole('button', { name: 'One more big day' }).click();
+    await expect(page.locator('#game')).toHaveAttribute('data-hat-collected', 'false');
+    expect(await page.evaluate<boolean>('window.__scene.bucketHatArt.visible && window.__scene.bucketHatLabel.visible')).toBe(true);
+    await teleport(page, BUCKET_HAT.x - 100);
+    await page.waitForTimeout(400);
+    await expect(page.locator('#game')).toHaveAttribute('data-hat-collected', 'false');
+    await teleport(page, BRIDE.x - 50);
+    await expect(page.locator('#result-detail')).toContainText('Bucket hat not collected');
+  });
+}
+
 test('there is no countdown or time-up loss', async ({ page }) => {
   await start(page);
   await page.evaluate(`(async () => {
@@ -345,7 +431,8 @@ test('the complete runner course is winnable with real timed jumps, ducks and ba
   type Encounter = { x: number; hurdleId?: number; mover?: number; kind?: 'barrel' | 'pigeon' };
   const encounters: Encounter[] = [...hurdles.map((hurdle, id) => ({ x: hurdle.x, hurdleId: id })),
     ...people.map(person => ({ x: person.x })),
-    ...movers.map((mover, id) => ({ x: mover.x, mover: id, kind: mover.kind }))].sort((a, b) => a.x - b.x);
+    ...movers.map((mover, id) => ({ x: mover.x, mover: id, kind: mover.kind })),
+    { x: BUCKET_HAT.x }].sort((a, b) => a.x - b.x);
   for (const encounter of encounters) {
     if (encounter.kind === 'pigeon') {
       await page.waitForFunction(id => {
@@ -382,6 +469,7 @@ test('the complete runner course is winnable with real timed jumps, ducks and ba
   }
   await expect(page.locator('#game')).toHaveAttribute('data-phase', 'won', { timeout: 5000 });
   await expect(page.locator('#result-title')).toHaveText('Sean, you may kiss Becky.');
+  await expect(page.locator('#game')).toHaveAttribute('data-hat-collected', 'true');
   await expect(page.locator('#lives')).toHaveText('3 / 3');
   await expect(page.locator('#game')).toHaveAttribute('data-dodged', String(movers.length));
   await expect(page.locator('#result-detail')).toContainText(`${hurdles.length} / ${hurdles.length} hurdles cleared`);

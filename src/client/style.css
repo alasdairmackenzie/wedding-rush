@@ -103,6 +103,14 @@ button:disabled { opacity: .6; cursor: wait; }
 }
 
 .combo strong { color: #7b4bb3; }
+.concentrate-power {
+  position: absolute; z-index: 4; bottom: max(16px, env(safe-area-inset-bottom)); left: max(12px, env(safe-area-inset-left));
+  margin: 0; padding: 8px 10px; border: 2px solid #a34710; background: #fff0cf; color: #a34710;
+  font: bold 12px/1.4 monospace; pointer-events: none;
+}
+@media (max-width: 700px), (pointer: coarse) {
+  .concentrate-power { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 68px); }
+}
 .combo strong[data-hot] { animation: combo-pop .3s ease-out; }
 @keyframes combo-pop { from { scale: 1.6; } }
 .becky-text {

@@ -46,11 +46,11 @@ function person(scene: Phaser.Scene, kind: TemptationKind | 'groom' | 'bride'): 
     oval(c, 49, 33, 25, 29, '#ffffffaa');
   } else box(c, 29, 47, 36, 35, colours[kind]);
   const uploaded = scene.textures.exists(`${kind}-face`);
-  if (uploaded || bride || kind === 'pingpong' || kind === 'deal' || kind === 'hat') {
+  if (uploaded || bride || kind === 'pingpong' || kind === 'deal' || kind === 'hat' || kind === 'karaoke' || kind === 'kebab' || kind === 'pub') {
     const headKey = uploaded ? `${kind}-face` : `${kind}-head`;
     const head = scene.textures.get(headKey).getSourceImage();
     if (!(head instanceof HTMLImageElement)) throw new Error(`Head photo is not loaded: ${headKey}`);
-    const height = kind === 'hat' ? 100 : 50, width = head.width / head.height * height;
+    const height = kind === 'hat' ? 80 : 50, width = head.width / head.height * height;
     c.drawImage(head, 48 - width / 2, 52 - height, width, height);
   } else {
     oval(c, 48, 29, 17, 20, skin);
@@ -98,7 +98,6 @@ function person(scene: Phaser.Scene, kind: TemptationKind | 'groom' | 'bride'): 
   } else if (kind === 'karaoke') {
     line(c, [72, 71, 76, 52]); oval(c, 77, 49, 6, 8, '#69778c');
     c.fillStyle = INK; c.font = '22px serif'; c.fillText('♪', 80, 28);
-    if (!uploaded) box(c, 34, 25, 28, 7, '#352b3c');
   } else {
     c.fillStyle = '#f0ca81';
     c.beginPath(); c.moveTo(67, 55); c.lineTo(88, 55); c.lineTo(79, 85); c.closePath(); c.fill(); c.stroke();
@@ -139,6 +138,25 @@ export function makeTextures(scene: Phaser.Scene): void {
 }
 
 function extras(scene: Phaser.Scene): void {
+  {
+    const [image, c] = canvas(192, 144);
+    box(c, 3, 3, 186, 49, '#fff8e8');
+    c.fillStyle = INK; c.font = 'bold 18px monospace'; c.textAlign = 'center';
+    c.fillText('4x ORANGE SQUASH', 96, 24);
+    c.font = 'bold 13px monospace';
+    c.fillText('4s INVINCIBILITY', 96, 43);
+    line(c, [90, 55, 96, 61, 102, 55]);
+    box(c, 70, 86, 52, 56, '#f58b24');
+    box(c, 84, 73, 24, 16, '#f58b24');
+    box(c, 81, 66, 30, 10, '#42735a');
+    box(c, 74, 98, 44, 35, '#fff8e8');
+    oval(c, 85, 116, 8, 8, '#f58b24');
+    c.strokeStyle = '#42735a';
+    oval(c, 86, 106, 5, 2, '#42735a');
+    c.fillStyle = INK; c.font = 'bold 17px monospace';
+    c.fillText('4x', 105, 122);
+    scene.textures.addCanvas('concentrate', image);
+  }
   {
     const [image, c] = canvas(52, 52);
     oval(c, 26, 26, 23, 23, '#a8693c');
