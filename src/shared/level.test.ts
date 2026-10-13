@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { beckyTexts, BRIDE, BUCKET_HAT, BUCKET_HAT_VALUE, concentrates, CONCENTRATE_DURATION, corks, daylightProgress, GROOM, hurdles, MAX_SCORE, movers, moverStart, MOVER_TRIGGER, people,
-  platforms, rings, RING_VALUE, Run, runnerSpeed, runTitle, START, sweets, temptations, TOTAL_SCORE, WORLD } from './level';
+  isNearMiss, NEAR_MISS_GAP, NEAR_MISS_VALUE, platforms, rings, RING_VALUE, Run, runChallenges, runnerSpeed, runTitle, START, sweets, temptations, TOTAL_SCORE, WORLD } from './level';
 
 function playing(): Run { const run = new Run(); run.phase = 'playing'; return run; }
 
@@ -301,6 +301,48 @@ describe('4x orange concentrate', () => {
   });
 });
 
+describe('close shaves and personal challenges', () => {
+  it('requires a non-colliding gap of at most 18 pixels and ducking for pigeons', () => {
+    for (const gap of [0, NEAR_MISS_GAP]) {
+      expect(isNearMiss('barrel', 400, 566 - gap, 588, 44, false)).toBe(true);
+      expect(isNearMiss('pigeon', 571 + gap, 610, 556, 30, true)).toBe(true);
+    }
+    for (const gap of [-1, NEAR_MISS_GAP + 1]) {
+      expect(isNearMiss('barrel', 400, 566 - gap, 588, 44, false)).toBe(false);
+      expect(isNearMiss('pigeon', 571 + gap, 610, 556, 30, true)).toBe(false);
+    }
+    expect(isNearMiss('pigeon', 582, 610, 556, 30, false)).toBe(false);
+  });
+  it('awards flat points once on a clean dodge, excludes hits, powers and inactive runs, and resets', () => {
+    const run = playing();
+    run.streak = 12;
+    expect(run.dodgeMover(0, true)).toBe(true);
+    expect(run.nearMissScore).toBe(NEAR_MISS_VALUE);
+    expect(run.score).toBe(5);
+    expect(run.dodgeMover(0, true)).toBe(false);
+    run.hitMover(1);
+    expect(run.dodgeMover(1, true)).toBe(false);
+    run.drinkConcentrate(0);
+    run.dodgeMover(2, true);
+    expect(run.nearMisses.size).toBe(1);
+    run.phase = 'paused';
+    expect(run.dodgeMover(3, true)).toBe(false);
+    expect(new Run().nearMissScore).toBe(0);
+  });
+  it('earns each challenge exactly from its requirement, with no-hit requiring a win', () => {
+    const run = playing();
+    expect(runChallenges(run).every(challenge => !challenge.earned)).toBe(true);
+    people.forEach((_person, id) => run.squashPerson(id));
+    rings.forEach((_ring, id) => run.collectRing(id));
+    run.collectHat();
+    expect(runChallenges(run).filter(challenge => challenge.earned).map(challenge => challenge.id)).toEqual(['mates', 'rings', 'hat']);
+    run.finish();
+    expect(runChallenges(run).every(challenge => challenge.earned)).toBe(true);
+    run.distractions = 1;
+    expect(runChallenges(run).find(challenge => challenge.id === 'flawless')?.earned).toBe(false);
+  });
+});
+
 describe('final bucket hat', () => {
   it('extends the finish and places the hat within a normal jump but above a grounded runner', () => {
     expect(BRIDE.x).toBe(14200);
@@ -365,7 +407,7 @@ describe('combo, rings and titles', () => {
   it('caps the maximum possible score for the leaderboard', () => {
     const run = playing();
     for (let id = 0; id < hurdles.length; id++) run.clearHurdle(id);
-    for (let id = 0; id < movers.length; id++) run.dodgeMover(id);
+    for (let id = 0; id < movers.length; id++) run.dodgeMover(id, true);
     people.forEach((_p, id) => run.squashPerson(id));
     rings.forEach((_r, id) => run.collectRing(id));
     sweets.forEach((_s, id) => run.collect(id));

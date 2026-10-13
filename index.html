@@ -47,6 +47,7 @@
           <p>One press, one full jump; press again in the air to double jump. Jump hurdles and beer barrels, and duck the pigeons. Champagne gives a super jump for the wedding rings. Land on your mates to squash them for +5; running into them costs a chance. Clear things in a row for up to a ×3 combo. Three hits and you're out.</p>
           <p>Grab an orange 4× squash bottle for four seconds of invincibility. Run straight through hurdles, mates, barrels and pigeons, or keep jumping for sweets and rings. There are two bottles along the route; champagne still gives its super jump.</p>
           <p>Find Sean's bucket hat in the final stretch! A normal jump grabs it for +50 bonus points before you reach Becky.</p>
+          <p>Narrowly jump a barrel or duck a pigeon for a CLOSE SHAVE and +5 points. Invincible passes don't earn this bonus. Earn personal challenge badges on the results screen and keep them on this device.</p>
         </div>
         <button id="restart" type="button" hidden>Start a fresh run</button>
         <button id="menu-top-list" type="button">🏆 View the guest top list</button>
@@ -60,6 +61,11 @@
         <p id="result-summary" class="summary"></p>
         <ul id="result-detail" class="stats" aria-label="Run stats"></ul>
         <p id="result-best" class="best"></p>
+        <section aria-labelledby="challenges-title">
+          <h3 id="challenges-title">Personal challenges</h3>
+          <ul id="result-challenges" class="challenges"></ul>
+          <p id="challenges-status"></p>
+        </section>
         <form id="score-form" class="post-score" novalidate>
           <label for="player-name">Your name for the guest top list</label>
           <div class="score-row">

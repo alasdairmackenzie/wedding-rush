@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { isFaceKind } from '../shared/faces';
-import { beckyTexts, BRIDE, BUCKET_HAT, BUCKET_HAT_VALUE, concentrates, corks, daylightProgress, GROOM, hurdles, movers, moverStart, MOVER_TRIGGER, people, platforms,
+import { beckyTexts, BRIDE, BUCKET_HAT, BUCKET_HAT_VALUE, concentrates, corks, daylightProgress, GROOM, hurdles, isNearMiss, movers, moverStart, MOVER_TRIGGER, NEAR_MISS_VALUE, people, platforms,
   RING_VALUE, rings, Run, RUN_OBJECTIVE, runnerSpeed, SQUASH_BONUS, START, sweets, WORLD } from '../shared/level';
 import { drawCity, makeTextures } from './art';
 import { RunnerInput } from './input';
@@ -31,6 +31,8 @@ interface Mover {
   art: Phaser.GameObjects.Image;
   x: number;
   active: boolean;
+  close: boolean;
+  poweredPass: boolean;
 }
 export interface GameUI {
   arena: HTMLElement;
@@ -49,6 +51,7 @@ export class WeddingScene extends Phaser.Scene {
   celebrating = false;
   private player!: Phaser.Physics.Arcade.Sprite;
   private playerArt!: Phaser.GameObjects.Image;
+  private wornHat!: Phaser.GameObjects.Image;
   private brideArt!: Phaser.GameObjects.Image;
   private victoryTimer?: Phaser.Time.TimerEvent;
   private controls!: RunnerInput;
@@ -127,6 +130,7 @@ export class WeddingScene extends Phaser.Scene {
     this.playerArt = this.add.image(START.x, START.y + 40, 'groom-photo').setOrigin(.5, 1).setDepth(5);
     this.setPlayerPhoto('groom-photo');
     this.playerArt.setScale(this.playerScale);
+    this.wornHat = this.add.image(START.x, START.y, 'bucket-hat').setDepth(6).setVisible(false).setName('worn-bucket-hat');
     this.concentrateGlow = this.add.ellipse(START.x, START.y, 90, 150, 0xff8c24, .22)
       .setStrokeStyle(3, 0xffa53b, .8).setDepth(4).setVisible(false).setName('concentrate-glow');
     this.physics.add.collider(this.player, ground);
@@ -184,7 +188,7 @@ export class WeddingScene extends Phaser.Scene {
     movers.forEach((definition, id) => {
       const art = this.add.image(moverStart(definition), definition.y, definition.kind)
         .setDepth(6).setName(`${definition.kind}-${id}`);
-      this.moving.push({ art, x: moverStart(definition), active: false });
+      this.moving.push({ art, x: moverStart(definition), active: false, close: false, poweredPass: false });
     });
     corks.forEach((cork, id) => {
       this.corkArt.push(this.add.image(cork.x, cork.y, 'champagne').setDepth(5).setName(`champagne-${id}`));
@@ -295,6 +299,7 @@ export class WeddingScene extends Phaser.Scene {
       this.moving.forEach((mover, id) => {
         mover.x = moverStart(movers[id]);
         mover.active = false;
+        mover.close = mover.poweredPass = false;
         mover.art.setPosition(mover.x, movers[id].y).setAlpha(1).setAngle(0);
       });
       this.corkArt.forEach(art => art.setVisible(true));
@@ -302,6 +307,7 @@ export class WeddingScene extends Phaser.Scene {
       this.ringArt.forEach(art => art.setVisible(true));
       this.bucketHatArt.setVisible(true);
       this.bucketHatLabel.setVisible(true);
+      this.wornHat.setVisible(false);
       this.textsSent = 0;
       this.lastMultiplier = 1;
       this.cameras.main.resetFX();
@@ -638,6 +644,16 @@ export class WeddingScene extends Phaser.Scene {
     this.playerArt.setPosition(this.player.x, this.player.y + 40 + bob);
     this.playerArt.setScale(this.playerScale, this.playerScale * (this.ducking ? .55 : 1));
     this.playerArt.setAlpha(this.run.elapsed < this.invulnerableUntil ? .5 : 1);
+    this.wornHat.setVisible(this.run.hatCollected);
+    if (this.run.hatCollected) {
+      const photo = this.playerArt;
+      const headOffset = photo.texture.key === 'groom-photo-alt' ? .036 : -.025;
+      const hatImage = this.textures.get('bucket-hat').getSourceImage();
+      const hatHeight = photo.displayHeight * .24;
+      this.wornHat.setDisplaySize(hatHeight * hatImage.width / hatImage.height, hatHeight)
+        .setPosition(photo.x + photo.displayWidth * headOffset, photo.y - photo.displayHeight * .945)
+        .setAlpha(photo.alpha);
+    }
     const powered = this.run.concentrateRemaining > 0;
     this.concentrateGlow.setVisible(powered).setPosition(this.playerArt.x, this.playerArt.y - this.playerArt.displayHeight / 2);
     this.concentrateGlow.setSize(this.playerArt.displayWidth + 24, this.playerArt.displayHeight + 18);
@@ -694,6 +710,11 @@ export class WeddingScene extends Phaser.Scene {
         mover.art.angle -= definition.speed * delta / 1000 / (definition.width / 2) * 180 / Math.PI;
       }
       if (this.run.hitMovers.has(id) || this.run.dodged.has(id)) return;
+      const alongside = body.right > mover.x - definition.width / 2 && body.left < mover.x + definition.width / 2;
+      if (alongside) {
+        if (this.run.concentrateRemaining || this.discoMode) mover.poweredPass = true;
+        if (isNearMiss(definition.kind, body.top, body.bottom, definition.y, definition.height, this.ducking)) mover.close = true;
+      }
       if (overlaps(mover.x, definition.y, definition.width, definition.height)) {
         if ((this.run.concentrateRemaining || this.discoMode) && this.run.dodgeMover(id)) {
           mover.art.setAlpha(.4);
@@ -705,9 +726,14 @@ export class WeddingScene extends Phaser.Scene {
           this.bump(definition.kind === 'pigeon' ? 'PIGEONED!' : 'BARRELLED!',
             definition.kind === 'pigeon' ? 'Hit by a pigeon! Duck next time.' : 'Flattened by a beer barrel! Jump it next time.');
         }
-      } else if (body.left > mover.x + definition.width / 2 && this.run.dodgeMover(id)) {
+      } else if (body.left > mover.x + definition.width / 2 &&
+        this.run.dodgeMover(id, mover.close && !mover.poweredPass && !this.discoMode)) {
         this.ui.audio.tone('sweet');
-        this.announceEvent(definition.kind === 'pigeon' ? 'DUCKED!' : 'DODGED!', 'NICE MOVES', '#42735a');
+        if (this.run.nearMisses.has(id)) {
+          this.floatText(mover.x, definition.y - 50, `+${NEAR_MISS_VALUE}`, '#42735a');
+          this.announceEvent('CLOSE SHAVE!', `+${NEAR_MISS_VALUE} BONUS POINTS`, '#42735a');
+          this.ui.notice(`Close shave! +${NEAR_MISS_VALUE} points for a narrow escape.`);
+        } else this.announceEvent(definition.kind === 'pigeon' ? 'DUCKED!' : 'DODGED!', 'NICE MOVES', '#42735a');
         this.comboCheck();
       }
     });

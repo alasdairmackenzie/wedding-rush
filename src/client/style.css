@@ -131,6 +131,12 @@ button:disabled { opacity: .6; cursor: wait; }
 .stats { list-style: none; margin: 10px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .stats li { padding: 4px 9px; border: 2px solid #302825; background: #fffaf0; font: bold 12px/1.4 monospace; }
 .stats li[data-key] { background: #ffd465; }
+.challenges { list-style: none; padding: 0; display: grid; gap: 8px; }
+.challenges li { border: 2px solid #302825; padding: 10px; background: #fffaf0; font-size: 13px; line-height: 1.5; }
+.challenges li[data-earned] { background: #e0ecd9; }
+.challenges li[data-new] { background: #ffd465; }
+.challenges strong, .challenges span { display: block; }
+#challenges-status { font-size: 12px; }
 .best { margin: 8px 0; }
 .post-score { border-top: 1px dashed #ac9c83; margin-top: 14px; padding-top: 12px; }
 .post-score label { font: bold 10px monospace; letter-spacing: 1px; }
