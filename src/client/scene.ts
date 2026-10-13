@@ -6,9 +6,11 @@ import { drawCity, makeTextures } from './art';
 import { RunnerInput } from './input';
 import { GameAudio } from './audio';
 import groomPhotoUrl from '../assets/art/groom-photo.png';
+import groomPhotoAltUrl from '../assets/art/groom-photo-alt.png';
 import brideHeadUrl from '../assets/art/bride-head.png';
 import pingpongHeadUrl from '../assets/art/pingpong-head.png';
 import dealHeadUrl from '../assets/art/deal-head.png';
+import hatHeadUrl from '../assets/art/hat-head.png';
 
 interface Hurdle {
   body: Phaser.GameObjects.Rectangle;
@@ -77,9 +79,11 @@ export class WeddingScene extends Phaser.Scene {
       this.ui.error(`Could not load ${file.key}. Reload the page to try again.`);
     });
     this.load.image('groom-photo', groomPhotoUrl);
+    this.load.image('groom-photo-alt', groomPhotoAltUrl);
     this.load.image('bride-head', brideHeadUrl);
     this.load.image('pingpong-head', pingpongHeadUrl);
     this.load.image('deal-head', dealHeadUrl);
+    this.load.image('hat-head', hatHeadUrl);
     this.load.on('filecomplete-json-faces', (_key: string, _type: string, data: { faces?: Record<string, number> } | undefined) => {
       for (const [kind, version] of Object.entries(data?.faces ?? {})) {
         if (isFaceKind(kind)) this.load.image(`${kind}-face`, `/api/faces/${kind}?v=${version}`);
@@ -107,8 +111,7 @@ export class WeddingScene extends Phaser.Scene {
     this.player = this.physics.add.sprite(START.x, START.y, 'groom').setAlpha(0);
     this.player.setSize(GROOM.width, GROOM.height).setOffset(31, 40);
     this.playerArt = this.add.image(START.x, START.y + 40, 'groom-photo').setOrigin(.5, 1).setDepth(5);
-    const photo = this.textures.get('groom-photo').getSourceImage();
-    this.playerScale = Math.min(90 / photo.width, 120 / photo.height);
+    this.setPlayerPhoto('groom-photo');
     this.playerArt.setScale(this.playerScale);
     this.physics.add.collider(this.player, ground);
     this.pickups = this.physics.add.staticGroup();
@@ -279,6 +282,7 @@ export class WeddingScene extends Phaser.Scene {
       this.invulnerableUntil = 0;
     }
     if (newRun) {
+      this.setPlayerPhoto('groom-photo');
       this.player.setVelocity(0);
       this.groundedAt = this.jumpUntil = -1000;
       this.doubleJumped = false;
@@ -586,6 +590,8 @@ export class WeddingScene extends Phaser.Scene {
       if (this.player.x >= BRIDE.x - 54 && this.run.finish()) this.end();
       this.syncUI();
     }
+    const photoKey = Math.floor(this.run.elapsed / 5000) % 2 === 0 ? 'groom-photo' : 'groom-photo-alt';
+    if (this.playerArt.texture.key !== photoKey) this.setPlayerPhoto(photoKey);
     const bob = !this.reducedMotion.matches && this.run.phase === 'playing' && this.player.body?.blocked.down
       ? Math.sin(this.run.elapsed / 65) * 2 : 0;
     this.playerArt.setPosition(this.player.x, this.player.y + 40 + bob);
@@ -598,6 +604,11 @@ export class WeddingScene extends Phaser.Scene {
         this.sparkle(this.player.x, this.player.y + 20);
       }
     }
+  }
+  private setPlayerPhoto(key: 'groom-photo' | 'groom-photo-alt'): void {
+    this.playerArt.setTexture(key);
+    const photo = this.textures.get(key).getSourceImage();
+    this.playerScale = 180 / photo.height;
   }
   private updateExtras(delta: number, body: Phaser.Physics.Arcade.Body): void {
     const overlaps = (x: number, y: number, width: number, height: number): boolean =>

@@ -64,6 +64,39 @@ test('uses the Sean and Becky title and character names throughout the UI', asyn
   await expect(page.getByRole('button', { name: 'Back to Becky' })).toBeVisible();
 });
 
+for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+  test(`reveals detailed instructions only through How to play at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    const howToPlay = page.getByRole('button', { name: 'How to play', exact: true });
+    const instructions = page.locator('#play-instructions');
+    await expect(page.locator('#play + #how-to-play')).toBeVisible();
+    await expect(instructions).toBeHidden();
+    await expect(page.locator('#controls')).toBeHidden();
+    await expect(howToPlay).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#controls')).not.toContainText('One press, one full jump');
+    await howToPlay.click();
+    await expect(howToPlay).toHaveAttribute('aria-expanded', 'true');
+    await expect(instructions).toContainText("One press, one full jump; press again in the air to double jump. Jump hurdles and beer barrels, and duck the pigeons. Champagne gives a super jump for the wedding rings. Land on your mates to squash them for +5; running into them costs a chance. Clear things in a row for up to a ×3 combo. Three hits and you're out.");
+    await expect(instructions).toBeVisible();
+    await expect(page.locator('#controls')).toBeVisible();
+    await expect(page.locator('#controls')).toHaveText('Space / W / ↑ jump · S / ↓ duck · Esc pause · on mobile, tap to jump and hold DUCK');
+    await howToPlay.focus();
+    await page.keyboard.press('Enter');
+    await expect(instructions).toBeHidden();
+    await expect(page.locator('#controls')).toBeHidden();
+    await expect(howToPlay).toHaveAttribute('aria-expanded', 'false');
+    await page.getByRole('button', { name: "I'm coming!" }).click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'paused');
+    await howToPlay.click();
+    await expect(instructions).toBeVisible();
+    await page.getByRole('button', { name: 'Back to Becky' }).click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+  });
+}
+
 test('high sweets can be collected with a timed hurdle jump and a squash-bounce', async ({ page }) => {
   await start(page);
   await page.waitForFunction(() => document.getElementById('game')?.dataset.grounded === 'true');
@@ -169,11 +202,39 @@ test('retains photo artwork and the distraction cast without platformer controls
     return {
       key: scene.playerArt.texture.key, height: scene.playerArt.displayHeight,
       hitbox: [scene.player.body.width, scene.player.body.height],
-      heads: ['bride-head', 'deal-head', 'pingpong-head'].every(key => scene.textures.exists(key)),
+      heads: ['bride-head', 'deal-head', 'pingpong-head', 'hat-head'].every(key => scene.textures.exists(key)),
       obstacles: scene.obstacles.length
     };
   })()`);
-  expect(artwork).toEqual({ key: 'groom-photo', height: 120, hitbox: [34, 56], heads: true, obstacles: hurdles.length });
+  expect(artwork).toEqual({ key: 'groom-photo', height: 180, hitbox: [34, 56], heads: true, obstacles: hurdles.length });
+  const cutouts = await page.evaluate<{ transparent: number; opaque: number; cornerAlpha: number[] }[]>(`(async () => {
+    const { game } = await import('/src/client/main.ts');
+    const scene = game.scene.getScene('wedding');
+    return ['groom-photo', 'groom-photo-alt', 'hat-head'].map(key => {
+      const image = scene.textures.get(key).getSourceImage();
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext('2d');
+      context.drawImage(image, 0, 0);
+      const pixels = context.getImageData(0, 0, image.width, image.height).data;
+      let transparent = 0, opaque = 0;
+      for (let i = 3; i < pixels.length; i += 4) {
+        if (pixels[i] === 0) transparent++;
+        if (pixels[i] === 255) opaque++;
+      }
+      return {
+        transparent: transparent / (image.width * image.height),
+        opaque: opaque / (image.width * image.height),
+        cornerAlpha: [pixels[3], pixels[image.width * 4 - 1]],
+      };
+    });
+  })()`);
+  for (const cutout of cutouts) {
+    expect(cutout.transparent).toBeGreaterThan(.15);
+    expect(cutout.opaque).toBeGreaterThan(.35);
+    expect(cutout.cornerAlpha).toEqual([0, 0]);
+  }
   const characters = await page.evaluate<string[]>(`(async () => {
     const { game } = await import('/src/client/main.ts');
     return game.scene.getScene('wedding').characters.map(character => character.art.texture.key);
@@ -181,8 +242,65 @@ test('retains photo artwork and the distraction cast without platformer controls
   expect(characters).toEqual(['football', 'deal', 'pingpong', 'hat', 'pub', 'karaoke', 'kebab']);
   await page.keyboard.press('Escape');
   await expect(page.locator('.cast')).toHaveCount(0);
-  await expect(page.locator('#controls')).toContainText('One press, one full jump');
+  await page.getByRole('button', { name: 'How to play', exact: true }).click();
+  await expect(page.locator('#play-instructions')).toContainText('One press, one full jump');
   await expect(page.getByRole('button', { name: 'Move right', exact: true })).toHaveCount(0);
+});
+
+test('bucket-hat character uses the bundled cutout by default and accepts an uploaded face', async ({ page }) => {
+  await page.route('**/api/faces', route => route.fulfill({ json: { faces: {} } }));
+  await page.goto('/');
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'ready');
+  const headPixels = `(async () => {
+    const { game } = await import('/src/client/main.ts');
+    const image = game.textures.get('hat').getSourceImage();
+    return Array.from(image.getContext('2d').getImageData(0, 2, 96, 40).data);
+  })()`;
+  const defaultHead = await page.evaluate<number[]>(headPixels);
+  expect(await page.evaluate(`(async () => {
+    const { game } = await import('/src/client/main.ts');
+    return game.textures.exists('hat-head') && !game.textures.exists('hat-face');
+  })()`)).toBe(true);
+  await page.route('**/api/faces', route => route.fulfill({ json: { faces: { hat: 1 } } }));
+  await page.route('**/api/faces/hat?*', route => route.fulfill({
+    contentType: 'image/png',
+    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP4z8CAFWEXHbQSACj/P8Fu7N9hAAAAAElFTkSuQmCC', 'base64'),
+  }));
+  await page.reload();
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'ready');
+  expect(await page.evaluate<number[]>(headPixels)).not.toEqual(defaultHead);
+  expect(await page.evaluate(`(async () => {
+    const { game } = await import('/src/client/main.ts');
+    return game.textures.exists('hat-face');
+  })()`)).toBe(true);
+});
+
+test('Sean alternates supplied photos every five seconds of play, pauses and resets', async ({ page }) => {
+  await start(page);
+  await exposeScene(page);
+  await page.keyboard.press('Escape');
+  for (const [elapsed, key] of [
+    [0, 'groom-photo'], [4999, 'groom-photo'], [5000, 'groom-photo-alt'],
+    [9999, 'groom-photo-alt'], [10000, 'groom-photo'], [15000, 'groom-photo-alt'],
+  ] as const) {
+    const artwork = await page.evaluate(`(() => {
+      const scene = window.__scene;
+      scene.run.elapsed = ${elapsed};
+      scene.update(0, 0);
+      return {
+        key: scene.playerArt.texture.key, height: scene.playerArt.displayHeight,
+        hitbox: [scene.player.body.width, scene.player.body.height],
+      };
+    })()`);
+    expect(artwork).toEqual({ key, height: 180, hitbox: [34, 56] });
+  }
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(`window.__scene.playerArt.texture.key`)).toBe('groom-photo-alt');
+  await page.getByRole('button', { name: 'Back to Becky' }).click();
+  expect(await page.evaluate(`window.__scene.playerArt.texture.key`)).toBe('groom-photo-alt');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Start a fresh run' }).click();
+  expect(await page.evaluate(`window.__scene.playerArt.texture.key`)).toBe('groom-photo');
 });
 
 test('there is no countdown or time-up loss', async ({ page }) => {
