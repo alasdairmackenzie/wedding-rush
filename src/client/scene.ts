@@ -14,6 +14,7 @@ import hatHeadUrl from '../assets/art/hat-head.png';
 import karaokeHeadUrl from '../assets/art/karaoke-head.png';
 import kebabHeadUrl from '../assets/art/kebab-head.png';
 import pubHeadUrl from '../assets/art/pub-head.png';
+import footballHeadUrl from '../assets/art/football-head.png';
 import bucketHatUrl from '../assets/art/bucket-hat.png';
 
 interface Hurdle {
@@ -95,6 +96,7 @@ export class WeddingScene extends Phaser.Scene {
     this.load.image('karaoke-head', karaokeHeadUrl);
     this.load.image('kebab-head', kebabHeadUrl);
     this.load.image('pub-head', pubHeadUrl);
+    this.load.image('football-head', footballHeadUrl);
     this.load.image('bucket-hat', bucketHatUrl);
     this.load.on('filecomplete-json-faces', (_key: string, _type: string, data: { faces?: Record<string, number> } | undefined) => {
       for (const [kind, version] of Object.entries(data?.faces ?? {})) {

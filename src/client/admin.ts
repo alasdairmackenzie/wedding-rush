@@ -7,6 +7,7 @@ import hatHeadUrl from '../assets/art/hat-head.png';
 import karaokeHeadUrl from '../assets/art/karaoke-head.png';
 import kebabHeadUrl from '../assets/art/kebab-head.png';
 import pubHeadUrl from '../assets/art/pub-head.png';
+import footballHeadUrl from '../assets/art/football-head.png';
 import './style.css';
 import './admin.css';
 
@@ -17,6 +18,7 @@ const defaultFaces: Partial<Record<FaceKind, string>> = {
   karaoke: karaokeHeadUrl,
   kebab: kebabHeadUrl,
   pub: pubHeadUrl,
+  football: footballHeadUrl,
 };
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const login = $<HTMLFormElement>('login');
