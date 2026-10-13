@@ -156,7 +156,7 @@ export class WeddingScene extends Phaser.Scene {
         definition.width, definition.height, 0xffffff, 0);
       this.physics.add.existing(body, true);
       const art = this.add.image(definition.x, 610, character.kind)
-        .setOrigin(.5, 102 / 112).setScale(1.1).setDepth(4);
+        .setOrigin(.5, character.kind === 'hat' ? 152 / 162 : 102 / 112).setScale(1.1).setDepth(4);
       const bubble = this.add.text(definition.x, 475, character.line, {
         fontFamily: 'Trebuchet MS, sans-serif', fontSize: '17px', fontStyle: 'bold',
         color: '#352b3c', backgroundColor: '#fff8e8', padding: { x: 12, y: 10 },
@@ -590,8 +590,12 @@ export class WeddingScene extends Phaser.Scene {
       if (this.player.x >= BRIDE.x - 54 && this.run.finish()) this.end();
       this.syncUI();
     }
-    const photoKey = Math.floor(this.run.elapsed / 5000) % 2 === 0 ? 'groom-photo' : 'groom-photo-alt';
-    if (this.playerArt.texture.key !== photoKey) this.setPlayerPhoto(photoKey);
+    if (this.run.phase === 'playing') {
+      const body = this.player.body;
+      const airborne = body && (!body.blocked.down || body.velocity.y < 0);
+      const photoKey = airborne ? 'groom-photo-alt' : 'groom-photo';
+      if (this.playerArt.texture.key !== photoKey) this.setPlayerPhoto(photoKey);
+    }
     const bob = !this.reducedMotion.matches && this.run.phase === 'playing' && this.player.body?.blocked.down
       ? Math.sin(this.run.elapsed / 65) * 2 : 0;
     this.playerArt.setPosition(this.player.x, this.player.y + 40 + bob);
@@ -608,7 +612,7 @@ export class WeddingScene extends Phaser.Scene {
   private setPlayerPhoto(key: 'groom-photo' | 'groom-photo-alt'): void {
     this.playerArt.setTexture(key);
     const photo = this.textures.get(key).getSourceImage();
-    this.playerScale = 180 / photo.height;
+    this.playerScale = 135 / photo.height;
   }
   private updateExtras(delta: number, body: Phaser.Physics.Arcade.Body): void {
     const overlaps = (x: number, y: number, width: number, height: number): boolean =>
