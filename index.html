@@ -61,11 +61,6 @@
         <p id="result-summary" class="summary"></p>
         <ul id="result-detail" class="stats" aria-label="Run stats"></ul>
         <p id="result-best" class="best"></p>
-        <section aria-labelledby="challenges-title">
-          <h3 id="challenges-title">Personal challenges</h3>
-          <ul id="result-challenges" class="challenges"></ul>
-          <p id="challenges-status"></p>
-        </section>
         <form id="score-form" class="post-score" novalidate>
           <label for="player-name">Your name for the guest top list</label>
           <div class="score-row">
@@ -77,8 +72,17 @@
         <button id="again" type="button" class="primary" autofocus>One more big day ↗</button>
         <div class="text-links">
           <button id="result-top-list" type="button" class="link">See the top list</button>
+          <button id="result-challenges-button" type="button" class="link" aria-haspopup="dialog" aria-controls="challenges-dialog">Challenges</button>
           <button id="result-menu" type="button" class="link">Back to menu</button>
         </div>
+      </dialog>
+      <dialog id="challenges-dialog" aria-labelledby="challenges-title">
+        <span class="stamp">YOUR WEDDINGRUSH CHALLENGES</span>
+        <h2 id="challenges-title">Personal challenges</h2>
+        <p>See your progress this run and the badges you have earned on this device.</p>
+        <ul id="result-challenges" class="challenges"></ul>
+        <p id="challenges-status"></p>
+        <button id="challenges-back" type="button" class="primary" autofocus>Back to results</button>
       </dialog>
       <dialog id="top-list" aria-labelledby="top-list-title">
         <span class="stamp">WEDDINGRUSH / TOP LIST</span>

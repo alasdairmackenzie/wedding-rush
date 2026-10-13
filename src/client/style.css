@@ -147,7 +147,7 @@ button:disabled { opacity: .6; cursor: wait; }
 #score-status:empty, #share-status:empty { display: none; }
 #score-status[data-error] { color: #b52f44; }
 dialog > button.share { margin-top: 16px; background: #f6d4dc; }
-.text-links { display: flex; justify-content: center; gap: 22px; margin-top: 12px; }
+.text-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; margin-top: 12px; }
 button.link { background: none; border: 0; box-shadow: none; padding: 6px 2px; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; color: #302825; }
 button.link:hover { background: none; color: #9c4937; }
 button.link:active { translate: none; }

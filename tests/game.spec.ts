@@ -495,20 +495,38 @@ for (const width of [1280, 390]) {
     await expect(page.locator('#game')).toHaveAttribute('data-hat-collected', 'true');
     await teleport(page, BRIDE.x - 50);
     const badges = page.locator('#result-challenges');
+    const challengesDialog = page.locator('#challenges-dialog');
+    await expect(page.getByRole('button', { name: 'Challenges' })).toBeVisible();
+    await expect(challengesDialog).toBeHidden();
+    await expect(page.locator('#result-summary')).toBeHidden();
+    await expect(page.locator('#result-detail')).toContainText('3/3 lives left');
+    if (width === 390) {
+      await expect(page.locator('#player-name')).toBeInViewport();
+      await expect(page.locator('#submit-score')).toBeInViewport();
+    }
+    await page.getByRole('button', { name: 'Challenges' }).click();
+    await expect(page.locator('#result')).toBeHidden();
+    await expect(challengesDialog).toBeVisible();
     await expect(badges.locator('li')).toHaveCount(4);
     await expect(badges.locator('[data-new]')).toHaveCount(2);
     await expect(badges.locator('[data-challenge="hat"]')).toContainText('NEW BADGE!');
     await expect(badges.locator('[data-challenge="mates"]')).toContainText('Not earned yet');
-    await expect(page.locator('#result-summary')).toBeHidden();
-    await expect(page.locator('#result-detail')).toContainText('3/3 lives left');
     const badgeBox = await badges.boundingBox();
     if (!badgeBox) throw new Error('Missing challenge badges.');
     expect(badgeBox.width).toBeLessThanOrEqual(width);
+    await page.keyboard.press('Escape');
+    await expect(challengesDialog).toBeHidden();
+    await expect(page.locator('#result')).toBeVisible();
+    await page.getByRole('button', { name: 'Challenges' }).click();
+    await page.getByRole('button', { name: 'Back to results' }).click();
+    await expect(challengesDialog).toBeHidden();
+    await expect(page.locator('#result')).toBeVisible();
     await page.reload();
     await page.getByRole('button', { name: "I'm coming!" }).click();
     await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
     await exposeScene(page);
     await teleport(page, BRIDE.x - 50);
+    await page.getByRole('button', { name: 'Challenges' }).click();
     await expect(badges.locator('[data-challenge="hat"]')).toContainText('Previously earned on this device');
     await expect(badges.locator('[data-challenge="flawless"]')).toContainText('Earned this run');
     await expect(badges.locator('[data-new]')).toHaveCount(0);
@@ -522,6 +540,7 @@ test('challenge storage failure is visible without preventing results', async ({
   await start(page);
   await exposeScene(page);
   await teleport(page, BRIDE.x - 50);
+  await page.getByRole('button', { name: 'Challenges' }).click();
   await expect(page.locator('#challenges-status')).toContainText('Badges could not be saved on this device');
   await expect(page.locator('#result-challenges [data-challenge="flawless"]')).toContainText('NEW BADGE!');
 });

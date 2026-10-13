@@ -33,6 +33,9 @@ const playerName = element('player-name', HTMLInputElement);
 const submitScore = element('submit-score', HTMLButtonElement);
 const scoreStatus = element('score-status', HTMLElement);
 const topList = element('top-list', HTMLDialogElement);
+const challengesDialog = element('challenges-dialog', HTMLDialogElement);
+const challengesBack = element('challenges-back', HTMLButtonElement);
+const resultChallengesButton = element('result-challenges-button', HTMLButtonElement);
 const topListIntro = element('top-list-intro', HTMLElement);
 const topListRows = element('top-list-rows', HTMLTableSectionElement);
 const topListPlay = element('top-list-play', HTMLButtonElement);
@@ -409,6 +412,20 @@ element('again', HTMLButtonElement).addEventListener('click', () => start(true))
 element('result-menu', HTMLButtonElement).addEventListener('click', () => {
   audio.stop();
   result.close(); started = false; showMenu();
+});
+function returnToResults(): void {
+  challengesDialog.close();
+  result.showModal();
+  resultChallengesButton.focus();
+}
+resultChallengesButton.addEventListener('click', () => {
+  result.close();
+  challengesDialog.showModal();
+});
+challengesBack.addEventListener('click', returnToResults);
+challengesDialog.addEventListener('cancel', event => {
+  event.preventDefault();
+  returnToResults();
 });
 element('menu-button', HTMLButtonElement).addEventListener('click', showMenu);
 const howToPlay = element('how-to-play', HTMLButtonElement);
