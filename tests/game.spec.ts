@@ -386,6 +386,8 @@ for (const width of [1280, 390]) {
     await start(page);
     await exposeScene(page);
     await teleport(page, BUCKET_HAT.x - 155);
+    expect(await page.evaluate<number[]>('[window.__scene.bucketHatArt.displayWidth, window.__scene.bucketHatArt.displayHeight]'))
+      .toEqual([72, 80]);
     await expect(page.locator('#game')).toHaveAttribute('data-grounded', 'true');
     const before = await page.evaluate<number>('window.__scene.run.score');
     await page.keyboard.press('Space');

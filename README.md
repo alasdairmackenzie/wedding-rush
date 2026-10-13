@@ -121,7 +121,8 @@ character's line waits until the intro finishes. Later encounter spacing stays u
 - **Combo multiplier**: clears, squashes and dodges build a capped multiplier;
   any hit resets it.
 - **Final bucket hat**: the background-free photo of Sean's actual hat appears
-  in the final stretch before Becky, with a jump prompt. A normal jump collects
+  at 72×80 world pixels in the final stretch before Becky, with a jump prompt
+  and a forgiving 90×100 collection area. A normal jump collects
   it once for a flat **50 points**, unaffected by combo multipliers. It is
   optional for winning, shown separately in results, and restored on replay.
 - **Becky's texts** pop up during the run and get more frantic near the end.
