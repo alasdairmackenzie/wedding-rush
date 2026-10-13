@@ -1,10 +1,13 @@
-export const WORLD = { width: 13300, height: 720 };
+export const WORLD = { width: 14500, height: 720 };
 export const GROOM = { speed: 300, maxSpeed: 430, jump: 650, gravity: 1600, width: 34, height: 56 };
 export const START = { x: 110, y: 566 };
-export const BRIDE = { x: 13000, y: 590 };
+export const BRIDE = { x: 14200, y: 590 };
+export const BUCKET_HAT = { x: 13600, y: 450, width: 90, height: 100 };
+export const BUCKET_HAT_VALUE = 50;
 export const SQUASH_BONUS = 5;
 export const RING_VALUE = 25;
 export const MAX_COMBO = 3;
+export const CONCENTRATE_DURATION = 4000;
 export const RUN_OBJECTIVE = 'Get Sean to Becky! Jump the hurdles, jump over or squash the distractions, collect sweets, and keep your three chances.';
 
 export interface Platform { x: number; y: number; width: number; height: number; kind: 'street' | 'ledge' }
@@ -68,6 +71,7 @@ export function moverStart(mover: (typeof movers)[number]): number {
 /** Champagne corks launch Sean into the sky, where the wedding rings spin out of normal reach. */
 export const corks = [520, ...CORK_AFTER.map(after => people[after].x + 280)].map(x => ({ x, y: 585 }));
 export const rings = corks.map(cork => ({ x: cork.x + 215, y: 285 }));
+export const concentrates = [3, 6].map(before => ({ x: hurdles[before].x - 300, y: 580 }));
 
 const sweetPositions = [
   ...[200, 260].map(x => ({ x, y: 565 })),
@@ -98,20 +102,45 @@ export class Run {
   readonly cleared = new Set<number>();
   readonly hit = new Set<number>();
   readonly hitPeople = new Set<number>();
+  readonly passedPeople = new Set<number>();
   readonly squashed = new Set<number>();
   readonly rings = new Set<number>();
   readonly corks = new Set<number>();
   readonly dodged = new Set<number>();
   readonly hitMovers = new Set<number>();
+  readonly concentrates = new Set<number>();
+  private concentrateUntil = 0;
   streak = 0;
   bestStreak = 0;
   comboScore = 0;
+  hatCollected = false;
 
   get sweetScore(): number { return [...this.collected].reduce((sum, id) => sum + sweets[id].value, 0); }
   get bonusScore(): number { return this.squashed.size * SQUASH_BONUS; }
   get ringScore(): number { return this.rings.size * RING_VALUE; }
-  get score(): number { return this.sweetScore + this.bonusScore + this.ringScore + this.comboScore; }
+  get hatScore(): number { return this.hatCollected ? BUCKET_HAT_VALUE : 0; }
+  get score(): number { return this.sweetScore + this.bonusScore + this.ringScore + this.hatScore + this.comboScore; }
+  collectHat(): boolean {
+    if (this.phase !== 'playing' || this.hatCollected) return false;
+    this.hatCollected = true;
+    return true;
+  }
   get multiplier(): number { return Math.min(MAX_COMBO, 1 + Math.floor(this.streak / 3)); }
+  get concentrateRemaining(): number {
+    return this.phase === 'playing' || this.phase === 'paused' ? Math.max(0, this.concentrateUntil - this.elapsed) : 0;
+  }
+  drinkConcentrate(id: number): boolean {
+    if (!this.valid(id, concentrates.length) || this.concentrates.has(id)) return false;
+    this.concentrates.add(id);
+    this.concentrateUntil = this.elapsed + CONCENTRATE_DURATION;
+    return true;
+  }
+  passPerson(id: number): boolean {
+    if (!this.valid(id, people.length) || !this.concentrateRemaining || this.hitPeople.has(id) ||
+      this.squashed.has(id) || this.passedPeople.has(id)) return false;
+    this.passedPeople.add(id);
+    return true;
+  }
   private valid(id: number, length: number): boolean {
     return this.phase === 'playing' && Number.isInteger(id) && id >= 0 && id < length;
   }
@@ -131,18 +160,21 @@ export class Run {
     return true;
   }
   hitHurdle(id: number): boolean {
+    if (this.concentrateRemaining) return false;
     if (this.phase !== 'playing' || !Number.isInteger(id) || id < 0 || id >= hurdles.length || this.hit.has(id) || this.cleared.has(id)) return false;
     this.hit.add(id);
     this.distract();
     return true;
   }
   hitPerson(id: number): boolean {
+    if (this.concentrateRemaining || this.passedPeople.has(id)) return false;
     if (this.phase !== 'playing' || !Number.isInteger(id) || id < 0 || id >= people.length || this.hitPeople.has(id) || this.squashed.has(id)) return false;
     this.hitPeople.add(id);
     this.distract();
     return true;
   }
   squashPerson(id: number): boolean {
+    if (this.passedPeople.has(id)) return false;
     if (this.phase !== 'playing' || !Number.isInteger(id) || id < 0 || id >= people.length || this.hitPeople.has(id) || this.squashed.has(id)) return false;
     this.squashed.add(id);
     this.earn(SQUASH_BONUS);
@@ -167,6 +199,7 @@ export class Run {
     return true;
   }
   hitMover(id: number): boolean {
+    if (this.concentrateRemaining) return false;
     if (!this.valid(id, movers.length) || this.dodged.has(id) || this.hitMovers.has(id)) return false;
     this.hitMovers.add(id);
     this.distract();
@@ -190,7 +223,7 @@ export class Run {
   }
 }
 
-export const MAX_SCORE = (TOTAL_SCORE + SQUASH_BONUS * people.length + RING_VALUE * rings.length) * MAX_COMBO;
+export const MAX_SCORE = (TOTAL_SCORE + SQUASH_BONUS * people.length + RING_VALUE * rings.length) * MAX_COMBO + BUCKET_HAT_VALUE;
 
 export function runTitle(run: Pick<Run, 'phase' | 'squashed' | 'rings' | 'distractions' | 'bestStreak' | 'collected'>): string {
   if (run.squashed.size === people.length) return `Squashed all ${people.length} mates`;

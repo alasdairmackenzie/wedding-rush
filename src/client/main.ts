@@ -24,6 +24,7 @@ const speed = element('speed', HTMLElement);
 const route = element('route', HTMLProgressElement);
 const notice = element('notice', HTMLElement);
 const combo = element('combo', HTMLElement);
+const concentratePower = element('concentrate-power', HTMLElement);
 const beckyText = element('becky-text', HTMLElement);
 const beckyMessage = element('becky-message', HTMLElement);
 const shareButton = element('share', HTMLButtonElement);
@@ -181,6 +182,12 @@ const wedding = new WeddingScene({
     lives.textContent = `${run.lives} / 3`;
     cleared.textContent = `${run.cleared.size} / ${hurdles.length}`;
     speed.textContent = `${Math.round(runnerSpeed(x))}`;
+    concentratePower.hidden = run.concentrateRemaining === 0;
+    const powerText = `4× ORANGE SQUASH · ${(Math.ceil(run.concentrateRemaining / 100) / 10).toFixed(1)}s`;
+    if (concentratePower.textContent !== powerText) concentratePower.textContent = powerText;
+    arena.dataset.concentrates = String(run.concentrates.size);
+    arena.dataset.hatCollected = String(run.hatCollected);
+    arena.dataset.concentrateRemaining = String(run.concentrateRemaining);
     const multiplier = `×${run.multiplier}`;
     if (combo.textContent !== multiplier) {
       combo.textContent = multiplier;
@@ -225,6 +232,7 @@ const wedding = new WeddingScene({
       ['🚧', `${run.cleared.size} / ${hurdles.length} hurdles cleared`],
       ['💥', `${run.squashed.size} / ${people.length} mates squashed`],
       ['💍', `${run.rings.size} / ${rings.length} rings`],
+      ['👒', run.hatCollected ? `Bucket hat found! +${run.hatScore} points` : 'Bucket hat not collected'],
       ['🔥', `best streak ${run.bestStreak}`],
     ];
     element('result-detail', HTMLElement).replaceChildren(...stats.map(([icon, text, key]) => {

@@ -41,9 +41,10 @@ a password when you start the server, for example
   with the scores (in Postgres on Railway) and appear the next time someone loads the game.
   The bucket-hat detective defaults to a background-free photo head; an uploaded
   face overrides it, and removing that upload restores the bundled photo.
-  Its in-game photo head is twice the usual height; the body and hitbox stay unchanged.
-  Admin previews show the bundled default photos for Becky, deal, ping-pong and
-  the bucket-hat detective when no custom face is uploaded.
+  Its in-game photo head is 60% taller than the usual height; the body and hitbox stay unchanged.
+  The Karaoke King, tube mate and pub regular also default to background-free photo heads.
+  Admin previews show the bundled default photos for Becky, deal, ping-pong,
+  the bucket-hat detective, Karaoke King, tube mate and pub regular when no custom face is uploaded.
 
 ## Deploy to Railway
 
@@ -101,7 +102,7 @@ character's line waits until the intro finishes. Later encounter spacing stays u
   hurdles and around people's heads, including a sweet after each person that
   can be caught on a squash-bounce. These need tighter jump timing.
 - Reach the flower arch to win. The result shows remaining chances, cleared
-  hurdles and points. A clean run takes roughly 27 seconds.
+  hurdles and points. A clean run takes roughly 39 seconds, including the extended final stretch.
   Sean and Becky meet with floating hearts, then the victory result appears
   after 3.2 seconds. Reduced motion uses a static reunion and hearts.
 - **Double jump**: press again in the air for a second, higher jump.
@@ -109,8 +110,20 @@ character's line waits until the intro finishes. Later encounter spacing stays u
   Hop over rolling beer barrels.
 - **Champagne corks** launch a super jump up to **spinning wedding rings**
   worth 25 points each.
+- Two orange **4× concentrate** bottles appear before the mid-run and final
+  hurdle stretches, with a larger orange-fruit bottle and a **4× ORANGE SQUASH**
+  sign explaining the effect before collection. Each gives **four seconds of invincibility** with an orange
+  glow and a countdown. Run through hurdles, mates, barrels and pigeons without
+  losing a chance or breaking a combo; jumping and champagne still work.
+  Passing through a mate earns no squash bonus; landing on their head still does.
+  There is no extra score multiplier. Pausing freezes the effect and replay
+  restores both bottles.
 - **Combo multiplier**: clears, squashes and dodges build a capped multiplier;
   any hit resets it.
+- **Final bucket hat**: the background-free photo of Sean's actual hat appears
+  in the final stretch before Becky, with a jump prompt. A normal jump collects
+  it once for a flat **50 points**, unaffected by combo multipliers. It is
+  optional for winning, shown separately in results, and restored on replay.
 - **Becky's texts** pop up during the run and get more frantic near the end.
 - Squashes throw confetti and shake the screen (not with reduced motion), and
   hits vibrate supporting phones.
