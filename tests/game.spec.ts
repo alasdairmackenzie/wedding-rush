@@ -56,6 +56,9 @@ test('uses the Sean and Becky title and character names throughout the UI', asyn
   await page.goto('/');
   await expect(page).toHaveTitle('WeddingRush featuring Sean and Becky');
   await expect(page.getByRole('heading', { name: 'WeddingRush featuring Sean and Becky' })).toBeVisible();
+  await expect(page.locator('.audio-controls > #music-toggle + #effects-toggle')).toHaveCount(1);
+  await expect(page.locator('.audio-controls + #menu-share')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Share WeddingRush with friends', exact: true })).toHaveClass('link');
   await expect(page.locator('#objective')).toContainText('get Sean to Becky');
   await expect(page.locator('#notice')).toContainText('Becky is ready. Sean');
   await page.getByRole('button', { name: "I'm coming!" }).click();
