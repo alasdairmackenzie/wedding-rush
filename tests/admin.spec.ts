@@ -91,7 +91,7 @@ test('an uploaded face shows up in the game and can be removed', async ({ page, 
 
 test('admin previews bundled default photos and restores the hat photo after reset', async ({ page }) => {
   await signIn(page);
-  for (const kind of ['bride', 'deal', 'pingpong', 'hat', 'karaoke', 'kebab', 'pub'] as const) {
+  for (const kind of ['bride', 'deal', 'pingpong', 'hat', 'karaoke', 'kebab', 'pub', 'football'] as const) {
     const preview = page.getByRole('img', { name: `Default face for ${FACE_LABELS[kind]}` });
     await expect(preview).toBeVisible();
     await expect.poll(() => preview.evaluate(image =>

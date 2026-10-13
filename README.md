@@ -42,9 +42,9 @@ a password when you start the server, for example
   The bucket-hat detective defaults to a background-free photo head; an uploaded
   face overrides it, and removing that upload restores the bundled photo.
   Its in-game photo head is 60% taller than the usual height; the body and hitbox stay unchanged.
-  The Karaoke King, tube mate and pub regular also default to background-free photo heads.
+  The Karaoke King, tube mate, pub regular and football fan also default to background-free photo heads.
   Admin previews show the bundled default photos for Becky, deal, ping-pong,
-  the bucket-hat detective, Karaoke King, tube mate and pub regular when no custom face is uploaded.
+  the bucket-hat detective, Karaoke King, tube mate, pub regular and football fan when no custom face is uploaded.
 
 ## Deploy to Railway
 

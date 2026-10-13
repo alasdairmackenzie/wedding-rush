@@ -46,7 +46,7 @@ function person(scene: Phaser.Scene, kind: TemptationKind | 'groom' | 'bride'): 
     oval(c, 49, 33, 25, 29, '#ffffffaa');
   } else box(c, 29, 47, 36, 35, colours[kind]);
   const uploaded = scene.textures.exists(`${kind}-face`);
-  if (uploaded || bride || kind === 'pingpong' || kind === 'deal' || kind === 'hat' || kind === 'karaoke' || kind === 'kebab' || kind === 'pub') {
+  if (uploaded || bride || kind === 'pingpong' || kind === 'deal' || kind === 'hat' || kind === 'karaoke' || kind === 'kebab' || kind === 'pub' || kind === 'football') {
     const headKey = uploaded ? `${kind}-face` : `${kind}-head`;
     const head = scene.textures.get(headKey).getSourceImage();
     if (!(head instanceof HTMLImageElement)) throw new Error(`Head photo is not loaded: ${headKey}`);

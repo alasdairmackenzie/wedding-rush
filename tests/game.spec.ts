@@ -202,7 +202,7 @@ test('retains photo artwork and the distraction cast without platformer controls
     return {
       key: scene.playerArt.texture.key, height: scene.playerArt.displayHeight,
       hitbox: [scene.player.body.width, scene.player.body.height],
-      heads: ['bride-head', 'deal-head', 'pingpong-head', 'hat-head', 'karaoke-head', 'kebab-head', 'pub-head'].every(key => scene.textures.exists(key)),
+      heads: ['bride-head', 'deal-head', 'pingpong-head', 'hat-head', 'karaoke-head', 'kebab-head', 'pub-head', 'football-head'].every(key => scene.textures.exists(key)),
       obstacles: scene.obstacles.length
     };
   })()`);
@@ -210,7 +210,7 @@ test('retains photo artwork and the distraction cast without platformer controls
   const cutouts = await page.evaluate<{ transparent: number; opaque: number; cornerAlpha: number[] }[]>(`(async () => {
     const { game } = await import('/src/client/main.ts');
     const scene = game.scene.getScene('wedding');
-    return ['groom-photo', 'groom-photo-alt', 'bride-head', 'hat-head', 'karaoke-head', 'kebab-head', 'pub-head', 'bucket-hat'].map(key => {
+    return ['groom-photo', 'groom-photo-alt', 'bride-head', 'hat-head', 'karaoke-head', 'kebab-head', 'pub-head', 'football-head', 'bucket-hat'].map(key => {
       const image = scene.textures.get(key).getSourceImage();
       const canvas = document.createElement('canvas');
       canvas.width = image.width;
