@@ -145,7 +145,7 @@ export class GameAudio {
       const source = context.createBufferSource(), gain = context.createGain();
       source.buffer = buffer;
       source.loop = true;
-      gain.gain.value = .3;
+      gain.gain.value = .2;
       source.connect(gain); gain.connect(context.destination);
       source.onended = () => { source.disconnect(); gain.disconnect(); };
       this.menuMusic = source;

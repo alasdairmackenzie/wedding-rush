@@ -847,7 +847,7 @@ test('reunites the couple with hearts before the delayed victory result and rese
   await expect(page.locator('#lives')).toHaveText('3 / 3');
 });
 
-test('narration uses 70% gain, game music uses 50%, menu music uses 30%, and victory music uses 60%', async ({ page }) => {
+test('narration uses 70% gain, game music uses 50%, menu music uses 20%, and victory music uses 60%', async ({ page }) => {
   await page.addInitScript(() => {
     const gains: GainNode[] = [];
     const createGain = AudioContext.prototype.createGain;
@@ -862,7 +862,7 @@ test('narration uses 70% gain, game music uses 50%, menu music uses 30%, and vic
   const values = () => page.evaluate<number[]>('window.__audioGains.map(gain => gain.gain.value)');
   await expect.poll(values).toEqual(expect.arrayContaining([.5, expect.closeTo(.7, 5)]));
   await page.keyboard.press('Escape');
-  await expect.poll(values).toEqual(expect.arrayContaining([expect.closeTo(.3, 5)]));
+  await expect.poll(values).toEqual(expect.arrayContaining([expect.closeTo(.2, 5)]));
   await page.getByRole('button', { name: 'Back to Becky' }).click();
   await page.evaluate(`(async () => {
     const { game } = await import('/src/client/main.ts');

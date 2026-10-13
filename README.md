@@ -174,7 +174,7 @@ posting to the top list plays `tada.mp3`. In play, recorded effects mark hits
 incoming pigeons (`flap`) and Becky's texts (`notify`).
 Loading or decoding errors are reported in the status strip.
 Music has a single On/Off toggle. When enabled, the original Classic track plays on the main menu
-(including the pause menu) at 30% gain, and `dnbloop.mp3` plays during the run at 50% gain.
+(including the pause menu) at 20% gain, and `dnbloop.mp3` plays during the run at 50% gain.
 Menu music starts once browser audio is unlocked by a tap or key press and stops when the menu closes
 or the page is backgrounded. DnB resumes from its previous position when returning to a paused run.
 `splat` plays on hurdle hits, person side hits and squashes, `gameover` on loss and `level_end` when
