@@ -199,7 +199,7 @@ export class WeddingScene extends Phaser.Scene {
       if (!this.reducedMotion.matches) this.tweens.add({ targets: art, scaleX: .15, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     });
     this.bucketHatArt = this.add.image(BUCKET_HAT.x, BUCKET_HAT.y, 'bucket-hat')
-      .setDisplaySize(BUCKET_HAT.width, BUCKET_HAT.height).setDepth(5).setName('bucket-hat');
+      .setDisplaySize(BUCKET_HAT.width * .8, BUCKET_HAT.height * .8).setDepth(5).setName('bucket-hat');
     this.bucketHatLabel = this.add.text(BUCKET_HAT.x, BUCKET_HAT.y - 65, 'MY BUCKET HAT!\nJUMP FOR +50 POINTS', {
       fontFamily: 'monospace', fontSize: '16px', fontStyle: 'bold', color: '#352b3c',
       backgroundColor: '#fff8e8', padding: { x: 10, y: 8 }, align: 'center',
