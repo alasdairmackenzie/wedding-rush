@@ -676,7 +676,7 @@ test('desktop retains the original page layout', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Pause game', exact: true })).toBeHidden();
 });
 
-test('plays the recorded intro, stops on pause and mute, and repeats only on replay', async ({ page }) => {
+test('plays the recorded intro, stops on pause and sound-effects off, and repeats only on replay', async ({ page }) => {
   await start(page);
   const voiceState = `(async () => {
     const { game } = await import('/src/client/main.ts');
@@ -692,7 +692,7 @@ test('plays the recorded intro, stops on pause and mute, and repeats only on rep
   await page.getByRole('button', { name: 'Start a fresh run' }).click();
   await expect.poll(() => page.evaluate(voiceState)).toEqual({ playing: true, cached: true });
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Sound: on', exact: true }).click();
+  await page.getByRole('button', { name: 'Sound effects: On', exact: true }).click();
   await page.getByRole('button', { name: 'Start a fresh run' }).click();
   await page.waitForTimeout(150);
   expect(await page.evaluate(voiceState)).toEqual({ playing: false, cached: true });
@@ -847,8 +847,52 @@ test('reunites the couple with hearts before the delayed victory result and rese
   await expect(page.locator('#lives')).toHaveText('3 / 3');
 });
 
-test('background music loops only during play, preserves its position on pause, and respects mute', async ({ page }) => {
+test('narration uses 70% gain, game music uses 50%, menu music uses 30%, and victory music uses 60%', async ({ page }) => {
+  await page.addInitScript(() => {
+    const gains: GainNode[] = [];
+    const createGain = AudioContext.prototype.createGain;
+    AudioContext.prototype.createGain = function () {
+      const gain = createGain.call(this);
+      gains.push(gain);
+      return gain;
+    };
+    Object.defineProperty(window, '__audioGains', { value: gains });
+  });
   await start(page);
+  const values = () => page.evaluate<number[]>('window.__audioGains.map(gain => gain.gain.value)');
+  await expect.poll(values).toEqual(expect.arrayContaining([.5, expect.closeTo(.7, 5)]));
+  await page.keyboard.press('Escape');
+  await expect.poll(values).toEqual(expect.arrayContaining([expect.closeTo(.3, 5)]));
+  await page.getByRole('button', { name: 'Back to Becky' }).click();
+  await page.evaluate(`(async () => {
+    const { game } = await import('/src/client/main.ts');
+    game.scene.getScene('wedding').player.body.reset(${BRIDE.x - 50}, 570);
+  })()`);
+  await expect(page.locator('#game')).toHaveAttribute('data-celebrating', 'true');
+  await expect.poll(values).toEqual(expect.arrayContaining([expect.closeTo(.6, 5)]));
+});
+
+test('Classic plays on the main menu, DnB plays in game, and Music On/Off controls both', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'How to play', exact: true }).click();
+  const menuPlaying = `(async () => {
+    const { game } = await import('/src/client/main.ts');
+    const audio = game.scene.getScene('wedding').ui.audio;
+    return Boolean(audio.menuMusic && audio.menuMusic.buffer === await audio.clips.get('background')
+      && audio.menuMusic.loop && !audio.background);
+  })()`;
+  await expect.poll(() => page.evaluate(menuPlaying)).toBe(true);
+  await page.getByRole('button', { name: 'Music: On', exact: true }).click();
+  await expect.poll(() => page.evaluate(menuPlaying)).toBe(false);
+  await page.getByRole('button', { name: 'Music: Off', exact: true }).click();
+  await expect.poll(() => page.evaluate(menuPlaying)).toBe(true);
+  await page.getByRole('button', { name: "I'm coming!" }).click();
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+  const noMenu = `(async () => {
+    const { game } = await import('/src/client/main.ts');
+    return !game.scene.getScene('wedding').ui.audio.menuMusic;
+  })()`;
+  await expect.poll(() => page.evaluate(noMenu)).toBe(true);
   const musicState = `(async () => {
     const { game } = await import('/src/client/main.ts');
     const audio = game.scene.getScene('wedding').ui.audio;
@@ -856,28 +900,82 @@ test('background music loops only during play, preserves its position on pause, 
       offset: audio.backgroundOffset, wanted: audio.backgroundWanted };
   })()`;
   await expect.poll(async () => (await page.evaluate<{ looping: boolean }>(musicState)).looping).toBe(true);
+  await expect.poll(() => page.evaluate(`(async () => {
+    const { game } = await import('/src/client/main.ts');
+    const audio = game.scene.getScene('wedding').ui.audio;
+    return Boolean(audio.background && audio.background.buffer === await audio.clips.get('dnb'));
+  })()`)).toBe(true);
   await page.waitForTimeout(200);
   await page.keyboard.press('Escape');
   const paused = await page.evaluate<{ playing: boolean; offset: number; wanted: boolean }>(musicState);
   expect(paused.playing).toBe(false);
   expect(paused.wanted).toBe(false);
   expect(paused.offset).toBeGreaterThan(0);
-  await page.getByRole('button', { name: 'Sound: on', exact: true }).click();
+  await expect.poll(() => page.evaluate(menuPlaying)).toBe(true);
   await page.getByRole('button', { name: 'Back to Becky' }).click();
   await page.waitForTimeout(100);
-  expect((await page.evaluate<{ playing: boolean }>(musicState)).playing).toBe(false);
+  expect((await page.evaluate<{ playing: boolean; offset: number }>(musicState)).playing).toBe(true);
+  expect((await page.evaluate<{ offset: number }>(musicState)).offset).toBe(paused.offset);
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Sound: off', exact: true }).click();
+  await page.getByRole('button', { name: 'Music: On', exact: true }).click();
+  await expect.poll(() => page.evaluate(menuPlaying)).toBe(false);
   expect((await page.evaluate<{ playing: boolean }>(musicState)).playing).toBe(false);
   await page.getByRole('button', { name: 'Back to Becky' }).click();
+  expect((await page.evaluate<{ playing: boolean }>(musicState)).playing).toBe(false);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Music: Off', exact: true }).click();
+  await expect.poll(() => page.evaluate(menuPlaying)).toBe(true);
+  await page.getByRole('button', { name: 'Back to Becky' }).click();
   await expect.poll(async () => (await page.evaluate<{ looping: boolean }>(musicState)).looping).toBe(true);
-  expect((await page.evaluate<{ offset: number }>(musicState)).offset).toBe(paused.offset);
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Start a fresh run' }).click();
   await expect.poll(async () => (await page.evaluate<{ playing: boolean }>(musicState)).playing).toBe(true);
   expect((await page.evaluate<{ offset: number }>(musicState)).offset).toBe(0);
 });
 
+test('sound effects can be turned off without affecting main music', async ({ page }) => {
+  await start(page);
+  const musicPlaying = `(async () => {
+    const { game } = await import('/src/client/main.ts');
+    return Boolean(game.scene.getScene('wedding').ui.audio.background);
+  })()`;
+  await expect.poll(() => page.evaluate<boolean>(musicPlaying)).toBe(true);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Sound effects: On' }).click();
+  await page.getByRole('button', { name: 'Back to Becky' }).click();
+  await expect.poll(() => page.evaluate<boolean>(musicPlaying)).toBe(true);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Sound effects: Off' }).click();
+  await page.getByRole('button', { name: 'Back to Becky' }).click();
+  await expect.poll(() => page.evaluate<boolean>(musicPlaying)).toBe(true);
+});
+
+test('menu buttons play the click sound unless sound effects are off', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as any).__clicks = 0;
+    HTMLMediaElement.prototype.play = function () {
+      if (this.src.includes('click')) (window as any).__clicks++;
+      return Promise.resolve();
+    };
+  });
+  await page.goto('/');
+  const clicks = () => page.evaluate(() => (window as any).__clicks as number);
+  await page.getByRole('button', { name: /View the guest top list/ }).click();
+  await expect.poll(clicks).toBe(1);
+  await page.getByRole('button', { name: 'Back to menu' }).click();
+  await expect.poll(clicks).toBe(2);
+  await page.getByRole('button', { name: 'Sound effects: On' }).click();
+  await page.getByRole('button', { name: /View the guest top list/ }).click();
+  await page.getByRole('button', { name: 'Back to menu' }).click();
+  expect(await clicks()).toBe(2);
+  await page.getByRole('button', { name: 'Sound effects: Off' }).click();
+  await expect.poll(clicks).toBe(3);
+  await page.getByRole('button', { name: "I'm coming!" }).click();
+  await expect.poll(clicks).toBe(4);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Jump', exact: true }).click();
+  expect(await clicks()).toBe(4);
+});
 test('plays bash for collisions and gameover on the final hit, stopping the music', async ({ page }) => {
   await start(page);
   await page.evaluate(`(async () => {
@@ -918,6 +1016,7 @@ test('goal replaces background music with level_end during the reunion', async (
   await start(page);
   await page.evaluate(`(async () => {
     const { game } = await import('/src/client/main.ts');
+    game.scene.getScene('wedding').ui.audio.setMusicMode('off');
     game.scene.getScene('wedding').player.body.reset(${BRIDE.x - 50}, 570);
   })()`);
   await expect(page.locator('#game')).toHaveAttribute('data-celebrating', 'true');
@@ -925,7 +1024,9 @@ test('goal replaces background music with level_end during the reunion', async (
     const { game } = await import('/src/client/main.ts');
     const audio = game.scene.getScene('wedding').ui.audio;
     const buffer = await audio.clips.get('level_end');
+    const weddingMusic = await audio.clips.get('wedding');
     return Boolean(buffer && buffer.duration > 0 && !audio.background
+      && audio.weddingMusic?.buffer === weddingMusic
       && [...audio.effects].some(effect => effect.buffer === buffer));
   })()`)).toBe(true);
   await expect(page.locator('#result')).not.toBeVisible();
@@ -1319,33 +1420,6 @@ test('the main menu opens the guest top list and returns or starts a run', async
   await expect(list).not.toBeVisible();
   await expect(page.locator('#menu')).not.toBeVisible();
   await expect(page).toHaveURL(/\/$/);
-});
-
-test('menu buttons play the click sound unless sound is off', async ({ page }) => {
-  await page.addInitScript(() => {
-    (window as any).__clicks = 0;
-    HTMLMediaElement.prototype.play = function () {
-      if (this.src.includes('click')) (window as any).__clicks++;
-      return Promise.resolve();
-    };
-  });
-  await page.goto('/');
-  const clicks = () => page.evaluate(() => (window as any).__clicks as number);
-  await page.getByRole('button', { name: /View the guest top list/ }).click();
-  await expect.poll(clicks).toBe(1);
-  await page.getByRole('button', { name: 'Back to menu' }).click();
-  await expect.poll(clicks).toBe(2);
-  await page.getByRole('button', { name: 'Sound: on' }).click();
-  await page.getByRole('button', { name: /View the guest top list/ }).click();
-  await page.getByRole('button', { name: 'Back to menu' }).click();
-  expect(await clicks()).toBe(2);
-  await page.getByRole('button', { name: 'Sound: off' }).click();
-  await expect.poll(clicks).toBe(3);
-  await page.getByRole('button', { name: "I'm coming!" }).click();
-  await expect.poll(clicks).toBe(4);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('button', { name: 'Jump', exact: true }).click();
-  expect(await clicks()).toBe(4);
 });
 
 test('plays recorded effects for corks, rings, pigeons, texts and hits', async ({ page }) => {

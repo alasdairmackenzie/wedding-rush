@@ -9,6 +9,7 @@ import karaokeUrl from '../shared/sounds/karaoke.mp3';
 import missedTubeUrl from '../assets/sounds/missed_tube_stop.mp3';
 import brideMusicUrl from '../assets/sounds/herecomesthebride.mp3';
 import backgroundUrl from '../assets/sounds/background.mp3';
+import dnbUrl from '../assets/sounds/dnbloop.mp3';
 import gameoverUrl from '../assets/sounds/gameover.mp3';
 import levelEndUrl from '../assets/sounds/level_end.mp3';
 import splatUrl from '../assets/sounds/splat.mp3';
@@ -22,11 +23,12 @@ import flapUrl from '../assets/sounds/flap.mp3';
 
 export type VoiceClip = 'intro' | TemptationKind;
 export type RecordedEffect = 'gameover' | 'level_end' | 'splat' | 'bash' | 'notify' | 'cork' | 'sparkle' | 'flap';
-type SoundClip = VoiceClip | RecordedEffect | 'background' | 'wedding';
+export type MusicMode = 'on' | 'off';
+type SoundClip = VoiceClip | RecordedEffect | 'background' | 'dnb' | 'wedding';
 const soundUrls: Record<SoundClip, string> = {
   intro: introUrl, football: footballUrl, deal: dealUrl, pingpong: pingpongUrl,
   hat: hatUrl, pub: pubUrl, karaoke: karaokeUrl, kebab: missedTubeUrl,
-  background: backgroundUrl, gameover: gameoverUrl, level_end: levelEndUrl, splat: splatUrl,
+  background: backgroundUrl, dnb: dnbUrl, gameover: gameoverUrl, level_end: levelEndUrl, splat: splatUrl,
   bash: bashUrl, notify: notifyUrl, cork: corkUrl, sparkle: sparkleUrl, flap: flapUrl,
   wedding: brideMusicUrl,
 };
@@ -35,7 +37,8 @@ const uiSounds = { click: { url: clickUrl, volume: .6 }, tada: { url: tadaUrl, v
 
 export class GameAudio {
   private context?: AudioContext;
-  private muted = false;
+  private effectsEnabled = true;
+  private musicMode: MusicMode = 'on';
   private voice?: AudioBufferSourceNode;
   private voiceRequest = 0;
   private voiceClip?: VoiceClip;
@@ -47,17 +50,21 @@ export class GameAudio {
   private backgroundRequest = 0;
   private backgroundOffset = 0;
   private backgroundStarted = 0;
+  private menuMusic?: AudioBufferSourceNode;
+  private menuMusicWanted = false;
+  private menuMusicRequest = 0;
   private weddingMusic?: AudioBufferSourceNode;
   private weddingRequest = 0;
   private effectRequest = 0;
   private readonly effects = new Set<AudioBufferSourceNode>();
   private readonly uiElements = new Map<keyof typeof uiSounds, HTMLAudioElement>();
+  private readonly activeUiSounds = new Set<HTMLAudioElement>();
   constructor(private readonly notice: (message: string) => void) {}
   click(): void { this.ui('click'); }
   tada(): void { this.ui('tada'); }
   // Menu sounds use a media element so they keep playing while the game audio is paused or restarted.
   private ui(name: keyof typeof uiSounds): void {
-    if (this.muted || this.destroyed) return;
+    if (!this.effectsEnabled || this.destroyed) return;
     let element = this.uiElements.get(name);
     if (!element) {
       element = Object.assign(new Audio(uiSounds[name].url), { preload: 'auto' });
@@ -66,7 +73,12 @@ export class GameAudio {
     const sound = element.paused ? element : element.cloneNode() as HTMLAudioElement;
     sound.volume = uiSounds[name].volume;
     sound.currentTime = 0;
-    void sound.play().catch(error => console.warn(`Could not play ${name} sound:`, error));
+    this.activeUiSounds.add(sound);
+    sound.addEventListener('ended', () => this.activeUiSounds.delete(sound), { once: true });
+    void sound.play().catch(error => {
+      this.activeUiSounds.delete(sound);
+      console.warn(`Could not play ${name} sound:`, error);
+    });
   }
   unlock(): void {
     if (this.destroyed) return;
@@ -74,8 +86,10 @@ export class GameAudio {
       this.context = new AudioContext();
       this.clips.clear();
     }
-    if (this.muted) return;
-    void this.resume(this.context);
+    if (!this.effectsEnabled && this.musicMode === 'off') return;
+    void this.resume(this.context).then(() => {
+      if (this.menuMusicWanted) this.startMenuMusic();
+    });
   }
   // Browsers suspend audio while the page is in the background and only allow it to restart
   // after a tap or key press, so a failed resume is expected and the next press retries it.
@@ -83,16 +97,62 @@ export class GameAudio {
     if (context.state === 'running') return Promise.resolve();
     return context.resume().catch(error => console.warn('Audio is waiting for a tap to restart:', error));
   }
-  setMuted(muted: boolean): void {
-    this.muted = muted;
-    if (muted) {
-      const backgroundWanted = this.backgroundWanted;
-      this.stop();
-      this.backgroundWanted = backgroundWanted;
-    } else {
+  setEffectsEnabled(enabled: boolean): void {
+    this.effectsEnabled = enabled;
+    if (enabled) {
       this.unlock();
-      if (this.backgroundWanted) this.startBackground();
+      return;
     }
+    this.stopEffects();
+    this.stopSpeech();
+    for (const sound of this.activeUiSounds) {
+      sound.pause();
+      sound.currentTime = 0;
+    }
+    this.activeUiSounds.clear();
+  }
+  setMusicMode(mode: MusicMode): void {
+    if (this.musicMode === mode) return;
+    this.musicMode = mode;
+    this.haltBackground();
+    this.haltMenuMusic();
+    if (mode !== 'off' && this.backgroundWanted) this.startBackground();
+    if (mode !== 'off' && this.menuMusicWanted) {
+      this.unlock();
+    }
+  }
+  private haltMenuMusic(): void {
+    this.menuMusicRequest++;
+    if (this.menuMusic) {
+      this.menuMusic.stop();
+      this.menuMusic.disconnect();
+      this.menuMusic = undefined;
+    }
+  }
+  stopMenuMusic(): void {
+    this.menuMusicWanted = false;
+    this.haltMenuMusic();
+  }
+  startMenuMusic(): void {
+    this.menuMusicWanted = true;
+    const context = this.context;
+    if (this.musicMode === 'off' || document.hidden || !document.hasFocus() || this.destroyed
+      || !context || context.state !== 'running' || this.menuMusic) return;
+    const request = ++this.menuMusicRequest;
+    void this.loadClip(context, 'background').then(buffer => {
+      if (request !== this.menuMusicRequest || !this.menuMusicWanted || this.musicMode === 'off'
+        || document.hidden || !document.hasFocus() || this.destroyed) return;
+      const source = context.createBufferSource(), gain = context.createGain();
+      source.buffer = buffer;
+      source.loop = true;
+      gain.gain.value = .3;
+      source.connect(gain); gain.connect(context.destination);
+      source.onended = () => { source.disconnect(); gain.disconnect(); };
+      this.menuMusic = source;
+      source.start();
+    }).catch(error => {
+      if (!this.destroyed) this.notice(`Could not play menu music: ${String(error)}`);
+    });
   }
   private haltWeddingMusic(): void {
     this.weddingRequest++;
@@ -104,14 +164,14 @@ export class GameAudio {
   }
   startWeddingMusic(): void {
     const context = this.context;
-    if (this.muted || document.hidden || this.destroyed || !context || this.weddingMusic) return;
+    if (document.hidden || this.destroyed || !context || this.weddingMusic) return;
     const request = ++this.weddingRequest;
     void Promise.all([this.loadClip(context, 'wedding'), this.resume(context)]).then(([buffer]) => {
-      if (request !== this.weddingRequest || this.muted || document.hidden || this.destroyed) return;
+      if (request !== this.weddingRequest || document.hidden || this.destroyed) return;
       const source = context.createBufferSource(), gain = context.createGain();
       source.buffer = buffer;
       source.loop = true;
-      gain.gain.value = .3;
+      gain.gain.value = .6;
       source.connect(gain); gain.connect(context.destination);
       source.onended = () => { source.disconnect(); gain.disconnect(); };
       this.weddingMusic = source;
@@ -121,6 +181,7 @@ export class GameAudio {
     });
   }
   stop(): void {
+    this.stopMenuMusic();
     this.backgroundWanted = false;
     this.haltBackground();
     this.haltWeddingMusic();
@@ -157,6 +218,7 @@ export class GameAudio {
     }
   }
   startBackground(fresh = false): void {
+    this.stopMenuMusic();
     this.backgroundWanted = true;
     if (fresh) {
       this.haltBackground();
@@ -165,14 +227,15 @@ export class GameAudio {
       this.stopEffects();
     }
     const context = this.context;
-    if (this.muted || document.hidden || this.destroyed || !context || this.background) return;
+    if (this.musicMode === 'off' || document.hidden || this.destroyed || !context || this.background) return;
+    const clip = 'dnb';
     const request = ++this.backgroundRequest;
-    void Promise.all([this.loadClip(context, 'background'), this.resume(context)]).then(([buffer]) => {
-      if (request !== this.backgroundRequest || !this.backgroundWanted || this.muted || document.hidden || this.destroyed) return;
+    void Promise.all([this.loadClip(context, clip), this.resume(context)]).then(([buffer]) => {
+      if (request !== this.backgroundRequest || !this.backgroundWanted || this.musicMode === 'off' || document.hidden || this.destroyed) return;
       const source = context.createBufferSource(), gain = context.createGain();
       source.buffer = buffer;
       source.loop = true;
-      gain.gain.value = .18;
+      gain.gain.value = .5;
       source.connect(gain); gain.connect(context.destination);
       source.onended = () => { source.disconnect(); gain.disconnect(); };
       this.background = source;
@@ -193,10 +256,10 @@ export class GameAudio {
   }
   effect(clip: RecordedEffect): void {
     const context = this.context;
-    if (this.muted || document.hidden || this.destroyed || !context) return;
+    if (!this.effectsEnabled || document.hidden || this.destroyed || !context) return;
     const request = this.effectRequest;
     void Promise.all([this.loadClip(context, clip), this.resume(context)]).then(([buffer]) => {
-      if (request !== this.effectRequest || this.muted || document.hidden || this.destroyed) return;
+      if (request !== this.effectRequest || !this.effectsEnabled || document.hidden || this.destroyed) return;
       const source = context.createBufferSource(), gain = context.createGain();
       source.buffer = buffer;
       gain.gain.value = effectVolume[clip] ?? 1;
@@ -232,21 +295,22 @@ export class GameAudio {
     }
     this.stopSpeech();
     const context = this.context;
-    if (this.muted || document.hidden || this.destroyed || !context) return;
+    if (!this.effectsEnabled || document.hidden || this.destroyed || !context) return;
     this.voiceClip = clip;
     const request = this.voiceRequest;
     const loading = this.loadClip(context, clip);
     void Promise.all([loading, this.resume(context)]).then(([buffer]) => {
       if (request !== this.voiceRequest) return;
-      if (this.muted || document.hidden || this.destroyed || context.state !== 'running') {
+      if (!this.effectsEnabled || document.hidden || this.destroyed || context.state !== 'running') {
         this.voiceClip = this.queuedClip = undefined;
         return;
       }
-      const voice = context.createBufferSource();
+      const voice = context.createBufferSource(), gain = context.createGain();
       voice.buffer = buffer;
-      voice.connect(context.destination);
+      gain.gain.value = .7;
+      voice.connect(gain); gain.connect(context.destination);
       voice.onended = () => {
-        voice.disconnect();
+        voice.disconnect(); gain.disconnect();
         if (this.voice !== voice) return;
         this.voice = undefined;
         this.voiceClip = undefined;
@@ -263,7 +327,7 @@ export class GameAudio {
   }
   tone(kind: 'sweet' | 'jump' | 'stomp' | 'delay' | 'win' | 'lose'): void {
     const context = this.context;
-    if (this.muted || document.hidden || !context || context.state !== 'running') return;
+    if (!this.effectsEnabled || document.hidden || !context || context.state !== 'running') return;
     const frequencies = { sweet: 880, jump: 440, stomp: 220, delay: 160, win: 660, lose: 130 };
     const oscillator = context.createOscillator(), gain = context.createGain();
     oscillator.type = kind === 'delay' ? 'triangle' : 'sine';
