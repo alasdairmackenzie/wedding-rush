@@ -160,24 +160,28 @@ and bundled locally. Sean keeps the original 34 x 56 physics hitbox.
 The wedding sign and victory banner sit above Becky; her caption sits
 to her left, keeping her head and face unobstructed.
 Artwork loading failures show an error rather than replacing the character.
-Generated sound effects and bundled ElevenLabs voice recordings can be muted.
+Sound effects and bundled ElevenLabs voice recordings can be turned off independently from the main music.
 The eight MP3s in `src/shared/sounds/` play the intro on a fresh run and each
 distraction's matching clip when the person approaches. Clips load on demand,
 are decoded and cached locally, and ship with the production build. No API
 key, ElevenLabs connection or browser speech synthesis is used during play.
-Only one voice plays at a time; a new clip replaces the previous one.
-Pause, mute, ending a run and leaving the page stop voice playback and cancel
+Voice recordings play at 70% gain. Only one voice plays at a time; a new clip replaces the previous one.
+Pause, turning sound effects off, ending a run and leaving the page stop voice playback and cancel
 pending playback. Resuming does not repeat the intro; replay does.
-Menu and dialog buttons play `src/assets/sounds/click.mp3` unless sound is off, and
+Menu and dialog buttons play `src/assets/sounds/click.mp3` unless sound effects are off, and
 posting to the top list plays `tada.mp3`. In play, recorded effects mark hits
 (`bash`), squashes (`splat`), champagne corks (`cork`), rings (`sparkle`),
 incoming pigeons (`flap`) and Becky's texts (`notify`).
 Loading or decoding errors are reported in the status strip.
-The four MP3s in `src/assets/sounds/` supply quiet, looping background music
-during the run, `splat` on hurdle hits, person side hits and squashes, `gameover` on loss and `level_end` when
+Music has a single On/Off toggle. When enabled, the original Classic track plays on the main menu
+(including the pause menu) at 30% gain, and `dnbloop.mp3` plays during the run at 50% gain.
+Menu music starts once browser audio is unlocked by a tap or key press and stops when the menu closes
+or the page is backgrounded. DnB resumes from its previous position when returning to a paused run.
+`splat` plays on hurdle hits, person side hits and squashes, `gameover` on loss and `level_end` when
 the couple meet. Music pauses with the game, resumes from its previous position,
-and restarts on a fresh run. It stops at the finish or game over. Sound off mutes
-music, recordings and generated effects together.
+and restarts on a fresh run. Main music stops at the finish or game over. The music setting only controls
+the main loop; the wedding music after the couple meet plays at 60% gain. Sound effects independently
+control recordings, generated effects and menu sounds.
 Captions remain visible without audio. Backgrounding or leaving the window
 pauses the run. Reduced motion disables Sean's running bob
 and floating-text movement, and makes squashes immediate.

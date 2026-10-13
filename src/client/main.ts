@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import { BRIDE, GROOM, hurdles, people, rings, Run, runChallenges, runnerSpeed, runTitle, START, TOTAL_SCORE } from '../shared/level';
 import { cleanName, ENTRY_ID, isRude, NAME_MAX, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
 import { WeddingScene } from './scene';
-import { GameAudio } from './audio';
+import { GameAudio, type MusicMode } from './audio';
 import './style.css';
 
 function element<T extends HTMLElement>(id: string, type: new (...args: never[]) => T): T {
@@ -108,10 +108,13 @@ function showMenu(): void {
   play.textContent = started ? 'Back to Becky ↗' : "I'm coming! ↗";
   restart.hidden = !started;
   if (!menu.open) menu.showModal();
+  audio.startMenuMusic();
+  if (!document.hidden && document.hasFocus()) audio.unlock();
 }
 function start(fresh = false): void {
   if (!scene) return;
   audio.unlock();
+  audio.stopMenuMusic();
   menu.close(); result.close();
   window.clearTimeout(textTimer);
   beckyText.hidden = true;
@@ -438,7 +441,6 @@ document.addEventListener('click', event => {
   if (event.target instanceof Element && event.target.closest('dialog button, #menu-button, #mobile-pause')) audio.click();
 });
 element('mobile-pause', HTMLButtonElement).addEventListener('click', showMenu);
-let soundMuted = false;
 function openShareModal(): void {
   const url = `${location.origin}/`;
   shareModalLink.textContent = url;
@@ -486,12 +488,35 @@ document.querySelectorAll('.wordmark i, #menu-title i').forEach(el => {
   el.addEventListener('click', onHeartTap as EventListener);
 });
 
-const soundToggle = element('sound-toggle', HTMLButtonElement);
-soundToggle.addEventListener('click', () => {
-  soundMuted = !soundMuted;
-  audio.setMuted(soundMuted);
-  soundToggle.textContent = soundMuted ? 'Sound: off' : 'Sound: on';
-  soundToggle.setAttribute('aria-pressed', String(soundMuted));
+let musicMode: MusicMode = 'on';
+const musicToggle = element('music-toggle', HTMLButtonElement);
+function renderMusicToggle(): void {
+  const label = musicMode === 'on' ? 'On' : 'Off';
+  musicToggle.textContent = `Music: ${label}`;
+  musicToggle.setAttribute('aria-pressed', String(musicMode === 'on'));
+}
+renderMusicToggle();
+musicToggle.addEventListener('click', () => {
+  musicMode = musicMode === 'on' ? 'off' : 'on';
+  audio.setMusicMode(musicMode);
+  renderMusicToggle();
+});
+menu.addEventListener('close', () => audio.stopMenuMusic());
+function unlockMenuMusic(): void {
+  if (menu.open && !document.hidden) {
+    audio.startMenuMusic();
+    audio.unlock();
+  }
+}
+document.addEventListener('pointerdown', unlockMenuMusic);
+document.addEventListener('keydown', unlockMenuMusic);
+let effectsEnabled = true;
+const effectsToggle = element('effects-toggle', HTMLButtonElement);
+effectsToggle.addEventListener('click', () => {
+  effectsEnabled = !effectsEnabled;
+  audio.setEffectsEnabled(effectsEnabled);
+  effectsToggle.textContent = `Sound effects: ${effectsEnabled ? 'On' : 'Off'}`;
+  effectsToggle.setAttribute('aria-pressed', String(effectsEnabled));
 });
 menu.addEventListener('cancel', event => {
   event.preventDefault();
