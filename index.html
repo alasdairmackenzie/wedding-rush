@@ -51,9 +51,11 @@
         </div>
         <button id="restart" type="button" hidden>Start a fresh run</button>
         <button id="menu-top-list" type="button">🏆 View the guest top list</button>
-        <button id="menu-share" type="button">📱 Share WeddingRush with friends</button>
-        <button id="music-toggle" type="button" aria-pressed="true">Music: On</button>
-        <button id="effects-toggle" type="button" aria-pressed="true">Sound effects: On</button>
+        <div class="audio-controls">
+          <button id="music-toggle" type="button" aria-pressed="true">Music: On</button>
+          <button id="effects-toggle" type="button" aria-pressed="true">Sound effects: On</button>
+        </div>
+        <button id="menu-share" class="link" type="button">Share WeddingRush with friends</button>
       </dialog>
       <dialog id="result" aria-labelledby="result-title">
         <span class="stamp" id="result-kicker">THE BIG DAY</span>

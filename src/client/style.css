@@ -38,6 +38,8 @@ dialog p { line-height: 1.6; font-size: 14px; }
 .stamp { font: bold 10px monospace; letter-spacing: 1px; color: #9c4937; border: 2px solid; padding: 6px 8px; display: inline-block; transform: rotate(-3deg); }
 dialog > button { display: block; width: 100%; margin-top: 13px; }
 .primary { background: #ffd465; padding: 15px; font-size: 17px; }
+.audio-controls { display: flex; gap: 12px; margin-top: 13px; }
+.audio-controls button { flex: 1 1 0; min-width: 0; margin: 0; }
 kbd { font: bold 12px monospace; border: 1px solid #ac9c83; padding: 2px 5px; background: #ebe2cd; }
 .cast { border-top: 1px dashed #ac9c83; margin-top: 25px; padding-top: 17px; font-size: 13px; }
 summary { cursor: pointer; font-weight: bold; }
