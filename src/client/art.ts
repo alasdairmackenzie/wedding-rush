@@ -28,7 +28,8 @@ function line(c: CanvasRenderingContext2D, points: number[]): void {
 }
 
 function person(scene: Phaser.Scene, kind: TemptationKind | 'groom' | 'bride'): void {
-  const [image, c] = canvas(96, 112);
+  const [image, c] = canvas(kind === 'hat' ? 148 : 96, kind === 'hat' ? 162 : 112);
+  if (kind === 'hat') c.translate(26, 50);
   const bride = kind === 'bride';
   const colours = { groom: '#39475f', bride: '#fffcf4', football: '#d36577', deal: '#a68ad0',
     pingpong: '#62b8ae', hat: '#dabf74', pub: '#799bd4', karaoke: '#c980ac', kebab: '#ce995e' };
@@ -49,8 +50,8 @@ function person(scene: Phaser.Scene, kind: TemptationKind | 'groom' | 'bride'): 
     const headKey = uploaded ? `${kind}-face` : `${kind}-head`;
     const head = scene.textures.get(headKey).getSourceImage();
     if (!(head instanceof HTMLImageElement)) throw new Error(`Head photo is not loaded: ${headKey}`);
-    const height = 50, width = head.width / head.height * height;
-    c.drawImage(head, 48 - width / 2, 2, width, height);
+    const height = kind === 'hat' ? 100 : 50, width = head.width / head.height * height;
+    c.drawImage(head, 48 - width / 2, 52 - height, width, height);
   } else {
     oval(c, 48, 29, 17, 20, skin);
     c.fillStyle = '#503c35';

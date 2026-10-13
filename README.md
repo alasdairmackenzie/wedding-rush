@@ -41,6 +41,7 @@ a password when you start the server, for example
   with the scores (in Postgres on Railway) and appear the next time someone loads the game.
   The bucket-hat detective defaults to a background-free photo head; an uploaded
   face overrides it, and removing that upload restores the bundled photo.
+  Its in-game photo head is twice the usual height; the body and hitbox stay unchanged.
   Admin previews show the bundled default photos for Becky, deal, ping-pong and
   the bucket-hat detective when no custom face is uploaded.
 
@@ -62,9 +63,10 @@ Set `ADMIN_TOKEN` to a long, unguessable password to turn on `/admin`.
 ## How to play
 
 Sean automatically runs along a continuous city street towards Becky.
-Sean uses background-free photo cutouts displayed at 180 world pixels tall,
-with the original gameplay hitbox. The poses alternate every five seconds of active play.
-Pausing freezes the photo cycle; a fresh run starts with the first pose.
+Sean uses background-free photo cutouts displayed at 135 world pixels tall,
+with the original gameplay hitbox. The second pose appears when Sean jumps
+or bounces, returning to the first pose when he lands. Pausing preserves the
+current pose; a fresh run starts with the first pose. There is no timed cycling.
 Time your jumps over **seven hurdles** and seven separate distraction characters. Speed increases smoothly
 from 300 to 430 world pixels per second as you approach the altar.
 The city starts at night with stars and a moon, brightens gradually across the

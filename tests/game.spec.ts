@@ -206,7 +206,7 @@ test('retains photo artwork and the distraction cast without platformer controls
       obstacles: scene.obstacles.length
     };
   })()`);
-  expect(artwork).toEqual({ key: 'groom-photo', height: 180, hitbox: [34, 56], heads: true, obstacles: hurdles.length });
+  expect(artwork).toEqual({ key: 'groom-photo', height: 135, hitbox: [34, 56], heads: true, obstacles: hurdles.length });
   const cutouts = await page.evaluate<{ transparent: number; opaque: number; cornerAlpha: number[] }[]>(`(async () => {
     const { game } = await import('/src/client/main.ts');
     const scene = game.scene.getScene('wedding');
@@ -251,6 +251,17 @@ test('bucket-hat character uses the bundled cutout by default and accepts an upl
   await page.route('**/api/faces', route => route.fulfill({ json: { faces: {} } }));
   await page.goto('/');
   await expect(page.locator('#game')).toHaveAttribute('data-phase', 'ready');
+  const sizes = await page.evaluate<{ kind: string; width: number; height: number }[]>(`(async () => {
+    const { game } = await import('/src/client/main.ts');
+    return game.scene.getScene('wedding').characters.map(character => ({
+      kind: character.art.texture.key, width: character.art.width, height: character.art.height,
+    }));
+  })()`);
+  for (const size of sizes) {
+    expect(size).toEqual({
+      kind: size.kind, width: size.kind === 'hat' ? 148 : 96, height: size.kind === 'hat' ? 162 : 112,
+    });
+  }
   const headPixels = `(async () => {
     const { game } = await import('/src/client/main.ts');
     const image = game.textures.get('hat').getSourceImage();
@@ -275,14 +286,23 @@ test('bucket-hat character uses the bundled cutout by default and accepts an upl
   })()`)).toBe(true);
 });
 
-test('Sean alternates supplied photos every five seconds of play, pauses and resets', async ({ page }) => {
+test('Sean changes photo on jump, restores it on landing and does not cycle with time', async ({ page }) => {
   await start(page);
   await exposeScene(page);
+  const photo = () => page.evaluate<string>('window.__scene.playerArt.texture.key');
+  await page.waitForFunction(() => document.getElementById('game')?.dataset.grounded === 'true');
+  expect(await photo()).toBe('groom-photo');
+  await page.keyboard.press('Space');
+  await expect.poll(photo).toBe('groom-photo-alt');
+  await page.keyboard.press('Space');
+  await expect.poll(photo).toBe('groom-photo-alt');
   await page.keyboard.press('Escape');
-  for (const [elapsed, key] of [
-    [0, 'groom-photo'], [4999, 'groom-photo'], [5000, 'groom-photo-alt'],
-    [9999, 'groom-photo-alt'], [10000, 'groom-photo'], [15000, 'groom-photo-alt'],
-  ] as const) {
+  await page.waitForTimeout(300);
+  expect(await photo()).toBe('groom-photo-alt');
+  await page.getByRole('button', { name: 'Back to Becky' }).click();
+  await expect.poll(photo).toBe('groom-photo');
+  await page.keyboard.press('Escape');
+  for (const elapsed of [4999, 5000, 9999, 10000, 15000]) {
     const artwork = await page.evaluate(`(() => {
       const scene = window.__scene;
       scene.run.elapsed = ${elapsed};
@@ -292,15 +312,14 @@ test('Sean alternates supplied photos every five seconds of play, pauses and res
         hitbox: [scene.player.body.width, scene.player.body.height],
       };
     })()`);
-    expect(artwork).toEqual({ key, height: 180, hitbox: [34, 56] });
+    expect(artwork).toEqual({ key: 'groom-photo', height: 135, hitbox: [34, 56] });
   }
-  await page.waitForTimeout(300);
-  expect(await page.evaluate(`window.__scene.playerArt.texture.key`)).toBe('groom-photo-alt');
   await page.getByRole('button', { name: 'Back to Becky' }).click();
-  expect(await page.evaluate(`window.__scene.playerArt.texture.key`)).toBe('groom-photo-alt');
+  await page.locator('#game').tap();
+  await expect.poll(photo).toBe('groom-photo-alt');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Start a fresh run' }).click();
-  expect(await page.evaluate(`window.__scene.playerArt.texture.key`)).toBe('groom-photo');
+  await expect.poll(photo).toBe('groom-photo');
 });
 
 test('there is no countdown or time-up loss', async ({ page }) => {
