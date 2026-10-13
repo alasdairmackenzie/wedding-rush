@@ -103,7 +103,7 @@ let started = false;
 const audio = new GameAudio(message => { console.error(message); notice.textContent = message; });
 
 function showMenu(): void {
-  if (result.open || errorDialog.open || topList.open || scene?.celebrating) return;
+  if (result.open || challengesDialog.open || errorDialog.open || topList.open || scene?.celebrating) return;
   scene?.pause();
   play.textContent = started ? 'Back to Becky ↗' : "I'm coming! ↗";
   restart.hidden = !started;
@@ -500,7 +500,7 @@ menu.addEventListener('cancel', event => {
 result.addEventListener('cancel', event => event.preventDefault());
 errorDialog.addEventListener('close', showMenu);
 window.addEventListener('keydown', event => {
-  if (event.code === 'Escape' && !menu.open && !result.open && !errorDialog.open && !topList.open) {
+  if (event.code === 'Escape' && !menu.open && !result.open && !challengesDialog.open && !errorDialog.open && !topList.open) {
     event.preventDefault(); showMenu();
   }
 });
