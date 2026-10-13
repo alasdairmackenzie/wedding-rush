@@ -45,7 +45,7 @@ function person(scene: Phaser.Scene, kind: TemptationKind | 'groom' | 'bride'): 
     oval(c, 49, 33, 25, 29, '#ffffffaa');
   } else box(c, 29, 47, 36, 35, colours[kind]);
   const uploaded = scene.textures.exists(`${kind}-face`);
-  if (uploaded || bride || kind === 'pingpong' || kind === 'deal') {
+  if (uploaded || bride || kind === 'pingpong' || kind === 'deal' || kind === 'hat') {
     const headKey = uploaded ? `${kind}-face` : `${kind}-head`;
     const head = scene.textures.get(headKey).getSourceImage();
     if (!(head instanceof HTMLImageElement)) throw new Error(`Head photo is not loaded: ${headKey}`);
@@ -88,10 +88,6 @@ function person(scene: Phaser.Scene, kind: TemptationKind | 'groom' | 'bride'): 
     line(c, [72, 78, 75, 62]); oval(c, 77, 57, 10, 13, '#e77379');
     oval(c, 87, 42, 4, 4, '#fff9e8');
   } else if (kind === 'hat') {
-    if (!uploaded) {
-      box(c, 27, 7, 37, 16, '#e9bf67');
-      oval(c, 46, 23, 28, 5, '#e9bf67');
-    }
     oval(c, 77, 62, 10, 10, '#c1e9f0aa');
     line(c, [69, 70, 63, 82]);
   } else if (kind === 'pub') {

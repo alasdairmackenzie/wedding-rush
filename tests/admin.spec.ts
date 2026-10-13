@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { MAX_SCORE } from '../src/shared/level';
+import { FACE_LABELS } from '../src/shared/faces';
 
 const TOKEN = 'test-admin-token';
 const PNG = Buffer.from(
@@ -86,6 +87,28 @@ test('an uploaded face shows up in the game and can be removed', async ({ page, 
   await page.getByRole('button', { name: 'Use the default face for Becky' }).click();
   await expect(page.getByRole('img', { name: 'Uploaded face for Becky' })).toHaveCount(0);
   expect((await (await request.get('/api/faces')).json()).faces).toEqual({});
+});
+
+test('admin previews bundled default photos and restores the hat photo after reset', async ({ page }) => {
+  await signIn(page);
+  for (const kind of ['bride', 'deal', 'pingpong', 'hat'] as const) {
+    const preview = page.getByRole('img', { name: `Default face for ${FACE_LABELS[kind]}` });
+    await expect(preview).toBeVisible();
+    await expect.poll(() => preview.evaluate(image =>
+      image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+    )).toBe(true);
+  }
+  const defaultHat = page.getByRole('img', { name: `Default face for ${FACE_LABELS.hat}` });
+  const defaultUrl = await defaultHat.getAttribute('src');
+  if (!defaultUrl) throw new Error('Default hat preview has no image URL.');
+  await page.getByLabel(`Upload a face for ${FACE_LABELS.hat}`).setInputFiles({
+    name: 'hat.png', mimeType: 'image/png', buffer: PNG,
+  });
+  await expect(page.getByRole('img', { name: `Uploaded face for ${FACE_LABELS.hat}` })).toBeVisible();
+  await expect(defaultHat).toHaveCount(0);
+  await page.getByRole('button', { name: `Use the default face for ${FACE_LABELS.hat}` }).click();
+  await expect(defaultHat).toBeVisible();
+  await expect(defaultHat).toHaveAttribute('src', defaultUrl);
 });
 
 test('admin dashboard scrolls on mobile viewports', async ({ page }) => {

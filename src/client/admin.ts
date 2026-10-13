@@ -1,10 +1,17 @@
 import { FACE_KINDS, FACE_LABELS, type FaceKind } from '../shared/faces';
 import { NAME_MAX, type ScoreEntry } from '../shared/leaderboard';
+import brideHeadUrl from '../assets/art/bride-head.png';
+import dealHeadUrl from '../assets/art/deal-head.png';
+import pingpongHeadUrl from '../assets/art/pingpong-head.png';
+import hatHeadUrl from '../assets/art/hat-head.png';
 import './style.css';
 import './admin.css';
 
 const KEY = 'wedding-rush-admin';
 const FACE_HEIGHT = 160;
+const defaultFaces: Partial<Record<FaceKind, string>> = {
+  bride: brideHeadUrl, deal: dealHeadUrl, pingpong: pingpongHeadUrl, hat: hatHeadUrl,
+};
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const login = $<HTMLFormElement>('login');
 const tokenInput = $<HTMLInputElement>('token');
@@ -174,10 +181,11 @@ function faceCard(kind: FaceKind, version?: number): HTMLLIElement {
   title.textContent = FACE_LABELS[kind];
   const preview = document.createElement('div');
   preview.className = 'preview';
-  if (version) {
+  const previewUrl = version ? `/api/faces/${kind}?v=${version}` : defaultFaces[kind];
+  if (previewUrl) {
     const image = document.createElement('img');
-    image.src = `/api/faces/${kind}?v=${version}`;
-    image.alt = `Uploaded face for ${FACE_LABELS[kind]}`;
+    image.src = previewUrl;
+    image.alt = `${version ? 'Uploaded' : 'Default'} face for ${FACE_LABELS[kind]}`;
     preview.append(image);
   } else {
     preview.textContent = 'Default';

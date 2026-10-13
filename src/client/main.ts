@@ -357,6 +357,12 @@ element('result-menu', HTMLButtonElement).addEventListener('click', () => {
   result.close(); started = false; showMenu();
 });
 element('menu-button', HTMLButtonElement).addEventListener('click', showMenu);
+const howToPlay = element('how-to-play', HTMLButtonElement);
+const playInstructions = element('play-instructions', HTMLElement);
+howToPlay.addEventListener('click', () => {
+  playInstructions.hidden = !playInstructions.hidden;
+  howToPlay.setAttribute('aria-expanded', String(!playInstructions.hidden));
+});
 document.addEventListener('click', event => {
   if (event.target instanceof Element && event.target.closest('dialog button, #menu-button, #mobile-pause')) audio.click();
 });

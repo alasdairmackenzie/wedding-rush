@@ -39,6 +39,10 @@ a password when you start the server, for example
   turned off. Tick **Auto-remove background** to erase the background with
   in-browser AI, or **Crop to a circle** for a round vignette. Faces are stored
   with the scores (in Postgres on Railway) and appear the next time someone loads the game.
+  The bucket-hat detective defaults to a background-free photo head; an uploaded
+  face overrides it, and removing that upload restores the bundled photo.
+  Admin previews show the bundled default photos for Becky, deal, ping-pong and
+  the bucket-hat detective when no custom face is uploaded.
 
 ## Deploy to Railway
 
@@ -58,6 +62,9 @@ Set `ADMIN_TOKEN` to a long, unguessable password to turn on `/admin`.
 ## How to play
 
 Sean automatically runs along a continuous city street towards Becky.
+Sean uses background-free photo cutouts displayed at 180 world pixels tall,
+with the original gameplay hitbox. The poses alternate every five seconds of active play.
+Pausing freezes the photo cycle; a fresh run starts with the first pose.
 Time your jumps over **seven hurdles** and seven separate distraction characters. Speed increases smoothly
 from 300 to 430 world pixels per second as you approach the altar.
 The city starts at night with stars and a moon, brightens gradually across the
@@ -74,6 +81,8 @@ character's line waits until the intro finishes. Later encounter spacing stays u
   captions, pause and jump controls overlay the game and respect screen safe
   areas. Browser address bars remain under the browser's control.
 - **Escape / How to play / pause**: pause, resume or start a fresh run.
+- The menu keeps keyboard and touch control instructions and detailed rules
+  hidden until you select **How to play**; select it again to collapse them.
 - Each hurdle hit or side collision with a person costs **one of three chances**,
   once per obstacle. There is no timer because the run is paced automatically.
   You keep running after a hit; the third hit ends the run and the result says
