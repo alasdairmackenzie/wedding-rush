@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import QRCode from 'qrcode';
-import { BRIDE, GROOM, hurdles, people, rings, Run, runnerSpeed, runTitle, START, TOTAL_SCORE } from '../shared/level';
+import { BRIDE, GROOM, hurdles, people, rings, Run, runChallenges, runnerSpeed, runTitle, START, TOTAL_SCORE } from '../shared/level';
 import { cleanName, ENTRY_ID, isRude, NAME_MAX, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
 import { WeddingScene } from './scene';
 import { GameAudio } from './audio';
@@ -46,6 +46,47 @@ const shareModalStatus = element('share-modal-status', HTMLElement);
 const shareModalClose = element('share-modal-close', HTMLButtonElement);
 const BEST_KEY = 'wedding-rush-best';
 const NAME_KEY = 'wedding-rush-name';
+const CHALLENGES_KEY = 'wedding-rush-challenges';
+const earnedChallenges = new Set<string>();
+let challengeStorageError = '';
+try {
+  const stored = JSON.parse(localStorage.getItem(CHALLENGES_KEY) ?? '[]') as unknown;
+  if (!Array.isArray(stored) || !stored.every(id => typeof id === 'string' && runChallenges(new Run()).some(challenge => challenge.id === id))) {
+    throw new Error('Invalid saved challenge badges.');
+  }
+  for (const id of stored) earnedChallenges.add(id);
+} catch (error) {
+  console.error('Could not load challenge badges.', error);
+  challengeStorageError = 'Saved badges could not be loaded. Badges will still track during this visit.';
+}
+
+function renderChallenges(run: Run): void {
+  const challenges = runChallenges(run);
+  const newBadges = new Set(challenges.filter(challenge => challenge.earned && !earnedChallenges.has(challenge.id)).map(challenge => challenge.id));
+  challenges.filter(challenge => challenge.earned).forEach(challenge => earnedChallenges.add(challenge.id));
+  try {
+    localStorage.setItem(CHALLENGES_KEY, JSON.stringify([...earnedChallenges]));
+  } catch (error) {
+    console.error('Could not save challenge badges.', error);
+    challengeStorageError = 'Badges could not be saved on this device. They will track during this visit only.';
+  }
+  element('result-challenges', HTMLElement).replaceChildren(...challenges.map(challenge => {
+    const item = document.createElement('li');
+    item.dataset.challenge = challenge.id;
+    item.toggleAttribute('data-earned', earnedChallenges.has(challenge.id));
+    item.toggleAttribute('data-new', newBadges.has(challenge.id));
+    const title = document.createElement('strong');
+    title.textContent = challenge.name;
+    const status = document.createElement('span');
+    status.textContent = newBadges.has(challenge.id) ? 'NEW BADGE!' : challenge.earned ? 'Earned this run'
+      : earnedChallenges.has(challenge.id) ? 'Previously earned on this device' : 'Not earned yet';
+    const goal = document.createElement('span');
+    goal.textContent = `${challenge.goal} · This run: ${challenge.progress}`;
+    item.append(title, status, goal);
+    return item;
+  }));
+  element('challenges-status', HTMLElement).textContent = challengeStorageError || 'Earned badges are remembered on this device. No extra points for badges.';
+}
 let lastRun: { score: number; squashed: number; won: boolean; title: string; lives: number; rings: number } | undefined;
 let posted: RankedEntry | undefined;
 let topListFromRun = false;
@@ -187,6 +228,7 @@ const wedding = new WeddingScene({
     if (concentratePower.textContent !== powerText) concentratePower.textContent = powerText;
     arena.dataset.concentrates = String(run.concentrates.size);
     arena.dataset.hatCollected = String(run.hatCollected);
+    arena.dataset.nearMisses = String(run.nearMisses.size);
     arena.dataset.concentrateRemaining = String(run.concentrateRemaining);
     const multiplier = `×${run.multiplier}`;
     if (combo.textContent !== multiplier) {
@@ -223,17 +265,20 @@ const wedding = new WeddingScene({
     scoreStatus.removeAttribute('data-error');
     element('result-kicker', HTMLElement).textContent = won ? 'THE BIG DAY / SAVED' : 'THE BIG DAY / OUT OF CHANCES';
     element('result-title', HTMLElement).textContent = won ? 'Sean, you may kiss Becky.' : 'Too many distractions!';
+    element('result-summary', HTMLElement).hidden = won;
     element('result-summary', HTMLElement).textContent = won
-      ? `Sean made it to Becky with ${run.lives} / 3 chances left. Becky said yes!`
+      ? ''
       : 'Three distractions used all your chances. Time your jumps and try again.';
     const stats: [string, string, boolean?][] = [
       ['🏆', `${run.score} total points`, true],
+      ['♥', `${run.lives}/3 lives left`],
       ['🍬', `${run.sweetScore} / ${TOTAL_SCORE} sweet points + ${run.bonusScore} squash bonus${run.comboScore ? ` + ${run.comboScore} combo` : ''}`],
       ['🚧', `${run.cleared.size} / ${hurdles.length} hurdles cleared`],
       ['💥', `${run.squashed.size} / ${people.length} mates squashed`],
       ['💍', `${run.rings.size} / ${rings.length} rings`],
       ['👒', run.hatCollected ? `Bucket hat found! +${run.hatScore} points` : 'Bucket hat not collected'],
       ['🔥', `best streak ${run.bestStreak}`],
+      ['✂', `${run.nearMisses.size} close shaves +${run.nearMissScore} points`],
     ];
     element('result-detail', HTMLElement).replaceChildren(...stats.map(([icon, text, key]) => {
       const item = document.createElement('li');
@@ -243,6 +288,7 @@ const wedding = new WeddingScene({
     }));
     notice.textContent = won ? 'Just married. The football can wait.'
       : 'No chances left. Jump the hurdles to avoid distractions on your next run.';
+    renderChallenges(run);
     result.showModal();
   },
   ready: readyScene => {

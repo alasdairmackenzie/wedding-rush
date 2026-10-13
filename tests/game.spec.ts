@@ -392,6 +392,7 @@ for (const width of [1280, 390]) {
     const before = await page.evaluate<number>('window.__scene.run.score');
     await page.keyboard.press('Space');
     await expect(page.locator('#game')).toHaveAttribute('data-hat-collected', 'true');
+    expect(await page.evaluate<boolean>('window.__scene.wornHat.visible')).toBe(true);
     expect(await page.evaluate<number>('window.__scene.run.score')).toBe(before + 50);
     expect(await page.evaluate<boolean>('window.__scene.bucketHatArt.visible || window.__scene.bucketHatLabel.visible')).toBe(false);
     await teleport(page, BUCKET_HAT.x, BUCKET_HAT.y - 12);
@@ -399,8 +400,10 @@ for (const width of [1280, 390]) {
     expect(await page.evaluate<number>('window.__scene.run.hatScore')).toBe(50);
     await teleport(page, BRIDE.x - 50);
     await expect(page.locator('#result-detail')).toContainText('Bucket hat found! +50 points');
+    expect(await page.evaluate<boolean>('window.__scene.wornHat.visible')).toBe(true);
     await page.getByRole('button', { name: 'One more big day' }).click();
     await expect(page.locator('#game')).toHaveAttribute('data-hat-collected', 'false');
+    expect(await page.evaluate<boolean>('window.__scene.wornHat.visible')).toBe(false);
     expect(await page.evaluate<boolean>('window.__scene.bucketHatArt.visible && window.__scene.bucketHatLabel.visible')).toBe(true);
     await teleport(page, BUCKET_HAT.x - 100);
     await page.waitForTimeout(400);
@@ -409,6 +412,119 @@ for (const width of [1280, 390]) {
     await expect(page.locator('#result-detail')).toContainText('Bucket hat not collected');
   });
 }
+
+for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+  test(`worn bucket hat follows both Sean poses, ducking and pause with ${reducedMotion} motion`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion });
+    await start(page);
+    await exposeScene(page);
+    await teleport(page, BUCKET_HAT.x, BUCKET_HAT.y - 12);
+    await expect(page.locator('#game')).toHaveAttribute('data-hat-collected', 'true');
+    await teleport(page, 900);
+    await expect(page.locator('#game')).toHaveAttribute('data-grounded', 'true');
+    const hatState = `(() => {
+      const scene = window.__scene, photo = scene.playerArt, hat = scene.wornHat;
+      return { key: photo.texture.key, visible: hat.visible,
+        dx: (hat.x - photo.x) / photo.displayWidth,
+        dy: (photo.y - hat.y) / photo.displayHeight,
+        height: hat.displayHeight, alpha: hat.alpha, photoAlpha: photo.alpha,
+        x: hat.x, y: hat.y };
+    })()`;
+    type HatState = { key: string; visible: boolean; dx: number; dy: number; height: number;
+      alpha: number; photoAlpha: number; x: number; y: number };
+    const grounded = await page.evaluate<HatState>(hatState);
+    expect(grounded.visible).toBe(true);
+    expect(grounded.dx).toBeCloseTo(-.025);
+    expect(grounded.dy).toBeCloseTo(.945);
+    expect(grounded.height).toBeCloseTo(32.4);
+    await page.keyboard.press('Space');
+    await expect.poll(() => page.evaluate<string>('window.__scene.playerArt.texture.key')).toBe('groom-photo-alt');
+    const airborne = await page.evaluate<HatState>(hatState);
+    expect(airborne.dx).toBeCloseTo(.036);
+    expect(airborne.dy).toBeCloseTo(.945);
+    expect(airborne.alpha).toBe(airborne.photoAlpha);
+    await page.keyboard.press('Escape');
+    const paused = await page.evaluate<HatState>(hatState);
+    await page.waitForTimeout(150);
+    expect(await page.evaluate<HatState>(hatState)).toEqual(paused);
+    await page.getByRole('button', { name: 'Back to Becky' }).click();
+    await teleport(page, 900);
+    await expect(page.locator('#game')).toHaveAttribute('data-grounded', 'true');
+    await page.keyboard.down('ArrowDown');
+    await expect.poll(() => page.evaluate<number>('window.__scene.wornHat.displayHeight')).toBeCloseTo(32.4 * .55);
+    expect((await page.evaluate<HatState>(hatState)).dy).toBeCloseTo(.945);
+    await page.keyboard.up('ArrowDown');
+  });
+}
+
+for (const width of [1280, 390]) {
+  test(`close shaves reward tight barrel jumps and pigeon ducks once at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await start(page);
+    await exposeScene(page);
+    for (const id of [0, 1]) {
+      if (id === 1) {
+        await page.keyboard.down('ArrowDown');
+        await expect(page.locator('#game')).toHaveAttribute('data-ducking', 'true');
+      }
+      await page.evaluate(`(() => {
+        const scene = window.__scene;
+        scene.player.body.setAllowGravity(false);
+        scene.player.body.reset(scene.moving[${id}].x, ${id === 0 ? 518 : 570});
+        scene.player.setVelocityY(0);
+      })()`);
+      await expect.poll(() => page.evaluate<boolean>(`window.__scene.moving[${id}].close`)).toBe(true);
+      await page.evaluate(`window.__scene.player.body.reset(window.__scene.moving[${id}].x + 90, ${id === 0 ? 518 : 570})`);
+      await expect(page.locator('#game')).toHaveAttribute('data-near-misses', String(id + 1));
+      if (id === 1) await page.keyboard.up('ArrowDown');
+    }
+    expect(await page.evaluate<number>('window.__scene.run.nearMissScore')).toBe(10);
+    await expect(page.locator('#lives')).toHaveText('3 / 3');
+    await teleport(page, BRIDE.x - 50);
+    await expect(page.locator('#result-detail')).toContainText('2 close shaves +10 points');
+    await page.getByRole('button', { name: 'One more big day' }).click();
+    await expect(page.locator('#game')).toHaveAttribute('data-near-misses', '0');
+    expect(await page.evaluate<boolean>('window.__scene.moving.every(m => !m.close && !m.poweredPass)')).toBe(true);
+  });
+
+  test(`challenge badges persist and winning results show compact lives at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await start(page);
+    await exposeScene(page);
+    await teleport(page, BUCKET_HAT.x, BUCKET_HAT.y - 12);
+    await expect(page.locator('#game')).toHaveAttribute('data-hat-collected', 'true');
+    await teleport(page, BRIDE.x - 50);
+    const badges = page.locator('#result-challenges');
+    await expect(badges.locator('li')).toHaveCount(4);
+    await expect(badges.locator('[data-new]')).toHaveCount(2);
+    await expect(badges.locator('[data-challenge="hat"]')).toContainText('NEW BADGE!');
+    await expect(badges.locator('[data-challenge="mates"]')).toContainText('Not earned yet');
+    await expect(page.locator('#result-summary')).toBeHidden();
+    await expect(page.locator('#result-detail')).toContainText('3/3 lives left');
+    const badgeBox = await badges.boundingBox();
+    if (!badgeBox) throw new Error('Missing challenge badges.');
+    expect(badgeBox.width).toBeLessThanOrEqual(width);
+    await page.reload();
+    await page.getByRole('button', { name: "I'm coming!" }).click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+    await exposeScene(page);
+    await teleport(page, BRIDE.x - 50);
+    await expect(badges.locator('[data-challenge="hat"]')).toContainText('Previously earned on this device');
+    await expect(badges.locator('[data-challenge="flawless"]')).toContainText('Earned this run');
+    await expect(badges.locator('[data-new]')).toHaveCount(0);
+  });
+}
+
+test('challenge storage failure is visible without preventing results', async ({ page }) => {
+  await page.addInitScript(() => {
+    Storage.prototype.setItem = () => { throw new Error('Storage unavailable'); };
+  });
+  await start(page);
+  await exposeScene(page);
+  await teleport(page, BRIDE.x - 50);
+  await expect(page.locator('#challenges-status')).toContainText('Badges could not be saved on this device');
+  await expect(page.locator('#result-challenges [data-challenge="flawless"]')).toContainText('NEW BADGE!');
+});
 
 test('there is no countdown or time-up loss', async ({ page }) => {
   await start(page);

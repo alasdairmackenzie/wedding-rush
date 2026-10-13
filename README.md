@@ -120,11 +120,22 @@ character's line waits until the intro finishes. Later encounter spacing stays u
   restores both bottles.
 - **Combo multiplier**: clears, squashes and dodges build a capped multiplier;
   any hit resets it.
+- **Close shaves**: overlap a barrel horizontally while passing 0–18 world
+  pixels above it, or duck 0–18 pixels below a pigeon, then pass it without a hit.
+  Each obstacle awards a flat **5 points** once, without a combo multiplier.
+  Squash invincibility and disco-mode passes are excluded.
+- **Personal challenges**: results show all seven mates squashed, all three
+  rings collected, bucket hat found, and finishing without a hit. Badges add no
+  points; earned badges persist on this device, with newly earned badges
+  highlighted and current-run progress shown. Storage failures are reported.
+  Winning results show a compact lives-left stat instead of the arrival sentence.
 - **Final bucket hat**: the background-free photo of Sean's actual hat appears
   at 72×80 world pixels in the final stretch before Becky, with a jump prompt
   and a forgiving 90×100 collection area. A normal jump collects
   it once for a flat **50 points**, unaffected by combo multipliers. It is
   optional for winning, shown separately in results, and restored on replay.
+  Sean wears the collected hat over his photo through jumps, ducks and the
+  wedding reunion. A fresh run removes the worn hat.
 - **Becky's texts** pop up during the run and get more frantic near the end.
 - Squashes throw confetti and shake the screen (not with reduced motion), and
   hits vibrate supporting phones.
