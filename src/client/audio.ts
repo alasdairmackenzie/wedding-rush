@@ -39,7 +39,7 @@ const soundUrls: Record<SoundClip, string> = {
   wedding: brideMusicUrl, oi: oiUrl, ourch: ourchUrl, hey: heyUrl, dice: diceUrl,
 };
 const characterReactions = ['ourch', 'oi', 'hey'] as const;
-const effectVolume: Partial<Record<RecordedEffect, number>> = { flap: 1.8, notify: .8 };
+const effectVolume: Partial<Record<RecordedEffect, number>> = { flap: 1.8, notify: .8, dice: .75 };
 const uiSounds = { click: { url: clickUrl, volume: .6 }, tada: { url: tadaUrl, volume: .8 } };
 
 export class GameAudio {
