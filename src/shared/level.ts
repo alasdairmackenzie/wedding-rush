@@ -1,7 +1,7 @@
-export const WORLD = { width: 14500, height: 720 };
+export const WORLD = { width: 14700, height: 720 };
 export const GROOM = { speed: 300, maxSpeed: 430, jump: 650, gravity: 1600, width: 34, height: 56 };
 export const START = { x: 110, y: 566 };
-export const BRIDE = { x: 14200, y: 590 };
+export const BRIDE = { x: 14400, y: 590 };
 export const BUCKET_HAT = { x: 13600, y: 450, width: 90, height: 100 };
 export const BUCKET_HAT_VALUE = 50;
 export const NEAR_MISS_VALUE = 5;
@@ -86,6 +86,7 @@ const sweetPositions = [
     { x: people[id].x - 55, y: 425 },
     { x: people[id].x + 90, y: 420 },
   ]),
+  ...[0, 2, 5].map(after => ({ x: hurdles[after + 1].x - 350, y: 450 })),
 ];
 export const sweets = sweetPositions.map((position, index) => ({ ...position, value: index % 6 + 1 }));
 export const TOTAL_SCORE = sweets.reduce((total, sweet) => total + sweet.value, 0);

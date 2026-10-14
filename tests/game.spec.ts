@@ -100,6 +100,32 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
   });
 }
 
+for (const width of [1280, 390]) {
+  test(`three extra gap dice score normally on a full jump and reset on replay at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await start(page);
+    await exposeScene(page);
+    const firstExtra = 2 + hurdles.length * 3;
+    for (let id = firstExtra; id < sweets.length; id++) {
+      await teleport(page, sweets[id].x - runnerSpeed(sweets[id].x) * .4);
+      await page.waitForFunction(() => document.getElementById('game')?.dataset.grounded === 'true');
+      expect(await page.evaluate(`window.__scene.run.collected.has(${id})`)).toBe(false);
+      const before = await page.evaluate<{ score: number; multiplier: number; lives: number }>(
+        `(() => { const run = window.__scene.run; return { score: run.score, multiplier: run.multiplier, lives: run.lives }; })()`);
+      await page.keyboard.press('Space');
+      await expect.poll(() => page.evaluate<boolean>(`window.__scene.run.collected.has(${id})`)).toBe(true);
+      expect(await page.evaluate<number>('window.__scene.run.score')).toBe(before.score + sweets[id].value * before.multiplier);
+      await expect(page.locator('#score')).toHaveText(`${before.score + sweets[id].value * before.multiplier} points`);
+      expect(await page.evaluate<number>('window.__scene.run.lives')).toBe(before.lives);
+      expect(await page.evaluate<boolean>(`window.__scene.pickups.getChildren()[${id}].active`)).toBe(false);
+    }
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Start a fresh run' }).click();
+    await expect.poll(() => page.evaluate<number>('window.__scene.run.collected.size')).toBe(0);
+    expect(await page.evaluate(`window.__scene.pickups.countActive(true)`)).toBe(sweets.length);
+  });
+}
+
 test('high sweets can be collected with a timed hurdle jump and a squash-bounce', async ({ page }) => {
   await start(page);
   await page.waitForFunction(() => document.getElementById('game')?.dataset.grounded === 'true');
@@ -401,6 +427,9 @@ for (const width of [1280, 390]) {
     await teleport(page, BUCKET_HAT.x, BUCKET_HAT.y - 12);
     await page.waitForTimeout(100);
     expect(await page.evaluate<number>('window.__scene.run.hatScore')).toBe(50);
+    await teleport(page, BRIDE.x - 250);
+    await page.waitForTimeout(100);
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
     await teleport(page, BRIDE.x - 50);
     await expect(page.locator('#result-detail')).toContainText('Bucket hat found! +50 points');
     expect(await page.evaluate<boolean>('window.__scene.wornHat.visible')).toBe(true);
@@ -1103,6 +1132,81 @@ test('city transitions from night through dawn to daylight and resets on replay'
   await expect.poll(async () => (await page.evaluate<{ night: number }>(lighting)).night).toBeGreaterThan(.99);
 });
 
+test('character reactions can select all three clips and remain muted with effects off', async ({ page }) => {
+  await start(page);
+  await exposeScene(page);
+  await page.evaluate(`(() => {
+    window.__reactionStarts = [];
+    window.__originalRandom = Math.random;
+    const originalStart = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function (...args) {
+      window.__reactionStarts.push({ buffer: this.buffer, detune: this.detune.value });
+      return originalStart.apply(this, args);
+    };
+    window.__scene.run.phase = 'paused';
+    window.__scene.physics.pause();
+  })()`);
+  for (const [index, clip] of ['ourch', 'oi', 'hey'].entries()) {
+    const random = (index + .25) / 3;
+    await page.evaluate(`(() => {
+      Math.random = () => ${random};
+      window.__scene.ui.audio.characterImpact('bash');
+    })()`);
+    await expect.poll(() => page.evaluate(`(async () => {
+      const buffer = await window.__scene.ui.audio.clips.get('${clip}');
+      return Boolean(buffer && buffer.duration > 0 && window.__reactionStarts.some(start =>
+        start.buffer === buffer && Math.abs(start.detune - (${random} * 600 - 300)) < .01));
+    })()`)).toBe(true);
+  }
+  await page.evaluate(`(() => {
+    Math.random = window.__originalRandom;
+    window.__scene.ui.audio.setEffectsEnabled(false);
+  })()`);
+  const before = await page.evaluate<number>('window.__reactionStarts.length');
+  await page.evaluate(`(() => { window.__scene.ui.audio.characterImpact('splat'); })()`);
+  await page.waitForTimeout(100);
+  expect(await page.evaluate<number>('window.__reactionStarts.length')).toBe(before);
+  expect(await page.evaluate<number>('window.__scene.ui.audio.effects.size')).toBe(0);
+});
+
+for (const squash of [false, true]) {
+  test(`character ${squash ? 'squashes' : 'side hits'} play a randomly pitched reaction with the impact sound`, async ({ page }) => {
+    await start(page);
+    await exposeScene(page);
+    await page.evaluate(`(() => {
+      window.__impactStarts = [];
+      const originalStart = AudioBufferSourceNode.prototype.start;
+      AudioBufferSourceNode.prototype.start = function (...args) {
+        window.__impactStarts.push({ buffer: this.buffer, detune: this.detune.value, when: args[0] });
+        return originalStart.apply(this, args);
+      };
+    })()`);
+    for (let id = 0; id < 2; id++) {
+      await teleport(page, people[id].x - 35, squash ? 455 : 570);
+      await page.evaluate(`(() => { window.__scene.player.setVelocityY(${squash ? 350 : 0}); })()`);
+      await expect.poll(() => page.evaluate(`(async () => {
+        const audio = window.__scene.ui.audio;
+        const reactions = (await Promise.all(['ourch', 'oi', 'hey'].map(clip => audio.clips.get(clip)))).filter(Boolean);
+        const impact = await audio.clips.get('${squash ? 'splat' : 'bash'}');
+        const voices = window.__impactStarts.filter(start => reactions.includes(start.buffer));
+        return voices.length === ${id + 1}
+          && voices.every(voice => voice.detune >= -300 && voice.detune <= 300
+            && window.__impactStarts.some(start => start.buffer === impact && start.when === voice.when && start.detune === 0));
+      })()`)).toBe(true);
+    }
+    expect(await page.evaluate(`(() => {
+      const voices = window.__impactStarts.filter(start => start.detune !== 0);
+      return voices.length === 2 && voices[0].detune !== voices[1].detune;
+    })()`)).toBe(true);
+    await page.evaluate(`(() => {
+      const scene = window.__scene;
+      scene.ui.audio.setEffectsEnabled(false);
+      scene.contactPerson(0);
+    })()`);
+    expect(await page.evaluate('window.__scene.ui.audio.effects.size')).toBe(0);
+  });
+}
+
 test('landing on a person squashes once, bounces, plays splat and preserves chances', async ({ page }) => {
   await start(page);
   await page.evaluate(`(async () => {
@@ -1338,7 +1442,13 @@ test("Becky's texts arrive as the run goes on and get frantic", async ({ page })
   await teleport(page, START.x + .59 * (BRIDE.x - START.x));
   await expect(page.locator('#becky-message')).toHaveText("I'm sending my bridesmaids to find you!!");
   await expect(page.locator('#becky-text')).toHaveAttribute('data-frantic', '');
-  await expect(page.locator('#becky-text')).toBeHidden({ timeout: 4000 });
+  await page.evaluate(`(() => {
+    window.__scene.run.phase = 'paused';
+    window.__scene.physics.pause();
+  })()`);
+  await page.waitForTimeout(3000);
+  await expect(page.locator('#becky-text')).toBeVisible();
+  await expect(page.locator('#becky-text')).toBeHidden({ timeout: 2000 });
 });
 
 async function ringThenCrash(page: Page): Promise<void> {
