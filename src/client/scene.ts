@@ -146,6 +146,7 @@ export class WeddingScene extends Phaser.Scene {
       if (this.run.collect(id)) {
         pickup.disableBody(true, true);
         this.ui.audio.tone('sweet');
+        this.ui.audio.effect('dice');
         this.floatText(pickup.x, pickup.y - 25, `+${sweets[id].value}`, '#42735a');
         this.announceEvent('SWEET!', `+${sweets[id].value} POINTS`, '#d68b25');
         this.ui.update(this.run, this.player.x);

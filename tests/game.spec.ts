@@ -101,7 +101,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
 }
 
 for (const width of [1280, 390]) {
-  test(`three extra gap dice score normally on a full jump and reset on replay at ${width}px`, async ({ page }) => {
+  test(`extra gap dice score normally on a full jump and reset on replay at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await start(page);
     await exposeScene(page);
@@ -119,10 +119,70 @@ for (const width of [1280, 390]) {
       expect(await page.evaluate<number>('window.__scene.run.lives')).toBe(before.lives);
       expect(await page.evaluate<boolean>(`window.__scene.pickups.getChildren()[${id}].active`)).toBe(false);
     }
+
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Start a fresh run' }).click();
     await expect.poll(() => page.evaluate<number>('window.__scene.run.collected.size')).toBe(0);
     expect(await page.evaluate(`window.__scene.pickups.countActive(true)`)).toBe(sweets.length);
+  });
+}
+
+test('both dice before the dealer are collectible on consecutive full jumps', async ({ page }) => {
+  await start(page);
+  await exposeScene(page);
+  const ids = [sweets.length - 1, 2 + hurdles.length * 3];
+  await teleport(page, sweets[ids[0]].x - runnerSpeed(sweets[ids[0]].x) * .4);
+  await page.waitForFunction(() => document.getElementById('game')?.dataset.grounded === 'true');
+  for (const id of ids) {
+    await page.waitForFunction(x => Number(document.getElementById('game')?.dataset.x) >= x, sweets[id].x - runnerSpeed(sweets[id].x) * .4);
+    await page.keyboard.press('Space');
+    await expect.poll(() => page.evaluate<boolean>(`window.__scene.run.collected.has(${id})`)).toBe(true);
+    await page.waitForFunction(() => document.getElementById('game')?.dataset.grounded === 'true');
+  }
+  await expect(page.locator('#score')).toHaveText(`${ids.reduce((sum, id) => sum + sweets[id].value, 0)} points`);
+  await expect(page.locator('#lives')).toHaveText('3 / 3');
+});
+
+for (const muted of [false, true]) {
+  test(`dice collection plays its recording and original tone once per pickup with sound effects ${muted ? 'off' : 'on'}`, async ({ page }) => {
+    await page.goto('/');
+    if (muted) await page.locator('#effects-toggle').click();
+    await page.evaluate(() => {
+      const buffers: (AudioBuffer | null)[] = [];
+      Object.defineProperty(window, '__diceStarts', { value: buffers });
+      const tones: OscillatorNode[] = [];
+      Object.defineProperty(window, '__pickupTones', { value: tones });
+      const originalTone = OscillatorNode.prototype.start;
+      OscillatorNode.prototype.start = function (...args) {
+        tones.push(this);
+        return originalTone.apply(this, args);
+      };
+      const original = AudioBufferSourceNode.prototype.start;
+      AudioBufferSourceNode.prototype.start = function (...args) {
+        buffers.push(this.buffer);
+        return original.apply(this, args);
+      };
+    });
+    await page.locator('#play').click();
+    await exposeScene(page);
+    await expect.poll(() => page.evaluate<number>('window.__scene.run.collected.size')).toBe(2);
+    expect(await page.evaluate<number>('window.__pickupTones.length')).toBe(muted ? 0 : 2);
+    if (muted) {
+      expect(await page.evaluate<boolean>("window.__scene.ui.audio.clips.has('dice')")).toBe(false);
+    } else {
+      await expect.poll(() => page.evaluate(`(async () => {
+        const buffer = await window.__scene.ui.audio.clips.get('dice');
+        return buffer && window.__diceStarts.filter(item => item === buffer).length;
+      })()`)).toBe(2);
+    }
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(150);
+    if (!muted) {
+      expect(await page.evaluate(`(async () => {
+        const buffer = await window.__scene.ui.audio.clips.get('dice');
+        return window.__diceStarts.filter(item => item === buffer).length;
+      })()`)).toBe(2);
+    }
   });
 }
 
