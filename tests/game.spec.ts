@@ -979,7 +979,7 @@ test('menu buttons play the click sound unless sound effects are off', async ({ 
   await page.getByRole('button', { name: 'Jump', exact: true }).click();
   expect(await clicks()).toBe(4);
 });
-test('plays bash for collisions and gameover on the final hit, stopping the music', async ({ page }) => {
+test('plays bash for collisions and both loss clips together on the final hit, stopping the music', async ({ page }) => {
   await start(page);
   await page.evaluate(`(async () => {
     const { game } = await import('/src/client/main.ts');
@@ -997,15 +997,25 @@ test('plays bash for collisions and gameover on the final hit, stopping the musi
   await page.evaluate(`(async () => {
     const { game } = await import('/src/client/main.ts');
     const scene = game.scene.getScene('wedding');
+    window.__lossStarts = [];
+    const originalStart = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function (...args) {
+      window.__lossStarts.push({ buffer: this.buffer, when: args[0] });
+      return originalStart.apply(this, args);
+    };
     scene.contact(1); scene.contact(2);
   })()`);
   await expect(page.locator('#game')).toHaveAttribute('data-phase', 'late');
+  await expect(page.locator('#result-title')).toHaveText('Too many distractions!');
+  await expect(page.locator('#result')).toBeVisible();
   await expect.poll(() => page.evaluate(`(async () => {
     const { game } = await import('/src/client/main.ts');
     const audio = game.scene.getScene('wedding').ui.audio;
-    const buffer = await audio.clips.get('gameover');
-    return Boolean(buffer && buffer.duration > 0 && !audio.background
-      && [...audio.effects].some(effect => effect.buffer === buffer));
+    const buffers = await Promise.all(['lose_horn', 'lose_you_lose'].map(clip => audio.clips.get(clip)));
+    const starts = window.__lossStarts.filter(start => buffers.includes(start.buffer));
+    return Boolean(buffers.every(buffer => buffer && buffer.duration > 0) && !audio.background
+      && buffers.every(buffer => [...audio.effects].some(effect => effect.buffer === buffer))
+      && starts.length === 2 && starts[0].when === starts[1].when);
   })()`)).toBe(true);
   await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
   const active = await page.evaluate<number>(`(async () => {
@@ -1013,6 +1023,24 @@ test('plays bash for collisions and gameover on the final hit, stopping the musi
     return game.scene.getScene('wedding').ui.audio.effects.size;
   })()`);
   expect(active).toBe(0);
+});
+
+test('loss clips stay silent when sound effects are off', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Sound effects: On', exact: true }).click();
+  await page.getByRole('button', { name: "I'm coming!" }).click();
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+  await page.evaluate(`(async () => {
+    const { game } = await import('/src/client/main.ts');
+    const scene = game.scene.getScene('wedding');
+    scene.contact(0); scene.contact(1); scene.contact(2);
+  })()`);
+  await expect(page.locator('#result-title')).toHaveText('Too many distractions!');
+  expect(await page.evaluate(`(async () => {
+    const { game } = await import('/src/client/main.ts');
+    const audio = game.scene.getScene('wedding').ui.audio;
+    return audio.effects.size === 0 && !audio.clips.has('lose_horn') && !audio.clips.has('lose_you_lose');
+  })()`)).toBe(true);
 });
 
 test('goal replaces background music with level_end during the reunion', async ({ page }) => {

@@ -177,8 +177,10 @@ Music has a single On/Off toggle. When enabled, the original Classic track plays
 (including the pause menu) at 20% gain, and `dnbloop.mp3` plays during the run at 50% gain.
 Menu music starts once browser audio is unlocked by a tap or key press and stops when the menu closes
 or the page is backgrounded. DnB resumes from its previous position when returning to a paused run.
-`splat` plays on hurdle hits, person side hits and squashes, `gameover` on loss and `level_end` when
-the couple meet. Music pauses with the game, resumes from its previous position,
+`splat` plays on hurdle hits, person side hits and squashes. On the "Too many distractions!" loss
+screen, `lose_horn.mp3` and `lose_you_lose.mp3` start together, replacing the old `gameover` effect.
+Both respect Sound effects On/Off and stop when leaving the results or restarting.
+`level_end` plays when the couple meet. Music pauses with the game, resumes from its previous position,
 and restarts on a fresh run. Main music stops at the finish or game over. The music setting only controls
 the main loop; the wedding music after the couple meet plays at 60% gain. Sound effects independently
 control recordings, generated effects and menu sounds.
