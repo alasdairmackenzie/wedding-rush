@@ -1,8 +1,9 @@
-export const WORLD = { width: 14700, height: 720 };
+const DEAL_LEAD_IN = 400;
+export const WORLD = { width: 14700 + DEAL_LEAD_IN, height: 720 };
 export const GROOM = { speed: 300, maxSpeed: 430, jump: 650, gravity: 1600, width: 34, height: 56 };
 export const START = { x: 110, y: 566 };
-export const BRIDE = { x: 14400, y: 590 };
-export const BUCKET_HAT = { x: 13600, y: 450, width: 90, height: 100 };
+export const BRIDE = { x: 14400 + DEAL_LEAD_IN, y: 590 };
+export const BUCKET_HAT = { x: 13600 + DEAL_LEAD_IN, y: 450, width: 90, height: 100 };
 export const BUCKET_HAT_VALUE = 50;
 export const NEAR_MISS_VALUE = 5;
 export const NEAR_MISS_GAP = 18;
@@ -44,7 +45,8 @@ const MOVER_GAP = 650;
 const CORK_AFTER = [2, 6];
 const CORK_GAP = 450;
 const extraGap = (after: number): number =>
-  (MOVER_AFTER.includes(after) ? MOVER_GAP : 0) + (CORK_AFTER.includes(after) ? CORK_GAP : 0);
+  (after === 0 ? DEAL_LEAD_IN : 0)
+  + (MOVER_AFTER.includes(after) ? MOVER_GAP : 0) + (CORK_AFTER.includes(after) ? CORK_GAP : 0);
 export const hurdles = temptations.map((_temptation, id) => ({
   x: 1300 + id * 1250 + temptations.slice(0, id).reduce((total, _t, after) => total + extraGap(after), 0),
   width: 64,
@@ -87,6 +89,7 @@ const sweetPositions = [
     { x: people[id].x + 90, y: 420 },
   ]),
   ...[0, 2, 5].map(after => ({ x: hurdles[after + 1].x - 350, y: 450 })),
+  { x: (people[0].x + hurdles[1].x - 350) / 2, y: 450 },
 ];
 export const sweets = sweetPositions.map((position, index) => ({ ...position, value: index % 6 + 1 }));
 export const TOTAL_SCORE = sweets.reduce((total, sweet) => total + sweet.value, 0);

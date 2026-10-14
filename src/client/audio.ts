@@ -24,9 +24,10 @@ import flapUrl from '../assets/sounds/flap.mp3';
 import oiUrl from '../assets/sounds/oi.mp3';
 import ourchUrl from '../assets/sounds/ourch.mp3';
 import heyUrl from '../assets/sounds/hey.mp3';
+import diceUrl from '../assets/sounds/dice.mp3';
 
 export type VoiceClip = 'intro' | TemptationKind;
-export type RecordedEffect = 'lose_horn' | 'lose_you_lose' | 'level_end' | 'splat' | 'bash' | 'notify' | 'cork' | 'sparkle' | 'flap' | 'oi' | 'ourch' | 'hey';
+export type RecordedEffect = 'lose_horn' | 'lose_you_lose' | 'level_end' | 'splat' | 'bash' | 'notify' | 'cork' | 'sparkle' | 'flap' | 'oi' | 'ourch' | 'hey' | 'dice';
 export type MusicMode = 'on' | 'off';
 type SoundClip = VoiceClip | RecordedEffect | 'background' | 'dnb' | 'wedding';
 const soundUrls: Record<SoundClip, string> = {
@@ -35,7 +36,7 @@ const soundUrls: Record<SoundClip, string> = {
   background: backgroundUrl, dnb: dnbUrl, lose_horn: loseHornUrl, lose_you_lose: loseYouLoseUrl,
   level_end: levelEndUrl, splat: splatUrl,
   bash: bashUrl, notify: notifyUrl, cork: corkUrl, sparkle: sparkleUrl, flap: flapUrl,
-  wedding: brideMusicUrl, oi: oiUrl, ourch: ourchUrl, hey: heyUrl,
+  wedding: brideMusicUrl, oi: oiUrl, ourch: ourchUrl, hey: heyUrl, dice: diceUrl,
 };
 const characterReactions = ['ourch', 'oi', 'hey'] as const;
 const effectVolume: Partial<Record<RecordedEffect, number>> = { flap: 1.8, notify: .8 };

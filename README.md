@@ -100,11 +100,14 @@ character's line waits until the intro finishes. Later encounter spacing stays u
 - Optional dice sweets score their face value, from **1 to 6**.
   Three extra dice sit in selected gaps between characters at normal jump height,
   with 350 pixels before the next hurdle. They award face-value points with the normal combo multiplier.
+  An extra 400 pixels before the dealer's hurdle gives roughly 1.2 seconds more
+  breathing room, with one more jump-height die worth 3 points in that stretch.
+  Later obstacles and the finish shift together, preserving their spacing.
   Only the first two are at street level. The others sit near jump peaks above
   hurdles and around people's heads, including a sweet after each person that
   can be caught on a squash-bounce. These need tighter jump timing.
 - Reach the flower arch to win. The result shows remaining chances, cleared
-  hurdles and points. A clean run takes roughly 40 seconds, including the extended final stretch.
+  hurdles and points. A clean run takes roughly 41 seconds, including the dealer lead-in and extended final stretch.
   The hat-to-Becky stretch is 800 pixels, giving roughly half a second more running time than before.
   Sean and Becky meet with floating hearts, then the victory result appears
   after 3.2 seconds. Reduced motion uses a static reunion and hearts.
@@ -175,6 +178,8 @@ Menu and dialog buttons play `src/assets/sounds/click.mp3` unless sound effects 
 posting to the top list plays `tada.mp3`. In play, recorded effects mark hits
 (`bash`), squashes (`splat`), champagne corks (`cork`), rings (`sparkle`),
 incoming pigeons (`flap`) and Becky's texts (`notify`).
+Collecting any dice sweet plays both `dice.mp3` and the original generated pickup tone,
+once per collected die, and respects Sound effects On/Off.
 Loading or decoding errors are reported in the status strip.
 Music has a single On/Off toggle. When enabled, the original Classic track plays on the main menu
 (including the pause menu) at 20% gain, and `dnbloop.mp3` plays during the run at 50% gain.

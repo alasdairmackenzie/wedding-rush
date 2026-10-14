@@ -18,7 +18,7 @@ describe('dice sweets', () => {
     });
   });
   it('places three gap dice in a normal jump path with clearance from nearby obstacles', () => {
-    const extraDice = sweets.slice(2 + hurdles.length * 3);
+    const extraDice = sweets.slice(2 + hurdles.length * 3, 5 + hurdles.length * 3);
     expect(extraDice).toHaveLength(3);
     const standingTop = platforms[0].y - GROOM.height;
     extraDice.forEach((sweet, index) => {
@@ -33,6 +33,22 @@ describe('dice sweets', () => {
       const mover = movers.find(mover => mover.x > people[after].x && mover.x < hurdles[after + 1].x);
       if (mover) expect(sweet.x - mover.x).toBeGreaterThanOrEqual(300);
     });
+  });
+  it('adds breathing room and a fourth gap die before the dealer without squeezing later obstacles', () => {
+    expect(people[1].temptation.kind).toBe('deal');
+    expect(hurdles[0].x).toBe(1300);
+    expect(hurdles[1].x).toBe(2950);
+    expect(people[1].x).toBe(3500);
+    const newDie = sweets.at(-1)!;
+    const nextDie = sweets[2 + hurdles.length * 3];
+    expect(newDie).toMatchObject({ x: 2225, y: 450, value: 3 });
+    expect(newDie.x - people[0].x).toBe(375);
+    expect(nextDie.x - newDie.x).toBe(375);
+    expect((nextDie.x - newDie.x) / runnerSpeed(nextDie.x)).toBeGreaterThan(2 * GROOM.jump / GROOM.gravity + .2);
+    expect(400 / runnerSpeed(people[1].x)).toBeGreaterThan(1);
+    expect(hurdles[2].x - hurdles[1].x).toBe(1900);
+    expect(sweets).toHaveLength(27);
+    expect(TOTAL_SCORE).toBe(90);
   });
   it('adds each exact face value once and resets on replay', () => {
     const run = playing();
@@ -250,7 +266,7 @@ describe('moving obstacles, corks and rings', () => {
 });
 
 describe('4x orange concentrate', () => {
-  it('has two reachable bottles before busy stretches and a roughly 39-second route', () => {
+  it('has two reachable bottles before busy stretches and a roughly 41-second route', () => {
     expect(concentrates).toHaveLength(2);
     concentrates.forEach((bottle, id) => {
       const hurdle = hurdles[id === 0 ? 3 : 6];
@@ -261,8 +277,8 @@ describe('4x orange concentrate', () => {
     });
     let seconds = 0;
     for (let x = START.x; x < BRIDE.x - 54; x++) seconds += 1 / runnerSpeed(x);
-    expect(seconds).toBeGreaterThan(38);
-    expect(seconds).toBeLessThan(40);
+    expect(seconds).toBeGreaterThan(40);
+    expect(seconds).toBeLessThan(41);
     expect(corks).toHaveLength(3);
     expect(rings).toHaveLength(3);
   });
@@ -362,7 +378,7 @@ describe('close shaves and personal challenges', () => {
 
 describe('final bucket hat', () => {
   it('extends the finish and places the hat within a normal jump but above a grounded runner', () => {
-    expect(BRIDE.x).toBe(14400);
+    expect(BRIDE.x).toBe(14800);
     expect(BRIDE.x - BUCKET_HAT.x).toBe(800);
     expect(WORLD.width - BRIDE.x).toBeGreaterThanOrEqual(300);
     expect(BUCKET_HAT.x).toBeGreaterThan(rings.at(-1)!.x + 500);
