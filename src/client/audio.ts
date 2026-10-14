@@ -10,7 +10,8 @@ import missedTubeUrl from '../assets/sounds/missed_tube_stop.mp3';
 import brideMusicUrl from '../assets/sounds/herecomesthebride.mp3';
 import backgroundUrl from '../assets/sounds/background.mp3';
 import dnbUrl from '../assets/sounds/dnbloop.mp3';
-import gameoverUrl from '../assets/sounds/gameover.mp3';
+import loseHornUrl from '../assets/sounds/lose_horn.mp3';
+import loseYouLoseUrl from '../assets/sounds/lose_you_lose.mp3';
 import levelEndUrl from '../assets/sounds/level_end.mp3';
 import splatUrl from '../assets/sounds/splat.mp3';
 import clickUrl from '../assets/sounds/click.mp3';
@@ -22,13 +23,14 @@ import sparkleUrl from '../assets/sounds/sparkle.mp3';
 import flapUrl from '../assets/sounds/flap.mp3';
 
 export type VoiceClip = 'intro' | TemptationKind;
-export type RecordedEffect = 'gameover' | 'level_end' | 'splat' | 'bash' | 'notify' | 'cork' | 'sparkle' | 'flap';
+export type RecordedEffect = 'lose_horn' | 'lose_you_lose' | 'level_end' | 'splat' | 'bash' | 'notify' | 'cork' | 'sparkle' | 'flap';
 export type MusicMode = 'on' | 'off';
 type SoundClip = VoiceClip | RecordedEffect | 'background' | 'dnb' | 'wedding';
 const soundUrls: Record<SoundClip, string> = {
   intro: introUrl, football: footballUrl, deal: dealUrl, pingpong: pingpongUrl,
   hat: hatUrl, pub: pubUrl, karaoke: karaokeUrl, kebab: missedTubeUrl,
-  background: backgroundUrl, dnb: dnbUrl, gameover: gameoverUrl, level_end: levelEndUrl, splat: splatUrl,
+  background: backgroundUrl, dnb: dnbUrl, lose_horn: loseHornUrl, lose_you_lose: loseYouLoseUrl,
+  level_end: levelEndUrl, splat: splatUrl,
   bash: bashUrl, notify: notifyUrl, cork: corkUrl, sparkle: sparkleUrl, flap: flapUrl,
   wedding: brideMusicUrl,
 };
@@ -254,29 +256,33 @@ export class GameAudio {
     }
     this.effects.clear();
   }
-  effect(clip: RecordedEffect): void {
+  effect(...clips: RecordedEffect[]): void {
     const context = this.context;
     if (!this.effectsEnabled || document.hidden || this.destroyed || !context) return;
     const request = this.effectRequest;
-    void Promise.all([this.loadClip(context, clip), this.resume(context)]).then(([buffer]) => {
+    void Promise.all([Promise.all(clips.map(clip => this.loadClip(context, clip))), this.resume(context)]).then(([buffers]) => {
       if (request !== this.effectRequest || !this.effectsEnabled || document.hidden || this.destroyed) return;
-      const source = context.createBufferSource(), gain = context.createGain();
-      source.buffer = buffer;
-      gain.gain.value = effectVolume[clip] ?? 1;
-      source.connect(gain); gain.connect(context.destination);
-      source.onended = () => { source.disconnect(); gain.disconnect(); this.effects.delete(source); };
-      this.effects.add(source);
-      source.start();
+      const startTime = context.currentTime;
+      buffers.forEach((buffer, index) => {
+        const source = context.createBufferSource(), gain = context.createGain();
+        source.buffer = buffer;
+        gain.gain.value = effectVolume[clips[index]] ?? 1;
+        source.connect(gain); gain.connect(context.destination);
+        source.onended = () => { source.disconnect(); gain.disconnect(); this.effects.delete(source); };
+        this.effects.add(source);
+        source.start(startTime);
+      });
     }).catch(error => {
       if (request === this.voiceRequest) this.voiceClip = this.queuedClip = undefined;
-      if (!this.destroyed) this.notice(`Could not play ${clip} sound: ${String(error)}`);
+      if (!this.destroyed) this.notice(`Could not play ${clips.join(' and ')} sound: ${String(error)}`);
     });
   }
   finish(won: boolean): void {
     this.backgroundWanted = false;
     this.haltBackground();
     this.stopSpeech();
-    this.effect(won ? 'level_end' : 'gameover');
+    if (won) this.effect('level_end');
+    else this.effect('lose_horn', 'lose_you_lose');
     if (won) this.startWeddingMusic();
   }
   stopSpeech(): void {
