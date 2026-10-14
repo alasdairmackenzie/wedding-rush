@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { imageType, isFaceKind, MAX_FACE_BYTES } from '../shared/faces.ts';
 import { cleanName, ENTRY_ID, isRude, NAME_MAX, validateSubmission } from '../shared/leaderboard.ts';
 import { ADMIN_LIST_SIZE, type ScoreStore } from './store.ts';
+import { analyticsBatch, isAnalyticsEvent, type AnalyticsEvent } from '../shared/analytics.ts';
 
 const MAX_BODY = 1024;
 const WINDOW_MS = 60_000;
@@ -80,6 +81,16 @@ async function admin(req: IncomingMessage, res: ServerResponse, store: ScoreStor
     return true;
   }
   const [, , , section, key = ''] = path.split('/');
+  if (section === 'analytics' && !key) {
+    if (req.method !== 'GET') return notAllowed(res, 'GET');
+    const days = Number(new URL(req.url ?? '/', 'http://localhost').searchParams.get('days') ?? 7);
+    if (![1, 7, 30, 90].includes(days)) {
+      send(res, 400, { error: 'Choose 1, 7, 30 or 90 days.' });
+      return true;
+    }
+    send(res, 200, await store.analytics(days));
+    return true;
+  }
   if (section === 'check' && !key) {
     send(res, 200, { ok: true });
     return true;
@@ -144,13 +155,46 @@ async function admin(req: IncomingMessage, res: ServerResponse, store: ScoreStor
 
 export function createApi(getStore: () => Promise<ScoreStore>, options: { adminToken?: string } = {}) {
   const posts = new Map<string, number[]>();
+  const analyticsPosts = new Map<string, { count: number; until: number }>();
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     const path = url.pathname;
     const isFaces = path === '/api/faces' || path.startsWith('/api/faces/');
     const isAdmin = path.startsWith('/api/admin/');
-    if (path !== '/api/scores' && !isFaces && !isAdmin) return false;
+    if (path !== '/api/scores' && path !== '/api/analytics' && !isFaces && !isAdmin) return false;
     try {
+      if (path === '/api/analytics') {
+        if (req.method !== 'POST') return notAllowed(res, 'POST');
+        if (req.headers['sec-fetch-site'] === 'cross-site') {
+          send(res, 403, { error: 'Analytics must be sent from this site.' });
+          return true;
+        }
+        if (!String(req.headers['content-type'] ?? '').startsWith('application/json')) {
+          send(res, 415, { error: 'Send JSON.' });
+          return true;
+        }
+        const now = Date.now();
+        for (const [key, value] of analyticsPosts) if (value.until <= now) analyticsPosts.delete(key);
+        const ip = clientIp(req);
+        const rate = analyticsPosts.get(ip) ?? { count: 0, until: now + WINDOW_MS };
+        if (rate.count >= 300 || analyticsPosts.size >= 5000 && !analyticsPosts.has(ip)) {
+          send(res, 429, { error: 'Too many analytics requests. Try again shortly.' });
+          return true;
+        }
+        rate.count++;
+        analyticsPosts.set(ip, rate);
+        let body: unknown;
+        try { body = JSON.parse((await readBytes(req, 16_384)).toString('utf8')); }
+        catch (error) {
+          send(res, error instanceof TooLarge ? 413 : 400, { error: 'Analytics request could not be read.' });
+          return true;
+        }
+        const events = analyticsBatch(body);
+        if (!events) { send(res, 400, { error: 'Invalid analytics events.' }); return true; }
+        await (await getStore()).track(events);
+        send(res, 202, { ok: true });
+        return true;
+      }
       const store = await getStore();
       if (isFaces) return await faces(req, res, store, path);
       if (isAdmin) return await admin(req, res, store, path, options.adminToken);
@@ -191,11 +235,19 @@ export function createApi(getStore: () => Promise<ScoreStore>, options: { adminT
       recent.push(now);
       posts.set(ip, recent);
       if (posts.size > 5000) posts.clear();
-      const entry = await store.add(result.value);
+      let analytics: AnalyticsEvent | undefined;
+      if (typeof body === 'object' && body !== null && 'analytics' in body && body.analytics !== undefined) {
+        if (!isAnalyticsEvent(body.analytics) || body.analytics.name !== 'score_saved' || body.analytics.target !== 'submit-score') {
+          send(res, 400, { error: 'Invalid score analytics context.' });
+          return true;
+        }
+        analytics = body.analytics;
+      }
+      const entry = await store.add(result.value, analytics);
       send(res, 201, { entry, scores: await store.top() });
     } catch (error) {
-      console.error('Leaderboard error', error);
-      if (!res.headersSent) send(res, 503, { error: 'The leaderboard is having a lie-down. Try again soon.' });
+      console.error('WeddingRush API error', error);
+      if (!res.headersSent) send(res, 503, { error: path.includes('analytics') ? 'Analytics are unavailable. Try again soon.' : 'The leaderboard is having a lie-down. Try again soon.' });
     }
     return true;
   };

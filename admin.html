@@ -19,6 +19,35 @@
       </form>
       <div id="dashboard" hidden>
         <p class="row links"><a href="/" target="_blank">Open the game ↗</a><a href="/live" target="_blank">Open the live screen ↗</a><button type="button" id="logout" class="link">Sign out</button></p>
+        <section class="panel" aria-labelledby="analytics-title">
+          <div class="row">
+            <h2 id="analytics-title">Usage analytics</h2>
+            <label for="analytics-days">Period</label>
+            <select id="analytics-days">
+              <option value="1">Last 24 hours</option>
+              <option value="7" selected>Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+            <button id="analytics-refresh" type="button">Refresh analytics</button>
+          </div>
+          <p class="hint">Unique browsers, not identifiable people. Anonymous IDs; no names, stored IP addresses or fingerprints. Activity starts when this feature is deployed.</p>
+          <p id="analytics-status" role="status"></p>
+          <dl id="analytics-metrics" class="analytics-metrics"></dl>
+          <h3>Run funnel</h3>
+          <p class="hint">Distinct runs started during the selected period, with outcomes recorded in that period. Unfinished includes active runs, restarts and exits; it is not a confirmed abandonment count.</p>
+          <div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Stage</th><th scope="col">Runs</th><th scope="col">Of starts</th></tr></thead><tbody id="analytics-funnel"></tbody></table></div>
+          <h3>Screen impressions</h3>
+          <div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Screen</th><th scope="col">Views</th><th scope="col">Browsers</th><th scope="col">Sessions</th></tr></thead><tbody id="analytics-screens"></tbody></table></div>
+          <h3>Actions and gameplay</h3>
+          <p class="hint">Clicks and completed actions are separate. Share successes mean a copied link or completed share dialog, not a delivered message. Live views are page loads, not each automatic leaderboard refresh.</p>
+          <div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Event</th><th scope="col">Control / outcome</th><th scope="col">Total</th><th scope="col">Browsers</th><th scope="col">Runs</th></tr></thead><tbody id="analytics-actions"></tbody></table></div>
+          <div class="analytics-breakdowns">
+            <div><h3>Daily activity (UTC)</h3><div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Day</th><th scope="col">Events</th><th scope="col">Browsers</th><th scope="col">Sessions</th></tr></thead><tbody id="analytics-daily"></tbody></table></div></div>
+            <div><h3>Device input</h3><div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Input</th><th scope="col">Events</th><th scope="col">Browsers</th><th scope="col">Sessions</th></tr></thead><tbody id="analytics-devices"></tbody></table></div></div>
+            <div><h3>Entry source</h3><div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Source</th><th scope="col">Events</th><th scope="col">Browsers</th><th scope="col">Sessions</th></tr></thead><tbody id="analytics-sources"></tbody></table></div></div>
+          </div>
+        </section>
         <section class="panel" aria-labelledby="faces-title">
           <h2 id="faces-title">Faces</h2>
           <p class="hint">Pick a photo of a face. Tick “Auto-remove background” to erase backgrounds with AI, or “Crop to a circle”. New faces show up the next time someone loads the game.</p>

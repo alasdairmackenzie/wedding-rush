@@ -1,8 +1,11 @@
 import QRCode from 'qrcode';
 import type { ScoreEntry } from '../shared/leaderboard';
+import { createAnalytics } from './analytics';
 import './live.css';
 
 const REFRESH_MS = 15_000;
+const analytics = createAnalytics('live');
+analytics.track('screen_view', 'live');
 const rows = document.getElementById('live-rows') as HTMLTableSectionElement;
 const status = document.getElementById('live-status') as HTMLElement;
 const link = document.getElementById('live-url') as HTMLElement;
@@ -13,7 +16,9 @@ link.textContent = targetHost;
 
 const fullUrl = /^https?:\/\//i.test(targetHost) ? targetHost : `${location.protocol}//${targetHost}`;
 if (qrContainer) {
-  QRCode.toString(fullUrl, { type: 'svg', margin: 1, color: { dark: '#302825', light: '#fffaf0' } })
+  const joinUrl = new URL(fullUrl);
+  joinUrl.searchParams.set('from', 'live');
+  QRCode.toString(joinUrl.href, { type: 'svg', margin: 1, color: { dark: '#302825', light: '#fffaf0' } })
     .then(svg => { qrContainer.innerHTML = svg; })
     .catch(() => { /* QR generation fallback */ });
 }
@@ -52,6 +57,7 @@ async function refresh(): Promise<void> {
     status.textContent = `Updated ${time()}. Refreshes every ${REFRESH_MS / 1000} seconds.`;
     delete status.dataset.error;
   } catch {
+    if (!status.hasAttribute('data-error')) analytics.track('error', 'live');
     status.textContent = `Can't reach the top list right now (${time()}). Trying again shortly.`;
     status.dataset.error = '';
   }

@@ -21,9 +21,12 @@ import notifyUrl from '../assets/sounds/notify.mp3';
 import corkUrl from '../assets/sounds/cork.mp3';
 import sparkleUrl from '../assets/sounds/sparkle.mp3';
 import flapUrl from '../assets/sounds/flap.mp3';
+import oiUrl from '../assets/sounds/oi.mp3';
+import ourchUrl from '../assets/sounds/ourch.mp3';
+import heyUrl from '../assets/sounds/hey.mp3';
 
 export type VoiceClip = 'intro' | TemptationKind;
-export type RecordedEffect = 'lose_horn' | 'lose_you_lose' | 'level_end' | 'splat' | 'bash' | 'notify' | 'cork' | 'sparkle' | 'flap';
+export type RecordedEffect = 'lose_horn' | 'lose_you_lose' | 'level_end' | 'splat' | 'bash' | 'notify' | 'cork' | 'sparkle' | 'flap' | 'oi' | 'ourch' | 'hey';
 export type MusicMode = 'on' | 'off';
 type SoundClip = VoiceClip | RecordedEffect | 'background' | 'dnb' | 'wedding';
 const soundUrls: Record<SoundClip, string> = {
@@ -32,8 +35,9 @@ const soundUrls: Record<SoundClip, string> = {
   background: backgroundUrl, dnb: dnbUrl, lose_horn: loseHornUrl, lose_you_lose: loseYouLoseUrl,
   level_end: levelEndUrl, splat: splatUrl,
   bash: bashUrl, notify: notifyUrl, cork: corkUrl, sparkle: sparkleUrl, flap: flapUrl,
-  wedding: brideMusicUrl,
+  wedding: brideMusicUrl, oi: oiUrl, ourch: ourchUrl, hey: heyUrl,
 };
+const characterReactions = ['ourch', 'oi', 'hey'] as const;
 const effectVolume: Partial<Record<RecordedEffect, number>> = { flap: 1.8, notify: .8 };
 const uiSounds = { click: { url: clickUrl, volume: .6 }, tada: { url: tadaUrl, volume: .8 } };
 
@@ -256,6 +260,10 @@ export class GameAudio {
     }
     this.effects.clear();
   }
+  characterImpact(impact: 'bash' | 'splat'): void {
+    const reaction = characterReactions[Math.floor(Math.random() * characterReactions.length)];
+    this.effect(impact, reaction);
+  }
   effect(...clips: RecordedEffect[]): void {
     const context = this.context;
     if (!this.effectsEnabled || document.hidden || this.destroyed || !context) return;
@@ -266,6 +274,9 @@ export class GameAudio {
       buffers.forEach((buffer, index) => {
         const source = context.createBufferSource(), gain = context.createGain();
         source.buffer = buffer;
+        if (clips[index] === 'oi' || clips[index] === 'ourch' || clips[index] === 'hey') {
+          source.detune.value = Math.random() * 600 - 300;
+        }
         gain.gain.value = effectVolume[clips[index]] ?? 1;
         source.connect(gain); gain.connect(context.destination);
         source.onended = () => { source.disconnect(); gain.disconnect(); this.effects.delete(source); };

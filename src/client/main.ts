@@ -4,6 +4,8 @@ import { BRIDE, GROOM, hurdles, people, rings, Run, runChallenges, runnerSpeed, 
 import { cleanName, ENTRY_ID, isRude, NAME_MAX, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
 import { WeddingScene } from './scene';
 import { GameAudio, type MusicMode } from './audio';
+import { createAnalytics } from './analytics';
+import { TARGETS } from '../shared/analytics';
 import './style.css';
 
 function element<T extends HTMLElement>(id: string, type: new (...args: never[]) => T): T {
@@ -100,6 +102,16 @@ const touch = document.querySelector<HTMLElement>('.touch-controls');
 if (!touch) throw new Error('Missing touch controls.');
 let scene: WeddingScene | undefined;
 let started = false;
+const analytics = createAnalytics('game');
+analytics.observeScreens({
+  menu: () => started ? 'pause' : 'menu',
+  result: () => lastRun?.won ? 'result_won' : 'result_lost',
+  'top-list': () => 'top-list',
+  'challenges-dialog': () => 'challenges-dialog',
+  'share-modal': () => 'share-modal',
+  'error-dialog': () => 'error-dialog',
+  'play-instructions': () => 'instructions',
+});
 const audio = new GameAudio(message => { console.error(message); notice.textContent = message; });
 
 function showMenu(): void {
@@ -119,7 +131,11 @@ function start(fresh = false): void {
   window.clearTimeout(textTimer);
   beckyText.hidden = true;
   started = true;
-  requestAnimationFrame(() => scene?.start(fresh));
+  requestAnimationFrame(() => {
+    if (!scene) return;
+    analytics.start(fresh, scene.run.phase);
+    scene.start(fresh);
+  });
 }
 function readBest(): number {
   try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch { return 0; }
@@ -134,7 +150,7 @@ function showText(message: string): void {
   beckyText.hidden = true;
   void beckyText.offsetWidth;
   beckyText.hidden = false;
-  textTimer = window.setTimeout(() => { beckyText.hidden = true; }, 2600);
+  textTimer = window.setTimeout(() => { beckyText.hidden = true; }, 4000);
 }
 function scoreRow(entry: ScoreEntry, rank: number, you?: ScoreEntry): HTMLTableRowElement {
   const row = document.createElement('tr');
@@ -211,6 +227,7 @@ async function openTopList(
   }
 }
 function reportError(message: string): void {
+  analytics.track('error', 'error-dialog');
   console.error(message);
   scene?.pause();
   element('error-message', HTMLElement).textContent = message;
@@ -243,6 +260,7 @@ const wedding = new WeddingScene({
       if (run.multiplier > 1) { void combo.offsetWidth; combo.setAttribute('data-hot', ''); }
     }
     route.value = Phaser.Math.Clamp((x - START.x) / (BRIDE.x - START.x) * 100, 0, 100);
+    if (run.phase === 'playing') analytics.progress(route.value);
     arena.dataset.phase = run.phase;
     arena.dataset.collected = String(run.collected.size);
     arena.dataset.score = String(run.score);
@@ -253,6 +271,7 @@ const wedding = new WeddingScene({
   },
   end: run => {
     const won = run.phase === 'won';
+    analytics.finish(won);
     window.clearTimeout(textTimer);
     beckyText.hidden = true;
     const best = readBest();
@@ -327,17 +346,19 @@ async function postScore(): Promise<RankedEntry | undefined> {
   if (posted) return posted;
   const name = cleanName(playerName.value);
   if (!name || isRude(name)) {
+    analytics.track('score_invalid', 'submit-score');
     showStatus(!name ? `Add your name (1 to ${NAME_MAX} letters, numbers or spaces).` : "Keep it clean, it's a wedding! Try another name.", true);
     playerName.focus();
     return undefined;
   }
   submitScore.disabled = true;
+  analytics.track('score_attempt', 'submit-score');
   showStatus('Posting…');
   try {
     const response = await fetch('/api/scores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ name, score: lastRun.score, squashed: lastRun.squashed, won: lastRun.won }),
+      body: JSON.stringify({ name, score: lastRun.score, squashed: lastRun.squashed, won: lastRun.won, analytics: analytics.scoreEvent() }),
     });
     const data = await response.json() as { error?: string; entry?: RankedEntry; scores?: ScoreEntry[] };
     if (!response.ok || !data.entry || !data.scores) throw new Error(data.error ?? 'The top list is offline right now.');
@@ -348,6 +369,7 @@ async function postScore(): Promise<RankedEntry | undefined> {
     audio.tada();
     return posted;
   } catch (error) {
+    analytics.track('score_failed', 'submit-score');
     submitScore.disabled = false;
     showStatus(error instanceof Error ? error.message : 'The top list is offline right now.', true);
     return undefined;
@@ -362,16 +384,23 @@ async function shareLink(entry: RankedEntry): Promise<void> {
   if (navigator.share) {
     try {
       await navigator.share({ title: 'WeddingRush top list', text, url });
+      analytics.track('share_success', 'native');
       showShareStatus(`Shared! You're #${entry.rank} on the top list.`);
       return;
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        analytics.track('share_cancelled', 'native');
+        return;
+      }
+      analytics.track('share_failed', 'native');
     }
   }
   try {
     await navigator.clipboard.writeText(url);
+    analytics.track('share_success', 'copy');
     showShareStatus('Link copied! Paste it in the wedding group chat.');
   } catch {
+    analytics.track('share_failed', 'copy');
     showShareStatus(`Share this link: ${url}`);
   }
 }
@@ -438,11 +467,16 @@ howToPlay.addEventListener('click', () => {
   howToPlay.setAttribute('aria-expanded', String(!playInstructions.hidden));
 });
 document.addEventListener('click', event => {
+  if (event.target instanceof Element) {
+    const control = event.target.closest('button, a');
+    const target = TARGETS.find(target => target === control?.id);
+    if (target) analytics.track('action', target);
+  }
   if (event.target instanceof Element && event.target.closest('dialog button, #menu-button, #mobile-pause')) audio.click();
 });
 element('mobile-pause', HTMLButtonElement).addEventListener('click', showMenu);
 function openShareModal(): void {
-  const url = `${location.origin}/`;
+  const url = `${location.origin}/?from=share`;
   shareModalLink.textContent = url;
   shareModalStatus.textContent = '';
   QRCode.toString(url, { type: 'svg', margin: 1, color: { dark: '#302825', light: '#fffaf0' } })
@@ -451,11 +485,13 @@ function openShareModal(): void {
   if (!shareModal.open) shareModal.showModal();
 }
 shareModalCopy.addEventListener('click', async () => {
-  const url = `${location.origin}/`;
+  const url = `${location.origin}/?from=share`;
   try {
     await navigator.clipboard.writeText(url);
+    analytics.track('share_success', 'copy');
     shareModalStatus.textContent = 'Link copied! Send it to the wedding guests 🥂';
   } catch {
+    analytics.track('share_failed', 'copy');
     shareModalStatus.textContent = `Copy: ${url}`;
   }
 });
@@ -500,6 +536,7 @@ musicToggle.addEventListener('click', () => {
   musicMode = musicMode === 'on' ? 'off' : 'on';
   audio.setMusicMode(musicMode);
   renderMusicToggle();
+  analytics.track('setting_changed', musicMode === 'on' ? 'music_on' : 'music_off');
 });
 menu.addEventListener('close', () => audio.stopMenuMusic());
 function unlockMenuMusic(): void {
@@ -517,6 +554,7 @@ effectsToggle.addEventListener('click', () => {
   audio.setEffectsEnabled(effectsEnabled);
   effectsToggle.textContent = `Sound effects: ${effectsEnabled ? 'On' : 'Off'}`;
   effectsToggle.setAttribute('aria-pressed', String(effectsEnabled));
+  analytics.track('setting_changed', effectsEnabled ? 'effects_on' : 'effects_off');
 });
 menu.addEventListener('cancel', event => {
   event.preventDefault();

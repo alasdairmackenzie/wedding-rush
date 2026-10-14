@@ -1,5 +1,6 @@
 import { FACE_KINDS, FACE_LABELS, type FaceKind } from '../shared/faces';
 import { NAME_MAX, type ScoreEntry } from '../shared/leaderboard';
+import type { AnalyticsCount, AnalyticsReport } from '../shared/analytics';
 import brideHeadUrl from '../assets/art/bride-head.png';
 import dealHeadUrl from '../assets/art/deal-head.png';
 import pingpongHeadUrl from '../assets/art/pingpong-head.png';
@@ -74,8 +75,89 @@ async function signIn(candidate: string): Promise<void> {
   login.hidden = true;
   dashboard.hidden = false;
   say(loginStatus, '');
-  await Promise.all([loadScores(), loadFaces()]);
+  await Promise.all([loadScores(), loadFaces(), loadAnalytics()]);
 }
+
+const analyticsDays = $<HTMLSelectElement>('analytics-days');
+const analyticsStatus = $('analytics-status');
+let analyticsRequest = 0;
+const label = (text: string): string => text.replaceAll('_', ' ').replaceAll('-', ' ');
+function analyticsTable(id: string, rows: (string | number)[][], columns: number): void {
+  const body = $(id);
+  body.replaceChildren(...rows.map(values => {
+    const row = document.createElement('tr');
+    for (const value of values) {
+      const cell = document.createElement('td');
+      cell.textContent = typeof value === 'number' ? value.toLocaleString() : value;
+      row.append(cell);
+    }
+    return row;
+  }));
+  if (!rows.length) {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = columns;
+    cell.textContent = 'No activity recorded in this period yet.';
+    row.append(cell);
+    body.append(row);
+  }
+}
+function renderAnalytics(report: AnalyticsReport): void {
+  const total = (name: string) => report.events.filter(e => e.name === name).reduce((sum, e) => sum + e.count, 0);
+  const metrics: [string, number][] = [
+    ['Unique browsers', report.totals.visitors], ['Tab sessions', report.totals.sessions],
+    ['Games played', report.funnel.started], ['Fresh restarts', total('game_restart')],
+    ['Play again', total('game_replay')], ['Resumes', total('game_resume')],
+    ['Reached Becky', total('game_won')], ['Lost games', total('game_lost')],
+    ['Scores saved', total('score_saved')], ['Share successes', total('share_success')],
+    ['Live page visits', report.events.find(e => e.name === 'page_view' && e.target === 'live')?.count ?? 0],
+    ['Score attempts', total('score_attempt')],
+  ];
+  $('analytics-metrics').replaceChildren(...metrics.map(([title, count]) => {
+    const box = document.createElement('div');
+    const dt = document.createElement('dt');
+    dt.textContent = title;
+    const dd = document.createElement('dd');
+    dd.textContent = count.toLocaleString();
+    box.append(dt, dd);
+    return box;
+  }));
+  const funnel: [string, number][] = [
+    ['Started', report.funnel.started], ['Reached Becky', report.funnel.won],
+    ['Lost', report.funnel.lost], ['Saved a score (any outcome)', report.funnel.submitted],
+    ['Reached Becky and saved', report.funnel.wonSubmitted],
+    ['Lost and saved', report.funnel.lostSubmitted], ['Unfinished / no recorded result', report.funnel.unfinished],
+  ];
+  analyticsTable('analytics-funnel', funnel.map(([name, count]) => [
+    name, count, report.funnel.started ? `${(100 * count / report.funnel.started).toFixed(1)}%` : '—',
+  ]), 3);
+  analyticsTable('analytics-screens', report.events.filter(e => e.name === 'screen_view')
+    .sort((a, b) => b.count - a.count).map(e => [label(e.target), e.count, e.visitors, e.sessions]), 4);
+  analyticsTable('analytics-actions', report.events.filter(e => e.name !== 'screen_view')
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .map(e => [label(e.name), label(e.target), e.count, e.visitors, e.runs]), 5);
+  const breakdown = (id: string, rows: AnalyticsCount[]) => analyticsTable(id, rows.map(e => [label(e.label), e.count, e.visitors, e.sessions]), 4);
+  breakdown('analytics-daily', report.daily);
+  breakdown('analytics-devices', report.devices);
+  breakdown('analytics-sources', report.sources);
+  say(analyticsStatus, `Updated ${new Date().toLocaleTimeString()}. Since ${new Date(report.since).toLocaleString()}. `
+    + (report.storage === 'memory' ? 'LOCAL MEMORY ONLY: analytics reset when this server restarts.' : 'Stored in PostgreSQL; events retained for 90 days.'));
+}
+async function loadAnalytics(): Promise<void> {
+  const request = ++analyticsRequest;
+  say(analyticsStatus, 'Loading analytics…');
+  try {
+    const report = await api<AnalyticsReport>(`/api/admin/analytics?days=${analyticsDays.value}`);
+    if (request === analyticsRequest && token) renderAnalytics(report);
+  } catch (error) {
+    if (request !== analyticsRequest) return;
+    $('analytics-metrics').replaceChildren();
+    for (const id of ['funnel', 'screens', 'actions', 'daily', 'devices', 'sources']) $(`analytics-${id}`).replaceChildren();
+    failed(error, analyticsStatus);
+  }
+}
+analyticsDays.addEventListener('change', () => { void loadAnalytics(); });
+$('analytics-refresh').addEventListener('click', () => { void loadAnalytics(); });
 
 const posted = (at: string): string => new Date(at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 

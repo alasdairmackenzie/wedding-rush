@@ -1,11 +1,15 @@
 import { randomBytes } from 'node:crypto';
 import type { Pool } from 'pg';
 import { LEADERBOARD_SIZE, type RankedEntry, type ScoreEntry, type ScoreSubmission } from '../shared/leaderboard.ts';
+import { ANALYTICS_RETENTION_DAYS, type AnalyticsEvent, type AnalyticsReport, type StoredEvent } from '../shared/analytics.ts';
+import { summarize } from './analytics.ts';
 
 export interface Face { mime: string; data: Buffer; version: number }
 export interface ScoreStore {
   top(limit?: number): Promise<ScoreEntry[]>;
-  add(entry: ScoreSubmission): Promise<RankedEntry>;
+  add(entry: ScoreSubmission, analytics?: AnalyticsEvent): Promise<RankedEntry>;
+  track(events: AnalyticsEvent[]): Promise<void>;
+  analytics(days: number): Promise<AnalyticsReport>;
   find(id: string): Promise<RankedEntry | undefined>;
   rename(id: string, name: string): Promise<boolean>;
   remove(id: string): Promise<boolean>;
@@ -26,6 +30,11 @@ const rank = (a: ScoreEntry, b: ScoreEntry): number => b.score - a.score || b.sq
 export function memoryStore(): ScoreStore {
   const entries: ScoreEntry[] = [];
   const faces = new Map<string, Face>();
+  const events = new Map<string, StoredEvent>();
+  const prune = () => {
+    const cutoff = Date.now() - ANALYTICS_RETENTION_DAYS * 86400_000;
+    for (const [id, event] of events) if (Date.parse(event.at) < cutoff) events.delete(id);
+  };
   const ranked = (id: string): RankedEntry | undefined => {
     const index = entries.findIndex(entry => entry.id === id);
     return index < 0 ? undefined : { ...entries[index], rank: index + 1 };
@@ -34,11 +43,24 @@ export function memoryStore(): ScoreStore {
     async top(limit = LEADERBOARD_SIZE) {
       return entries.slice(0, limit);
     },
-    async add(submission) {
+    async track(batch) {
+      prune();
+      for (const event of batch) if (!events.has(event.id)) events.set(event.id, { ...event, at: new Date().toISOString() });
+    },
+    async analytics(days) {
+      prune();
+      const since = new Date(Date.now() - days * 86400_000).toISOString();
+      return summarize([...events.values()].filter(e => e.at >= since), days, since);
+    },
+    async add(submission, analytics) {
       const entry = { id: newEntryId(), ...submission, at: new Date().toISOString() };
       entries.push(entry);
       entries.sort(rank);
       entries.length = Math.min(entries.length, 500);
+      if (analytics) {
+        prune();
+        if (!events.has(analytics.id)) events.set(analytics.id, { ...analytics, at: new Date().toISOString() });
+      }
       return ranked(entry.id) ?? { ...entry, rank: entries.length + 1 };
     },
     async find(id) {
@@ -102,11 +124,79 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
     data BYTEA NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS analytics_events (
+    id UUID PRIMARY KEY,
+    visitor UUID NOT NULL,
+    session UUID NOT NULL,
+    run UUID,
+    name VARCHAR(32) NOT NULL,
+    target VARCHAR(40) NOT NULL,
+    page VARCHAR(8) NOT NULL,
+    device VARCHAR(8) NOT NULL,
+    source VARCHAR(16) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query('CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_events_time ON analytics_events (created_at)');
+  const insertEvents = async (batch: AnalyticsEvent[], query: Pool['query']) => {
+    await query(`INSERT INTO analytics_events (id, visitor, session, run, name, target, page, device, source)
+      SELECT id, visitor, session, run, name, target, page, device, source
+      FROM jsonb_to_recordset($1::jsonb) AS e(id UUID, visitor UUID, session UUID, run UUID,
+        name TEXT, target TEXT, page TEXT, device TEXT, source TEXT)
+      ON CONFLICT (id) DO NOTHING`, [JSON.stringify(batch)]);
+  };
+  let lastPrune = 0;
+  const prune = async () => {
+    if (Date.now() - lastPrune < 3600_000) return;
+    await pool.query("DELETE FROM analytics_events WHERE created_at < now() - interval '90 days'");
+    lastPrune = Date.now();
+  };
+  await prune();
   const find = async (id: string): Promise<RankedEntry | undefined> => {
     const { rows } = await pool.query<ScoreRow>(`SELECT ${COLUMNS}, ${RANK} FROM scores s WHERE public_id = $1`, [id]);
     return rows[0] && { ...toEntry(rows[0]), rank: Number(rows[0].rank) };
   };
   return {
+    async track(batch) {
+      await prune();
+      await insertEvents(batch, pool.query.bind(pool));
+    },
+    async analytics(days) {
+      await prune();
+      const since = new Date(Date.now() - days * 86400_000).toISOString();
+      const { rows } = await pool.query<{ report: AnalyticsReport }>(`
+        WITH filtered AS (
+          SELECT *, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day
+          FROM analytics_events WHERE created_at >= $1::timestamptz
+        ), grouped AS (
+          SELECT name, target, day, device, source, grouping(name, day, device, source) AS kind,
+            count(*)::int AS count, count(DISTINCT visitor)::int AS visitors,
+            count(DISTINCT session)::int AS sessions,
+            count(DISTINCT (visitor, run)) FILTER (WHERE run IS NOT NULL)::int AS runs
+          FROM filtered GROUP BY GROUPING SETS ((), (name, target), (day), (device), (source))
+        ), runs AS (
+          SELECT visitor, run, bool_or(name = 'game_start') AS started,
+            bool_or(name = 'game_won') AS won, bool_or(name = 'game_lost') AS lost,
+            bool_or(name = 'score_saved') AS submitted
+          FROM filtered WHERE run IS NOT NULL GROUP BY visitor, run
+        )
+        SELECT jsonb_build_object(
+          'days', $2::int, 'since', $1::text, 'storage', 'postgres',
+          'totals', (SELECT jsonb_build_object('label', 'All activity', 'count', count, 'visitors', visitors, 'sessions', sessions) FROM grouped WHERE kind = 15),
+          'events', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', target, 'name', name, 'target', target, 'count', count, 'visitors', visitors, 'sessions', sessions, 'runs', runs) ORDER BY name, target) FROM grouped WHERE kind = 7), '[]'::jsonb),
+          'daily', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', day, 'count', count, 'visitors', visitors, 'sessions', sessions) ORDER BY day) FROM grouped WHERE kind = 11), '[]'::jsonb),
+          'devices', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', device, 'count', count, 'visitors', visitors, 'sessions', sessions) ORDER BY count DESC) FROM grouped WHERE kind = 13), '[]'::jsonb),
+          'sources', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', source, 'count', count, 'visitors', visitors, 'sessions', sessions) ORDER BY count DESC) FROM grouped WHERE kind = 14), '[]'::jsonb),
+          'funnel', (SELECT jsonb_build_object(
+            'started', count(*) FILTER (WHERE started),
+            'won', count(*) FILTER (WHERE started AND won),
+            'lost', count(*) FILTER (WHERE started AND lost),
+            'submitted', count(*) FILTER (WHERE started AND submitted),
+            'wonSubmitted', count(*) FILTER (WHERE started AND won AND submitted),
+            'lostSubmitted', count(*) FILTER (WHERE started AND lost AND submitted),
+            'unfinished', count(*) FILTER (WHERE started AND NOT won AND NOT lost)) FROM runs)
+        ) AS report`, [since, days]);
+      return rows[0].report;
+    },
     async top(limit = LEADERBOARD_SIZE) {
       const { rows } = await pool.query<ScoreRow>(
         `SELECT ${COLUMNS} FROM scores WHERE public_id IS NOT NULL ORDER BY score DESC, squashed DESC, created_at ASC LIMIT $1`,
@@ -114,12 +204,23 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
       );
       return rows.map(toEntry);
     },
-    async add({ name, score, squashed, won }) {
+    async add({ name, score, squashed, won }, analytics) {
       const id = newEntryId();
-      await pool.query(
-        'INSERT INTO scores (public_id, name, score, squashed, won) VALUES ($1, $2, $3, $4, $5)',
-        [id, name, score, squashed, won],
-      );
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          'INSERT INTO scores (public_id, name, score, squashed, won) VALUES ($1, $2, $3, $4, $5)',
+          [id, name, score, squashed, won],
+        );
+        if (analytics) await insertEvents([analytics], client.query.bind(client));
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
       const entry = await find(id);
       if (!entry) throw new Error('Saved score could not be read back.');
       return entry;

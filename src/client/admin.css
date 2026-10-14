@@ -54,3 +54,12 @@ body.admin main {
 .admin .toplist td:nth-child(n+3) { white-space: nowrap; }
 .actions button { padding: 5px 9px; font-size: 13px; box-shadow: 2px 2px 0 #302825; margin-left: 6px; }
 .actions button.danger { background: #f6d4dc; }
+.analytics-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 16px 0 24px; }
+.analytics-metrics div { padding: 12px; border: 2px solid #302825; background: #f8efe3; }
+.analytics-metrics dt { font-size: 13px; }
+.analytics-metrics dd { font-size: 28px; font-weight: 800; margin: 4px 0 0; }
+.analytics-breakdowns { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+#analytics-title { margin-right: auto; }
+.admin select { padding: 8px; border: 2px solid #302825; background: #fff; color: #302825; font: inherit; }
+.admin #analytics-title ~ button { font-size: 14px; }
+.admin .panel h3 { margin-top: 20px; }

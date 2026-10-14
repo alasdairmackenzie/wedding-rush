@@ -429,7 +429,7 @@ export class WeddingScene extends Phaser.Scene {
     }
     this.lastMultiplier = multiplier;
   }
-  private bump(title: string, message: string): void {
+  private bump(title: string, message: string, characterHit = false): void {
     if (this.discoMode) {
       this.sparkle(this.player.x, this.player.y);
       this.floatText(this.player.x, this.player.y - 55, 'DEFLECTED!', '#b84b64');
@@ -437,7 +437,8 @@ export class WeddingScene extends Phaser.Scene {
       return;
     }
     this.invulnerableUntil = this.run.elapsed + 900;
-    this.ui.audio.effect('bash');
+    if (characterHit) this.ui.audio.characterImpact('bash');
+    else this.ui.audio.effect('bash');
     this.buzz(120);
     this.floatText(this.player.x, this.player.y - 55, '-1 chance!', '#b52f44');
     this.announceEvent(title, '-1 CHANCE', '#b52f44');
@@ -479,7 +480,7 @@ export class WeddingScene extends Phaser.Scene {
       this.player.setVelocityY(-GROOM.jump * .65);
       this.groundedAt = this.jumpUntil = -1000;
       this.doubleJumped = false;
-      this.ui.audio.effect('splat');
+      this.ui.audio.characterImpact('splat');
       this.buzz(40);
       this.confetti(character.art.x, 540);
       if (!this.reducedMotion.matches) this.cameras.main.shake(180, .008);
@@ -507,7 +508,7 @@ export class WeddingScene extends Phaser.Scene {
       target.enable = false;
       character.art.setAlpha(.5);
       character.bubble.setVisible(false);
-      this.bump('DISTRACTED!', `Distracted by ${people[id].temptation.name.toLowerCase()}! One chance lost. Land on their head or jump over them!`);
+      this.bump('DISTRACTED!', `Distracted by ${people[id].temptation.name.toLowerCase()}! One chance lost. Land on their head or jump over them!`, true);
     }
     this.syncUI();
   }

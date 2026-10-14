@@ -98,11 +98,14 @@ character's line waits until the intro finishes. Later encounter spacing stays u
   Results show sweet points and squash bonuses separately.
   There is no steering, platform climbing, gap jumping or checkpoint system.
 - Optional dice sweets score their face value, from **1 to 6**.
+  Three extra dice sit in selected gaps between characters at normal jump height,
+  with 350 pixels before the next hurdle. They award face-value points with the normal combo multiplier.
   Only the first two are at street level. The others sit near jump peaks above
   hurdles and around people's heads, including a sweet after each person that
   can be caught on a squash-bounce. These need tighter jump timing.
 - Reach the flower arch to win. The result shows remaining chances, cleared
-  hurdles and points. A clean run takes roughly 39 seconds, including the extended final stretch.
+  hurdles and points. A clean run takes roughly 40 seconds, including the extended final stretch.
+  The hat-to-Becky stretch is 800 pixels, giving roughly half a second more running time than before.
   Sean and Becky meet with floating hearts, then the victory result appears
   after 3.2 seconds. Reduced motion uses a static reunion and hearts.
 - **Double jump**: press again in the air for a second, higher jump.
@@ -136,7 +139,7 @@ character's line waits until the intro finishes. Later encounter spacing stays u
   optional for winning, shown separately in results, and restored on replay.
   Sean wears the collected hat over his photo through jumps, ducks and the
   wedding reunion. A fresh run removes the worn hat.
-- **Becky's texts** pop up during the run and get more frantic near the end.
+- **Becky's texts** pop up during the run, stay visible for four seconds and get more frantic near the end.
 - Squashes throw confetti and shake the screen (not with reduced motion), and
   hits vibrate supporting phones.
 - Your **best score** and name are remembered on this device.
@@ -177,8 +180,11 @@ Music has a single On/Off toggle. When enabled, the original Classic track plays
 (including the pause menu) at 20% gain, and `dnbloop.mp3` plays during the run at 50% gain.
 Menu music starts once browser audio is unlocked by a tap or key press and stops when the menu closes
 or the page is backgrounded. DnB resumes from its previous position when returning to a paused run.
-`splat` plays on hurdle hits, person side hits and squashes. On the "Too many distractions!" loss
-screen, `lose_horn.mp3` and `lose_you_lose.mp3` start together, replacing the old `gameover` effect.
+`bash` plays on hurdle and person side hits; `splat` plays on head squashes.
+Character side hits and head squashes also randomly choose `ourch.mp3`, `oi.mp3` or `hey.mp3` alongside the impact sound,
+with a fresh random pitch between three semitones lower and higher. Both respect Sound effects On/Off.
+On the "Too many distractions!" loss screen, `lose_horn.mp3` and `lose_you_lose.mp3`
+start together, replacing the old `gameover` effect.
 Both respect Sound effects On/Off and stop when leaving the results or restarting.
 `level_end` plays when the couple meet. Music pauses with the game, resumes from its previous position,
 and restarts on a fresh run. Main music stops at the finish or game over. The music setting only controls
@@ -187,6 +193,62 @@ control recordings, generated effects and menu sounds.
 Captions remain visible without audio. Backgrounding or leaving the window
 pauses the run. Reduced motion disables Sean's running bob
 and floating-text movement, and makes squashes immediate.
+
+## Usage analytics
+
+The `/admin` page includes anonymous usage analytics with 24-hour, 7-day,
+30-day and 90-day filters. It shows unique browsers and tab sessions, games
+started, fresh restarts, play-again runs, resumes, wins/losses, score attempts
+and saved scores, successful sharing and live-page visits. Screen and action
+tables include unique browsers; daily UTC activity, input-device and entry-source
+breakdowns help explain usage. Refresh manually to update the dashboard.
+
+Tracking uses a random UUID in localStorage and a tab-session UUID in
+sessionStorage, plus a fresh run UUID for each new game. It does **not** fingerprint
+devices or record IP addresses, player names, full URLs, referrers or user-agent
+strings in analytics. Browser IDs count browsers, not people: clearing storage,
+private browsing and switching devices change identity. If browser storage is
+unavailable, page-local IDs are used with a console warning.
+
+The menu is unchanged. Do Not Track and Global Privacy Control disable collection
+automatically. Visiting `/?analytics=off` saves an opt-out for this browser and
+clears its IDs; visiting `/?analytics=on` re-enables collection unless a browser
+privacy signal forbids it. This preference also applies to the same-origin live
+screen. Opt-out does not retract already-delivered events.
+Check applicable consent/privacy requirements before deploying; this technical
+opt-out is not a legal compliance guarantee.
+
+Events are batched to the first-party `/api/analytics` endpoint every two seconds,
+with keepalive delivery when hidden/leaving, bounded retries and event-ID
+deduplication. No external analytics service is used. The ingestion endpoint
+validates an allowlist, limits payload/batch sizes, rejects cross-site browser
+requests and rate-limits using IPs transiently in memory (never in analytics).
+Delivery is best-effort: blocked requests, offline browsers and abrupt exits
+can undercount. Client events are not fraud-proof or a source of billing truth.
+
+Score conversions are written by the server **only after a valid score is saved**,
+in the same PostgreSQL transaction as the score. The dashboard distinguishes
+attempts, validation errors and failures from saved conversions. The run funnel
+counts distinct starts and outcomes within the selected period, including
+finish-and-save and loss-and-save; unfinished includes active runs and missing
+telemetry, not just abandonment. Results are counted once per run, while
+returning to a dialog counts another screen impression. Pauses/resumes do not
+start another game. Gameplay progress records 25/50/75/100% once per run.
+
+Share successes mean clipboard writes or a resolved native share dialog, not
+message delivery or recipient counts. Game share links and QR codes carry
+`from=share`; live QR links carry `from=live`; incoming `/top?you=...` links are
+classified as shared scores. No QR scans are inferred without a page visit.
+Live visits are page loads, not 15-second automatic refreshes. Admin page views
+are not tracked.
+
+PostgreSQL creates `analytics_events` automatically at server startup and retains
+events for 90 days. Expired rows are removed at startup and at most hourly on
+ingestion/reporting; no pruning occurs while the server is idle. Development and
+servers without `DATABASE_URL` use an in-memory store, clearly labelled in admin,
+which resets on restart. Analytics start at deployment; historical games cannot
+be reconstructed. Reporting requires the existing `ADMIN_TOKEN` authentication
+and returns aggregates only, never individual browser IDs.
 
 ## Structure
 

@@ -8,13 +8,30 @@ describe('dice sweets', () => {
   it('keeps two easy starters and places later sweets near achievable jump peaks', () => {
     expect(sweets.slice(0, 2).map(sweet => sweet.y)).toEqual([565, 565]);
     const highestBodyTop = 610 - GROOM.height - GROOM.jump ** 2 / (2 * GROOM.gravity);
-    for (const sweet of sweets.slice(2)) {
+    for (const sweet of sweets.slice(2, 2 + hurdles.length * 3)) {
       expect(sweet.y).toBeLessThanOrEqual(425);
       expect(sweet.y + 20).toBeGreaterThan(highestBodyTop);
     }
     hurdles.forEach((hurdle, id) => {
       expect(sweets[2 + id * 3]).toMatchObject({ x: hurdle.x, y: 420 });
       expect(sweets[4 + id * 3].x).toBe(people[id].x + 90);
+    });
+  });
+  it('places three gap dice in a normal jump path with clearance from nearby obstacles', () => {
+    const extraDice = sweets.slice(2 + hurdles.length * 3);
+    expect(extraDice).toHaveLength(3);
+    const standingTop = platforms[0].y - GROOM.height;
+    extraDice.forEach((sweet, index) => {
+      const after = [0, 2, 5][index];
+      expect(sweet.x).toBe(hurdles[after + 1].x - 350);
+      expect(sweet.x - people[after].x).toBeGreaterThanOrEqual(350);
+      expect(hurdles[after + 1].x - sweet.x).toBe(350);
+      expect(sweet.y + 20).toBeLessThan(standingTop);
+      const jumpPeakTop = standingTop - GROOM.jump ** 2 / (2 * GROOM.gravity);
+      expect(sweet.y + 20).toBeGreaterThan(jumpPeakTop);
+      expect(sweet.y - 20).toBeLessThan(jumpPeakTop + GROOM.height);
+      const mover = movers.find(mover => mover.x > people[after].x && mover.x < hurdles[after + 1].x);
+      if (mover) expect(sweet.x - mover.x).toBeGreaterThanOrEqual(300);
     });
   });
   it('adds each exact face value once and resets on replay', () => {
@@ -345,7 +362,8 @@ describe('close shaves and personal challenges', () => {
 
 describe('final bucket hat', () => {
   it('extends the finish and places the hat within a normal jump but above a grounded runner', () => {
-    expect(BRIDE.x).toBe(14200);
+    expect(BRIDE.x).toBe(14400);
+    expect(BRIDE.x - BUCKET_HAT.x).toBe(800);
     expect(WORLD.width - BRIDE.x).toBeGreaterThanOrEqual(300);
     expect(BUCKET_HAT.x).toBeGreaterThan(rings.at(-1)!.x + 500);
     expect(BUCKET_HAT.x).toBeLessThan(BRIDE.x - 300);
