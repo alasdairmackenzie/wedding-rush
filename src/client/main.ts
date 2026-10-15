@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import QRCode from 'qrcode';
 import { BRIDE, GROOM, hurdles, people, rings, Run, runChallenges, runnerSpeed, runTitle, START, TOTAL_SCORE } from '../shared/level';
-import { cleanName, ENTRY_ID, isRude, NAME_MAX, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
+import { cleanName, ENTRY_ID, FULL_RESULTS_SIZE, isRude, NAME_MAX, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
 import { WeddingScene } from './scene';
 import { GameAudio, type MusicMode } from './audio';
 import { createAnalytics } from './analytics';
@@ -13,6 +13,15 @@ function element<T extends HTMLElement>(id: string, type: new (...args: never[])
   if (!(node instanceof type)) throw new Error(`Missing or invalid element: ${id}`);
   return node;
 }
+function setButtonText(button: HTMLButtonElement, text: string): void {
+  const icon = document.createElement('span');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = `${button.dataset.icon} `;
+  button.replaceChildren(icon, text);
+}
+document.querySelectorAll<HTMLButtonElement>('button[data-icon]').forEach(button => {
+  setButtonText(button, button.textContent ?? '');
+});
 const arena = element('game', HTMLElement);
 const menu = element('menu', HTMLDialogElement);
 const result = element('result', HTMLDialogElement);
@@ -35,9 +44,16 @@ const playerName = element('player-name', HTMLInputElement);
 const submitScore = element('submit-score', HTMLButtonElement);
 const scoreStatus = element('score-status', HTMLElement);
 const topList = element('top-list', HTMLDialogElement);
+const fullResults = element('full-results', HTMLDialogElement);
+const fullResultsOpen = element('full-results-open', HTMLButtonElement);
+const fullResultsRows = element('full-results-rows', HTMLTableSectionElement);
+const fullResultsStatus = element('full-results-status', HTMLElement);
+let fullResultsRequest = 0;
 const challengesDialog = element('challenges-dialog', HTMLDialogElement);
 const challengesBack = element('challenges-back', HTMLButtonElement);
 const resultChallengesButton = element('result-challenges-button', HTMLButtonElement);
+const menuAchievements = element('menu-achievements', HTMLButtonElement);
+let achievementsFromMenu = false;
 const topListIntro = element('top-list-intro', HTMLElement);
 const topListRows = element('top-list-rows', HTMLTableSectionElement);
 const topListPlay = element('top-list-play', HTMLButtonElement);
@@ -67,16 +83,26 @@ try {
   challengeStorageError = 'Saved badges could not be loaded. Badges will still track during this visit.';
 }
 
-function renderChallenges(run: Run): void {
+function renderAchievementCounts(): void {
+  const label = `My Achievements (${earnedChallenges.size}/${runChallenges(new Run()).length})`;
+  setButtonText(menuAchievements, label);
+  setButtonText(resultChallengesButton, label);
+}
+renderAchievementCounts();
+
+function renderChallenges(run: Run, save = true): void {
   const challenges = runChallenges(run);
-  const newBadges = new Set(challenges.filter(challenge => challenge.earned && !earnedChallenges.has(challenge.id)).map(challenge => challenge.id));
-  challenges.filter(challenge => challenge.earned).forEach(challenge => earnedChallenges.add(challenge.id));
-  try {
-    localStorage.setItem(CHALLENGES_KEY, JSON.stringify([...earnedChallenges]));
-  } catch (error) {
-    console.error('Could not save challenge badges.', error);
-    challengeStorageError = 'Badges could not be saved on this device. They will track during this visit only.';
+  const newBadges = new Set(challenges.filter(challenge => save && challenge.earned && !earnedChallenges.has(challenge.id)).map(challenge => challenge.id));
+  if (save) {
+    challenges.filter(challenge => challenge.earned).forEach(challenge => earnedChallenges.add(challenge.id));
+    try {
+      localStorage.setItem(CHALLENGES_KEY, JSON.stringify([...earnedChallenges]));
+    } catch (error) {
+      console.error('Could not save challenge badges.', error);
+      challengeStorageError = 'Badges could not be saved on this device. They will track during this visit only.';
+    }
   }
+  renderAchievementCounts();
   element('result-challenges', HTMLElement).replaceChildren(...challenges.map(challenge => {
     const item = document.createElement('li');
     item.dataset.challenge = challenge.id;
@@ -112,6 +138,7 @@ analytics.observeScreens({
   menu: () => started ? 'pause' : 'menu',
   result: () => lastRun?.won ? 'result_won' : 'result_lost',
   'top-list': () => 'top-list',
+  'full-results': () => 'full-results',
   'challenges-dialog': () => 'challenges-dialog',
   'share-modal': () => 'share-modal',
   'error-dialog': () => 'error-dialog',
@@ -122,7 +149,7 @@ const audio = new GameAudio(message => { console.error(message); notice.textCont
 function showMenu(): void {
   if (result.open || challengesDialog.open || errorDialog.open || topList.open || shareModal.open || scene?.celebrating) return;
   scene?.pause();
-  play.textContent = started ? 'Back to Becky ↗' : "I'm coming! ↗";
+  setButtonText(play, started ? 'Back to Becky ↗' : "I'm coming! ↗");
   restart.hidden = !started;
   menuResults.hidden = !lastRun || (scene?.run.phase !== 'won' && scene?.run.phase !== 'late');
   if (!menu.open) menu.showModal();
@@ -188,8 +215,11 @@ function renderScores(body: HTMLTableSectionElement, scores: ScoreEntry[], you?:
   }
   body.replaceChildren(...rows);
 }
-async function fetchScores(you?: string): Promise<{ scores: ScoreEntry[]; you?: RankedEntry }> {
-  const query = you ? `?you=${encodeURIComponent(you)}` : '';
+async function fetchScores(you?: string, limit?: number): Promise<{ scores: ScoreEntry[]; you?: RankedEntry }> {
+  const params = new URLSearchParams();
+  if (you) params.set('you', you);
+  if (limit !== undefined) params.set('limit', String(limit));
+  const query = params.size ? `?${params}` : '';
   const response = await fetch(`/api/scores${query}`, { headers: { Accept: 'application/json' } });
   if (!response.ok) throw new Error(String(response.status));
   return response.json() as Promise<{ scores: ScoreEntry[]; you?: RankedEntry }>;
@@ -207,9 +237,9 @@ async function openTopList(
   topListAction = 'back';
   topListFromRun = Boolean(options.fromRun);
   topListFromMenu = Boolean(options.fromMenu);
-  topListPlay.textContent = topListFromRun ? 'One more big day ↗'
+  setButtonText(topListPlay, topListFromRun ? 'One more big day ↗'
     : topListFromMenu ? (started ? 'Back to Becky ↗' : "I'm coming! ↗")
-    : 'Beat them! Play WeddingRush ↗';
+    : 'Beat them! Play WeddingRush ↗');
   topListBack.hidden = !topListFromRun;
   element('top-list-title', HTMLElement).textContent = options.live ? 'Live scores' : 'Wedding guest top list';
   shareButton.hidden = true;
@@ -439,6 +469,27 @@ async function shareLink(entry: RankedEntry): Promise<void> {
   }
 }
 shareButton.addEventListener('click', () => { if (posted) void shareLink(posted); });
+fullResultsOpen.addEventListener('click', async () => {
+  const request = ++fullResultsRequest;
+  fullResultsRows.replaceChildren();
+  fullResultsStatus.textContent = 'Loading the top 50…';
+  fullResults.showModal();
+  try {
+    const data = await fetchScores(undefined, FULL_RESULTS_SIZE);
+    if (!fullResults.open || request !== fullResultsRequest) return;
+    renderScores(fullResultsRows, data.scores, posted && data.scores.some(entry => entry.id === posted?.id) ? posted : undefined);
+    fullResultsStatus.textContent = 'The top 50 wedding guests.';
+  } catch (error) {
+    if (!fullResults.open || request !== fullResultsRequest) return;
+    console.error('Could not load full results:', error);
+    fullResultsStatus.textContent = 'Full results are offline right now. Go back and try again.';
+  }
+});
+element('full-results-back', HTMLButtonElement).addEventListener('click', () => fullResults.close());
+fullResults.addEventListener('close', () => {
+  ++fullResultsRequest;
+  fullResultsOpen.focus();
+});
 scoreForm.addEventListener('submit', async event => {
   event.preventDefault();
   const run = lastRun;
@@ -505,19 +556,33 @@ menuResults.addEventListener('click', () => {
   result.showModal();
   element('result-menu', HTMLButtonElement).focus();
 });
-function returnToResults(): void {
+function returnFromAchievements(): void {
   challengesDialog.close();
+  if (achievementsFromMenu) {
+    showMenu();
+    menuAchievements.focus();
+    return;
+  }
   result.showModal();
   resultChallengesButton.focus();
 }
+menuAchievements.addEventListener('click', () => {
+  achievementsFromMenu = true;
+  if (!lastRun) renderChallenges(scene?.run ?? new Run(), false);
+  setButtonText(challengesBack, 'Back to menu');
+  menu.close();
+  challengesDialog.showModal();
+});
 resultChallengesButton.addEventListener('click', () => {
+  achievementsFromMenu = false;
+  setButtonText(challengesBack, 'Back to results');
   result.close();
   challengesDialog.showModal();
 });
-challengesBack.addEventListener('click', returnToResults);
+challengesBack.addEventListener('click', returnFromAchievements);
 challengesDialog.addEventListener('cancel', event => {
   event.preventDefault();
-  returnToResults();
+  returnFromAchievements();
 });
 element('menu-button', HTMLButtonElement).addEventListener('click', showMenu);
 const howToPlay = element('how-to-play', HTMLButtonElement);
@@ -589,7 +654,7 @@ let musicMode: MusicMode = 'on';
 const musicToggle = element('music-toggle', HTMLButtonElement);
 function renderMusicToggle(): void {
   const label = musicMode === 'on' ? 'On' : 'Off';
-  musicToggle.textContent = `Music: ${label}`;
+  setButtonText(musicToggle, `Music: ${label}`);
   musicToggle.setAttribute('aria-pressed', String(musicMode === 'on'));
 }
 renderMusicToggle();
@@ -613,7 +678,7 @@ const effectsToggle = element('effects-toggle', HTMLButtonElement);
 effectsToggle.addEventListener('click', () => {
   effectsEnabled = !effectsEnabled;
   audio.setEffectsEnabled(effectsEnabled);
-  effectsToggle.textContent = `Sound effects: ${effectsEnabled ? 'On' : 'Off'}`;
+  setButtonText(effectsToggle, `Sound effects: ${effectsEnabled ? 'On' : 'Off'}`);
   effectsToggle.setAttribute('aria-pressed', String(effectsEnabled));
   analytics.track('setting_changed', effectsEnabled ? 'effects_on' : 'effects_off');
 });

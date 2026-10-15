@@ -40,8 +40,20 @@
         <h1 id="menu-title">Wedding<span>Rush</span><i>♥</i><small>featuring Sean and Becky</small></h1>
         <p class="intro">Becky is waiting for Sean.<br />Unfortunately, so are his mates.</p>
         <p id="objective"><strong>Sean runs, you jump.</strong> Clear seven hurdles to get Sean to Becky as the city goes from night to the BIG DAY.</p>
-        <button id="play" class="primary" type="button" autofocus>I'm coming! ↗</button>
-        <button id="how-to-play" type="button" aria-expanded="false" aria-controls="play-instructions">How to play</button>
+        <button id="play" data-icon="🏃" class="primary" type="button" autofocus>I'm coming! ↗</button>
+        <button id="restart" data-icon="🔄" type="button" hidden>Start a fresh run</button>
+        <button id="menu-top-list" data-icon="🏆" type="button">View the guest top list</button>
+        <button id="menu-achievements" data-icon="🏅" type="button" aria-haspopup="dialog" aria-controls="challenges-dialog">My Achievements</button>
+        <button id="menu-results" data-icon="📊" type="button" hidden>Back to results</button>
+        <div class="audio-controls">
+          <button id="music-toggle" data-icon="🎵" type="button" aria-pressed="true">Music: On</button>
+          <button id="effects-toggle" data-icon="🔊" type="button" aria-pressed="true">Sound effects: On</button>
+        </div>
+        <nav class="menu-footer" aria-label="Menu footer">
+          <button id="menu-share" data-icon="📣" class="link" type="button">Share with friends</button>
+          <a id="live-link" href="/live" data-live-scores><span aria-hidden="true">📊 </span>Live scores</a>
+          <button id="how-to-play" data-icon="❓" class="link" type="button" aria-expanded="false" aria-controls="play-instructions">How to play</button>
+        </nav>
         <div id="play-instructions" hidden>
           <p id="controls"><kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd> jump · <kbd>S</kbd> / <kbd>↓</kbd> duck · <kbd>Esc</kbd> pause · on mobile, tap to jump and hold DUCK</p>
           <p>One press, one full jump; press again in the air to double jump. Jump hurdles and beer barrels, and duck the pigeons. Champagne gives a super jump for the wedding rings. Land on your mates to squash them for +5; running into them costs a chance. Clear things in a row for up to a ×3 combo. Three hits and you're out.</p>
@@ -49,17 +61,6 @@
           <p>Find Sean's bucket hat in the final stretch! A normal jump grabs it for +50 bonus points before you reach Becky.</p>
           <p>Narrowly jump a barrel or duck a pigeon for a CLOSE SHAVE and +5 points. Invincible passes don't earn this bonus. Earn personal challenge badges on the results screen and keep them on this device.</p>
         </div>
-        <button id="restart" type="button" hidden>Start a fresh run</button>
-        <button id="menu-top-list" type="button">🏆 View the guest top list</button>
-        <button id="menu-results" type="button" hidden>Back to results</button>
-        <div class="audio-controls">
-          <button id="music-toggle" type="button" aria-pressed="true">Music: On</button>
-          <button id="effects-toggle" type="button" aria-pressed="true">Sound effects: On</button>
-        </div>
-        <nav class="menu-footer" aria-label="Menu footer">
-          <button id="menu-share" class="link" type="button">Share WeddingRush with friends</button>
-          <a id="live-link" href="/live" data-live-scores>Live scores</a>
-        </nav>
       </dialog>
       <dialog id="result" aria-labelledby="result-title">
         <span class="stamp" id="result-kicker">THE BIG DAY</span>
@@ -72,24 +73,24 @@
           <label for="player-name">Your name for the guest top list</label>
           <div class="score-row">
             <input id="player-name" name="name" maxlength="16" autocomplete="nickname" required />
-            <button id="submit-score" type="submit">Post to the top list ↗</button>
+            <button id="submit-score" data-icon="📮" type="submit">Post to the top list ↗</button>
           </div>
           <p id="score-status" role="status"></p>
         </form>
-        <button id="again" type="button" class="primary" autofocus>One more big day ↗</button>
+        <button id="again" data-icon="🔄" type="button" class="primary" autofocus>One more big day ↗</button>
+        <button id="result-challenges-button" data-icon="🏅" type="button" aria-haspopup="dialog" aria-controls="challenges-dialog">My Achievements</button>
         <div class="text-links">
-          <button id="result-top-list" type="button" class="link">See the top list</button>
-          <button id="result-challenges-button" type="button" class="link" aria-haspopup="dialog" aria-controls="challenges-dialog">My badges</button>
-          <button id="result-menu" type="button" class="link">Back to menu</button>
+          <button id="result-top-list" data-icon="🏆" type="button" class="link">See the top list</button>
+          <button id="result-menu" data-icon="🏠" type="button" class="link">Back to menu</button>
         </div>
       </dialog>
       <dialog id="challenges-dialog" aria-labelledby="challenges-title">
         <span class="stamp">YOUR WEDDINGRUSH BADGES</span>
-        <h2 id="challenges-title">My badges</h2>
+        <h2 id="challenges-title">My Achievements</h2>
         <p>See your progress this run and the badges you have earned on this device.</p>
         <ul id="result-challenges" class="challenges"></ul>
         <p id="challenges-status"></p>
-        <button id="challenges-back" type="button" class="primary" autofocus>Back to results</button>
+        <button id="challenges-back" data-icon="↩️" type="button" class="primary" autofocus>Back to results</button>
       </dialog>
       <dialog id="top-list" aria-labelledby="top-list-title">
         <span class="stamp">WEDDINGRUSH / TOP LIST</span>
@@ -100,11 +101,24 @@
           <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Points</th><th scope="col">Squashed</th></tr></thead>
           <tbody id="top-list-rows"></tbody>
         </table>
-        <button id="share" type="button" class="share" hidden>Share my place on the top list ↗</button>
+        <div class="text-links"><button id="full-results-open" data-icon="📊" type="button" class="link" aria-haspopup="dialog" aria-controls="full-results">Full results — top 50</button></div>
+        <button id="share" data-icon="📣" type="button" class="share" hidden>Share my place on the top list ↗</button>
         <p id="share-status" role="status"></p>
-        <button id="top-list-play" type="button" class="primary" autofocus>Beat them! Play WeddingRush ↗</button>
-        <button id="top-list-back" type="button" class="link" hidden>Back to results</button>
-        <button id="top-list-menu" type="button" class="link">Back to menu</button>
+        <button id="top-list-play" data-icon="🏃" type="button" class="primary" autofocus>Beat them! Play WeddingRush ↗</button>
+        <div class="text-links">
+          <button id="top-list-back" data-icon="📊" type="button" class="link" hidden>Back to results</button>
+          <button id="top-list-menu" data-icon="🏠" type="button" class="link">Back to menu</button>
+        </div>
+      </dialog>
+      <dialog id="full-results" aria-labelledby="full-results-title">
+        <h2 id="full-results-title">Full results</h2>
+        <p id="full-results-status" role="status">The top 50 wedding guests.</p>
+        <table class="toplist">
+          <caption class="visually-hidden">Top 50 wedding guest scores</caption>
+          <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Points</th><th scope="col">Squashed</th></tr></thead>
+          <tbody id="full-results-rows"></tbody>
+        </table>
+        <button id="full-results-back" data-icon="↩️" type="button" autofocus>Back to top list</button>
       </dialog>
       <dialog id="share-modal" aria-labelledby="share-modal-title">
         <span class="stamp">SPREAD THE WORD</span>
@@ -112,14 +126,14 @@
         <p class="intro">Scan to play on your phone or share the link with the wedding party.</p>
         <div id="share-modal-qr" class="share-qr" aria-label="QR code to play WeddingRush"></div>
         <p id="share-modal-link" class="share-url"></p>
-        <button id="share-modal-copy" type="button" class="primary">Copy link ↗</button>
+        <button id="share-modal-copy" data-icon="🔗" type="button" class="primary">Copy link ↗</button>
         <p id="share-modal-status" role="status"></p>
-        <button id="share-modal-close" type="button" class="link">Back</button>
+        <button id="share-modal-close" data-icon="↩️" type="button" class="link">Back</button>
       </dialog>
       <dialog id="error-dialog" aria-labelledby="error-title">
         <h2 id="error-title">A bump in the road</h2>
         <p id="error-message" role="alert"></p>
-        <form method="dialog"><button type="submit" autofocus>Close</button></form>
+        <form method="dialog"><button data-icon="❌" type="submit" autofocus>Close</button></form>
       </dialog>
     </main>
     <script type="module" src="/src/client/main.ts"></script>

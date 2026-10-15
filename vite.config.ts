@@ -5,6 +5,8 @@ import { memoryStore } from './src/server/store.ts';
 function leaderboard(adminToken?: string): Plugin {
   const api = createApi(lazyStore(async () => memoryStore()), { adminToken });
   const middleware = (req: Parameters<typeof api>[0], res: Parameters<typeof api>[1], next: () => void): void => {
+    const adminPage = req.url?.match(/^\/admin\/(?:scores|photos|stats)\/?(\?.*)?$/);
+    if (adminPage) req.url = `/admin.html${adminPage[1] ?? ''}`;
     const page = req.url?.match(/^\/(live|admin)\/?(\?.*)?$/);
     if (page) req.url = `/${page[1]}.html${page[2] ?? ''}`;
     api(req, res).then(handled => { if (!handled) next(); }, next);

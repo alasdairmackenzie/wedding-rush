@@ -48,6 +48,31 @@ describe('leaderboard API', () => {
     server = createServer(async (req, res) => {
       if (!await api(req, res)) res.writeHead(404).end();
     });
+
+    it('serves the top 50 on request while keeping the default top 10 and rejecting invalid limits', async () => {
+      const store = memoryStore();
+      for (let i = 0; i < 55; i++) {
+        await store.add({ name: `Guest ${i}`, score: i, squashed: 0, won: false });
+      }
+      const api = createApi(lazyStore(async () => store));
+      const server = createServer(async (req, res) => {
+        if (!await api(req, res)) res.writeHead(404).end();
+      });
+      await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+      const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/scores`;
+      try {
+        expect((await (await fetch(base)).json()).scores).toHaveLength(10);
+        const full = (await (await fetch(`${base}?limit=50`)).json()).scores;
+        expect(full).toHaveLength(50);
+        expect(full[0].score).toBe(54);
+        expect(full[49].score).toBe(5);
+        for (const limit of ['0', '51', '-1', 'abc']) {
+          expect((await fetch(`${base}?limit=${limit}`)).status).toBe(400);
+        }
+      } finally {
+        await new Promise<void>(resolve => server.close(() => resolve()));
+      }
+    });
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });

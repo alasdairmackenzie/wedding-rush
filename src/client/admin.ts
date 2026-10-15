@@ -29,6 +29,18 @@ const dashboard = $('dashboard');
 const scoresBody = $<HTMLTableSectionElement>('scores');
 const scoresStatus = $('scores-status');
 const facesList = $<HTMLUListElement>('faces');
+const page = location.pathname.replace(/\/+$/, '').split('/')[2] ?? 'stats';
+if (location.pathname === '/admin' || location.pathname === '/admin/' || location.pathname === '/admin.html') {
+  history.replaceState(null, '', `/admin/stats${location.search}${location.hash}`);
+}
+const pageLabels: Record<string, string> = { stats: 'Stats', photos: 'Photos', scores: 'Scores' };
+document.title = `${pageLabels[page]} · WeddingRush admin`;
+document.querySelectorAll<HTMLElement>('[data-admin-section]').forEach(section => {
+  section.hidden = section.dataset.adminSection !== page;
+});
+document.querySelectorAll<HTMLAnchorElement>('[data-admin-page]').forEach(link => {
+  if (link.dataset.adminPage === page) link.setAttribute('aria-current', 'page');
+});
 let token = sessionStorage.getItem(KEY) ?? '';
 
 class AuthError extends Error {}
@@ -75,7 +87,9 @@ async function signIn(candidate: string): Promise<void> {
   login.hidden = true;
   dashboard.hidden = false;
   say(loginStatus, '');
-  await Promise.all([loadScores(), loadFaces(), loadAnalytics()]);
+  if (page === 'scores') await loadScores();
+  else if (page === 'photos') await loadFaces();
+  else await loadAnalytics();
 }
 
 const analyticsDays = $<HTMLSelectElement>('analytics-days');
@@ -169,6 +183,9 @@ function scoreRow(entry: ScoreEntry, index: number): HTMLTableRowElement {
     row.append(cell);
     return cell;
   });
+  for (const [index, label] of [[2, 'Points'], [3, 'Squashed'], [4, 'Posted']] as const) {
+    cells[index].dataset.label = label;
+  }
   const name = document.createElement('input');
   name.value = entry.name;
   name.maxLength = NAME_MAX;
