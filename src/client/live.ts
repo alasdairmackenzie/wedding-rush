@@ -41,9 +41,10 @@ function render(scores: ScoreEntry[]): void {
     if (entry.hasReplay) {
       const watch = document.createElement('a');
       watch.href = `/top?you=${encodeURIComponent(entry.id)}`;
-      watch.textContent = 'Watch run';
+      watch.textContent = ' 🎞';
+      watch.title = `View ${entry.name}'s score and replay`;
       watch.setAttribute('aria-label', `View ${entry.name}'s score and replay`);
-      row.cells[1].append(document.createElement('br'), watch);
+      row.cells[1].append(watch);
     }
     if (seen && !seen.has(entry.id)) row.dataset.new = '';
     fresh.add(entry.id);

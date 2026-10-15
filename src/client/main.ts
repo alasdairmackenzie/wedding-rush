@@ -213,7 +213,8 @@ function scoreRow(entry: ScoreEntry, rank: number, you?: ScoreEntry): HTMLTableR
     const watch = document.createElement('button');
     watch.type = 'button';
     watch.className = 'watch-replay';
-    watch.textContent = 'Watch run';
+    watch.textContent = '🎞';
+    watch.title = `Watch ${entry.name}'s run`;
     watch.setAttribute('aria-label', `Watch ${entry.name}'s run`);
     watch.setAttribute('aria-haspopup', 'dialog');
     watch.addEventListener('click', () => { void replayViewer.show(entry.id, `${entry.name}'s run · ${entry.score} points`); });

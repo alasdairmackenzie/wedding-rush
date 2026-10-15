@@ -29,13 +29,11 @@ memory and resets when the server restarts. To use the admin page locally, set
 a password when you start the server, for example
 `ADMIN_TOKEN=yourpassword npm run dev` or `ADMIN_TOKEN=yourpassword npm start`.
 
-## Live screen and admin
-
-### Run replays
+## Run replays
 
 The results screen offers **Rewatch run** for the latest completed run (including
 losses). Posting a score from the game also publishes its gameplay recording:
-**Watch run** appears beside that score in the top 10 and full results. The TV
+An inline film icon appears beside that score in the top 10 and full results. The TV
 leaderboard links to the score's watch button. Older scores have no replay.
 
 Replays start paused, with play/pause, restart and a keyboard-accessible seek bar.
@@ -57,6 +55,8 @@ deleting the score removes its replay. Memory mode retains recordings only for
 its retained 500 scores and loses them on restart. Legacy API clients may still
 submit scores without recordings. Upload validation bounds the format and checks
 the final score/result/squash count; it is not authoritative anti-cheat verification.
+
+## Live screen and admin
 
 - `/live` is a top list for a TV or projector at the venue. It
   shows the address to play at, has a **Back to game** link and refreshes every 15 seconds.
