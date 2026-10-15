@@ -122,7 +122,7 @@ for (const width of [1280, 390]) {
     await page.keyboard.press('Escape');
     await page.evaluate('window.__previousDiceRun = window.__scene.run');
     await page.getByRole('button', { name: 'Start a fresh run' }).click();
-    expect(await page.evaluate('window.__previousDiceRun !== window.__scene.run')).toBe(true);
+    await expect.poll(() => page.evaluate('window.__previousDiceRun !== window.__scene.run')).toBe(true);
     const replay = await readDice();
     expect(replay.total).toBeGreaterThanOrEqual(90);
     expect(replay.total).toBeLessThanOrEqual(162);
@@ -131,7 +131,7 @@ for (const width of [1280, 390]) {
     await expect(page.locator('#result')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('#result-detail')).toContainText(` / ${replay.total} sweet points`);
     await page.getByRole('button', { name: 'One more big day', exact: false }).click();
-    expect(await page.evaluate('window.__scene.run.collected.size')).toBe(0);
+    await expect.poll(() => page.evaluate('window.__scene.run.collected.size')).toBe(0);
     const next = await readDice();
     expect(next.textures).toEqual(next.values.map(value => `sweet-${value}`));
   });
