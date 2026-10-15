@@ -39,6 +39,9 @@ body.admin main {
 .admin [data-error] { color: #b52f44; }
 .links { margin: 0 0 18px; }
 .links a { color: #302825; font-weight: 700; }
+.admin-nav { gap: 12px; }
+.admin-nav a { padding: 10px 14px; border: 2px solid #302825; text-decoration: none; }
+.admin-nav a[aria-current=page] { background: #ffd465; }
 .hint { margin: 0 0 14px; font-size: 14px; color: #5d5045; }
 .faces { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
 .face { display: grid; gap: 8px; align-content: start; border: 2px solid #302825; background: #f8efe3; padding: 12px; }
@@ -54,6 +57,19 @@ body.admin main {
 .admin .toplist td:nth-child(n+3) { white-space: nowrap; }
 .actions button { padding: 5px 9px; font-size: 13px; box-shadow: 2px 2px 0 #302825; margin-left: 6px; }
 .actions button.danger { background: #f6d4dc; }
+@media (max-width: 700px) {
+  #admin-scores-table thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #admin-scores-table tbody { display: grid; gap: 16px; }
+  #admin-scores-table tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-bottom: 12px; border-bottom: 1px dashed #ac9c83; }
+  #admin-scores-table td { padding: 0; border: 0; min-width: 0; }
+  #admin-scores-table td:first-child { grid-area: 1 / 1; align-self: center; width: 28px; }
+  #admin-scores-table td:nth-child(2) { grid-area: 1 / 1 / 2 / -1; margin-left: 36px; display: flex; align-items: center; }
+  #admin-scores-table td:nth-child(2) input { max-width: none; flex: 1; font-size: 16px; }
+  #admin-scores-table td[data-label] { white-space: normal; overflow-wrap: anywhere; }
+  #admin-scores-table td[data-label]::before { content: attr(data-label); display: block; font-size: 11px; font-weight: 700; color: #5d5045; }
+  #admin-scores-table .actions { grid-column: 1 / -1; display: flex; gap: 10px; }
+  #admin-scores-table .actions button { margin: 0; min-height: 44px; }
+}
 .analytics-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 16px 0 24px; }
 .analytics-metrics div { padding: 12px; border: 2px solid #302825; background: #f8efe3; }
 .analytics-metrics dt { font-size: 13px; }

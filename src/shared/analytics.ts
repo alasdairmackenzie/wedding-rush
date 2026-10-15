@@ -8,10 +8,10 @@ export const EVENT_NAMES = [
 ] as const;
 export type EventName = typeof EVENT_NAMES[number];
 export const TARGETS = [
-  'game', 'live', 'menu', 'pause', 'result_won', 'result_lost', 'top-list', 'challenges-dialog',
+  'game', 'live', 'menu', 'pause', 'result_won', 'result_lost', 'top-list', 'full-results', 'full-results-open', 'full-results-back', 'challenges-dialog',
   'share-modal', 'error-dialog', 'instructions', '25', '50', '75', '100',
   'play', 'restart', 'again', 'result-menu', 'result-top-list', 'result-challenges-button',
-  'challenges-back', 'menu-top-list', 'top-list-play', 'top-list-menu', 'menu-button', 'mobile-pause',
+  'challenges-back', 'menu-top-list', 'menu-achievements', 'top-list-play', 'top-list-menu', 'menu-button', 'mobile-pause',
   'how-to-play', 'header-share-button', 'menu-share', 'share-modal-copy', 'share-modal-close',
   'share', 'submit-score', 'music-toggle', 'effects-toggle', 'native', 'copy',
   'music_on', 'music_off', 'effects_on', 'effects_off', 'live-link',

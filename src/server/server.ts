@@ -64,7 +64,9 @@ const server = createServer(async (req, res) => {
   const clean = target.replace(/[\\/]+$/, '');
   const page = async (): Promise<string | undefined> =>
     extname(pathname) || clean === root ? undefined : file(`${clean}.html`);
-  const found = await file(target) ?? await page() ?? (extname(pathname) ? undefined : await file(join(root, 'index.html')));
+  const adminPage = /^\/admin\/(?:scores|photos|stats)\/?$/.test(pathname)
+    ? await file(join(root, 'admin.html')) : undefined;
+  const found = adminPage ?? await file(target) ?? await page() ?? (extname(pathname) ? undefined : await file(join(root, 'index.html')));
   if (!found) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found');
     return;

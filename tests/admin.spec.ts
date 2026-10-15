@@ -16,14 +16,14 @@ async function seed(request: APIRequestContext, name: string, score: number): Pr
   expect(response.status()).toBe(201);
   return (await response.json()).entry.id;
 }
-async function signIn(page: Page): Promise<void> {
-  await page.goto('/admin');
+async function signIn(page: Page, section = 'scores'): Promise<void> {
+  await page.goto(`/admin/${section}`);
   await page.getByLabel('Admin password').fill(TOKEN);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.locator('#dashboard')).toBeVisible();
 }
 
-test('live screen shows the top list and where to play, with nothing to press', async ({ page, request }) => {
+test('live screen shows scores, where to play and a return link', async ({ page, request }) => {
   const name = `Live ${Date.now() % 1000000}`;
   await seed(request, name, MAX_SCORE);
   await page.goto('/live?url=seanandbeckywedding.run');
@@ -31,10 +31,31 @@ test('live screen shows the top list and where to play, with nothing to press', 
   await expect(page.locator('#live-rows tr').first()).toContainText(name);
   await expect(page.locator('#live-rows tr').first()).toContainText('💍');
   await expect(page.getByRole('button')).toHaveCount(0);
-  await expect(page.getByRole('link')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Back to game' })).toHaveAttribute('href', '/');
 
   await page.goto('/live');
   await expect(page.locator('#live-url')).toHaveText('127.0.0.1:5300');
+  await page.getByRole('link', { name: 'Back to game' }).click();
+  await expect(page.locator('#menu')).toBeVisible();
+});
+
+test('admin sections have separate URLs and share sign-in', async ({ page }) => {
+  await signIn(page, 'stats');
+  await expect(page.locator('[data-admin-section="stats"]')).toBeVisible();
+  await expect(page.locator('[data-admin-section="photos"]')).toBeHidden();
+  await expect(page.locator('[data-admin-section="scores"]')).toBeHidden();
+  for (const section of ['photos', 'scores', 'stats']) {
+    await page.locator(`[data-admin-page="${section}"]`).click();
+    await expect(page).toHaveURL(new RegExp(`/admin/${section}$`));
+    await expect(page.locator(`[data-admin-section="${section}"]`)).toBeVisible();
+    await expect(page.locator(`[data-admin-page="${section}"]`)).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#login')).toBeHidden();
+    await page.reload();
+    await expect(page.locator(`[data-admin-section="${section}"]`)).toBeVisible();
+  }
+  await page.goto('/admin');
+  await expect(page).toHaveURL(/\/admin\/stats$/);
+  await expect(page.locator('[data-admin-section="stats"]')).toBeVisible();
 });
 
 test('admin needs the password, then renames and deletes scores', async ({ page, request }) => {
@@ -70,7 +91,7 @@ test('admin needs the password, then renames and deletes scores', async ({ page,
 });
 
 test('an uploaded face shows up in the game and can be removed', async ({ page, request }) => {
-  await signIn(page);
+  await signIn(page, 'photos');
   await page.getByLabel('Upload a face for Becky').setInputFiles({ name: 'becky.png', mimeType: 'image/png', buffer: PNG });
   await expect(page.getByRole('img', { name: 'Uploaded face for Becky' })).toBeVisible();
   expect(Object.keys((await (await request.get('/api/faces')).json()).faces)).toEqual(['bride']);
@@ -82,7 +103,7 @@ test('an uploaded face shows up in the game and can be removed', async ({ page, 
     return game.textures.exists('bride-face');
   })()`)).toBe(true);
 
-  await page.goto('/admin');
+  await page.goto('/admin/photos');
   await expect(page.locator('#dashboard')).toBeVisible();
   await page.getByRole('button', { name: 'Use the default face for Becky' }).click();
   await expect(page.getByRole('img', { name: 'Uploaded face for Becky' })).toHaveCount(0);
@@ -90,7 +111,7 @@ test('an uploaded face shows up in the game and can be removed', async ({ page, 
 });
 
 test('admin previews bundled default photos and restores the hat photo after reset', async ({ page }) => {
-  await signIn(page);
+  await signIn(page, 'photos');
   for (const kind of ['bride', 'deal', 'pingpong', 'hat', 'karaoke', 'kebab', 'pub', 'football'] as const) {
     const preview = page.getByRole('img', { name: `Default face for ${FACE_LABELS[kind]}` });
     await expect(preview).toBeVisible();
@@ -111,9 +132,33 @@ test('admin previews bundled default photos and restores the hat photo after res
   await expect(defaultHat).toHaveAttribute('src', defaultUrl);
 });
 
+for (const width of [320, 375, 390]) {
+  test(`admin name fields stay wide and can rename scores at ${width}px`, async ({ page, request }) => {
+    await page.setViewportSize({ width, height: 667 });
+    const name = `Guest ${width}`;
+    await seed(request, name, 12);
+    await signIn(page);
+    const input = page.getByLabel(`Name for ${name}`, { exact: true });
+    await expect(input).toBeVisible();
+    const box = await input.boundingBox();
+    if (!box) throw new Error('Score name input is not visible.');
+    expect(box.width).toBeGreaterThanOrEqual(180);
+    const row = input.locator('..').locator('..');
+    const actionsBox = await row.locator('.actions').boundingBox();
+    if (!actionsBox) throw new Error('Score actions are not visible.');
+    expect(actionsBox.y).toBeGreaterThanOrEqual(box.y + box.height);
+    expect(await page.locator('#admin-scores-table').evaluate(table =>
+      table.scrollWidth <= table.parentElement!.clientWidth
+    )).toBe(true);
+    await input.fill(`Renamed ${width}`);
+    await page.getByRole('button', { name: `Rename ${name}`, exact: true }).click();
+    await expect(page.getByLabel(`Name for Renamed ${width}`, { exact: true })).toBeVisible();
+  });
+}
+
 test('admin dashboard scrolls on mobile viewports', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 667 });
-  await signIn(page);
+  await signIn(page, 'photos');
   const scrollable = await page.evaluate(() => ({
     scrollHeight: document.documentElement.scrollHeight,
     clientHeight: document.documentElement.clientHeight,

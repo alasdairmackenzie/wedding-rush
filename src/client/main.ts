@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import QRCode from 'qrcode';
 import { BRIDE, GROOM, hurdles, people, rings, Run, runChallenges, runnerSpeed, runTitle, START, TOTAL_SCORE } from '../shared/level';
-import { cleanName, ENTRY_ID, isRude, NAME_MAX, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
+import { cleanName, ENTRY_ID, FULL_RESULTS_SIZE, isRude, NAME_MAX, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
 import { WeddingScene } from './scene';
 import { GameAudio, type MusicMode } from './audio';
 import { createAnalytics } from './analytics';
@@ -13,6 +13,15 @@ function element<T extends HTMLElement>(id: string, type: new (...args: never[])
   if (!(node instanceof type)) throw new Error(`Missing or invalid element: ${id}`);
   return node;
 }
+function setButtonText(button: HTMLButtonElement, text: string): void {
+  const icon = document.createElement('span');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = `${button.dataset.icon} `;
+  button.replaceChildren(icon, text);
+}
+document.querySelectorAll<HTMLButtonElement>('button[data-icon]').forEach(button => {
+  setButtonText(button, button.textContent ?? '');
+});
 const arena = element('game', HTMLElement);
 const menu = element('menu', HTMLDialogElement);
 const result = element('result', HTMLDialogElement);
@@ -35,13 +44,22 @@ const playerName = element('player-name', HTMLInputElement);
 const submitScore = element('submit-score', HTMLButtonElement);
 const scoreStatus = element('score-status', HTMLElement);
 const topList = element('top-list', HTMLDialogElement);
+const fullResults = element('full-results', HTMLDialogElement);
+const fullResultsOpen = element('full-results-open', HTMLButtonElement);
+const fullResultsRows = element('full-results-rows', HTMLTableSectionElement);
+const fullResultsStatus = element('full-results-status', HTMLElement);
+let fullResultsRequest = 0;
 const challengesDialog = element('challenges-dialog', HTMLDialogElement);
 const challengesBack = element('challenges-back', HTMLButtonElement);
 const resultChallengesButton = element('result-challenges-button', HTMLButtonElement);
+const menuAchievements = element('menu-achievements', HTMLButtonElement);
+let achievementsFromMenu = false;
 const topListIntro = element('top-list-intro', HTMLElement);
 const topListRows = element('top-list-rows', HTMLTableSectionElement);
 const topListPlay = element('top-list-play', HTMLButtonElement);
 const topListMenu = element('top-list-menu', HTMLButtonElement);
+const topListBack = element('top-list-back', HTMLButtonElement);
+const menuResults = element('menu-results', HTMLButtonElement);
 const shareStatus = element('share-status', HTMLElement);
 const shareModal = element('share-modal', HTMLDialogElement);
 const shareModalQr = element('share-modal-qr', HTMLElement);
@@ -65,16 +83,26 @@ try {
   challengeStorageError = 'Saved badges could not be loaded. Badges will still track during this visit.';
 }
 
-function renderChallenges(run: Run): void {
+function renderAchievementCounts(): void {
+  const label = `My Achievements (${earnedChallenges.size}/${runChallenges(new Run()).length})`;
+  setButtonText(menuAchievements, label);
+  setButtonText(resultChallengesButton, label);
+}
+renderAchievementCounts();
+
+function renderChallenges(run: Run, save = true): void {
   const challenges = runChallenges(run);
-  const newBadges = new Set(challenges.filter(challenge => challenge.earned && !earnedChallenges.has(challenge.id)).map(challenge => challenge.id));
-  challenges.filter(challenge => challenge.earned).forEach(challenge => earnedChallenges.add(challenge.id));
-  try {
-    localStorage.setItem(CHALLENGES_KEY, JSON.stringify([...earnedChallenges]));
-  } catch (error) {
-    console.error('Could not save challenge badges.', error);
-    challengeStorageError = 'Badges could not be saved on this device. They will track during this visit only.';
+  const newBadges = new Set(challenges.filter(challenge => save && challenge.earned && !earnedChallenges.has(challenge.id)).map(challenge => challenge.id));
+  if (save) {
+    challenges.filter(challenge => challenge.earned).forEach(challenge => earnedChallenges.add(challenge.id));
+    try {
+      localStorage.setItem(CHALLENGES_KEY, JSON.stringify([...earnedChallenges]));
+    } catch (error) {
+      console.error('Could not save challenge badges.', error);
+      challengeStorageError = 'Badges could not be saved on this device. They will track during this visit only.';
+    }
   }
+  renderAchievementCounts();
   element('result-challenges', HTMLElement).replaceChildren(...challenges.map(challenge => {
     const item = document.createElement('li');
     item.dataset.challenge = challenge.id;
@@ -96,7 +124,10 @@ let lastRun: { score: number; squashed: number; won: boolean; title: string; liv
 let posted: RankedEntry | undefined;
 let topListFromRun = false;
 let topListFromMenu = false;
-let replayFromTopList = false;
+let topListAction: 'back' | 'play' | 'menu' = 'back';
+let topListRequest = 0;
+let liveScoresTimer: number | undefined;
+let topListOpener: HTMLElement | undefined;
 let textTimer = 0;
 const touch = document.querySelector<HTMLElement>('.touch-controls');
 if (!touch) throw new Error('Missing touch controls.');
@@ -107,6 +138,7 @@ analytics.observeScreens({
   menu: () => started ? 'pause' : 'menu',
   result: () => lastRun?.won ? 'result_won' : 'result_lost',
   'top-list': () => 'top-list',
+  'full-results': () => 'full-results',
   'challenges-dialog': () => 'challenges-dialog',
   'share-modal': () => 'share-modal',
   'error-dialog': () => 'error-dialog',
@@ -115,10 +147,11 @@ analytics.observeScreens({
 const audio = new GameAudio(message => { console.error(message); notice.textContent = message; });
 
 function showMenu(): void {
-  if (result.open || challengesDialog.open || errorDialog.open || topList.open || scene?.celebrating) return;
+  if (result.open || challengesDialog.open || errorDialog.open || topList.open || shareModal.open || scene?.celebrating) return;
   scene?.pause();
-  play.textContent = started ? 'Back to Becky ↗' : "I'm coming! ↗";
+  setButtonText(play, started ? 'Back to Becky ↗' : "I'm coming! ↗");
   restart.hidden = !started;
+  menuResults.hidden = !lastRun || (scene?.run.phase !== 'won' && scene?.run.phase !== 'late');
   if (!menu.open) menu.showModal();
   audio.startMenuMusic();
   if (!document.hidden && document.hasFocus()) audio.unlock();
@@ -127,6 +160,7 @@ function start(fresh = false): void {
   if (!scene) return;
   audio.unlock();
   audio.stopMenuMusic();
+  if (fresh || scene.run.phase === 'won' || scene.run.phase === 'late') lastRun = undefined;
   menu.close(); result.close();
   window.clearTimeout(textTimer);
   beckyText.hidden = true;
@@ -181,8 +215,11 @@ function renderScores(body: HTMLTableSectionElement, scores: ScoreEntry[], you?:
   }
   body.replaceChildren(...rows);
 }
-async function fetchScores(you?: string): Promise<{ scores: ScoreEntry[]; you?: RankedEntry }> {
-  const query = you ? `?you=${encodeURIComponent(you)}` : '';
+async function fetchScores(you?: string, limit?: number): Promise<{ scores: ScoreEntry[]; you?: RankedEntry }> {
+  const params = new URLSearchParams();
+  if (you) params.set('you', you);
+  if (limit !== undefined) params.set('limit', String(limit));
+  const query = params.size ? `?${params}` : '';
   const response = await fetch(`/api/scores${query}`, { headers: { Accept: 'application/json' } });
   if (!response.ok) throw new Error(String(response.status));
   return response.json() as Promise<{ scores: ScoreEntry[]; you?: RankedEntry }>;
@@ -190,14 +227,21 @@ async function fetchScores(you?: string): Promise<{ scores: ScoreEntry[]; you?: 
 type TopListData = { scores: ScoreEntry[]; you?: RankedEntry };
 async function openTopList(
   id: string | null,
-  options: { fromRun?: boolean; fromMenu?: boolean; data?: TopListData } = {},
+  options: { fromRun?: boolean; fromMenu?: boolean; live?: boolean; data?: TopListData } = {},
 ): Promise<void> {
+  const request = ++topListRequest;
+  topListOpener = options.live ? element('live-link', HTMLAnchorElement)
+    : options.fromRun ? element('result-top-list', HTMLButtonElement)
+    : element('menu-top-list', HTMLButtonElement);
+  window.clearInterval(liveScoresTimer);
+  topListAction = 'back';
   topListFromRun = Boolean(options.fromRun);
   topListFromMenu = Boolean(options.fromMenu);
-  topListPlay.textContent = topListFromRun ? 'One more big day ↗'
+  setButtonText(topListPlay, topListFromRun ? 'One more big day ↗'
     : topListFromMenu ? (started ? 'Back to Becky ↗' : "I'm coming! ↗")
-    : 'Beat them! Play WeddingRush ↗';
-  topListMenu.hidden = !topListFromRun && !topListFromMenu;
+    : 'Beat them! Play WeddingRush ↗');
+  topListBack.hidden = !topListFromRun;
+  element('top-list-title', HTMLElement).textContent = options.live ? 'Live scores' : 'Wedding guest top list';
   shareButton.hidden = true;
   shareStatus.textContent = '';
   if (!options.data) {
@@ -205,26 +249,42 @@ async function openTopList(
     topListRows.replaceChildren();
   }
   if (!topList.open) topList.showModal();
-  try {
-    const data = options.data ?? await fetchScores(id && ENTRY_ID.test(id) ? id : undefined);
-    renderScores(topListRows, data.scores, data.you);
-    if (data.you) {
-      const yours = posted?.id === data.you.id;
-      topListIntro.replaceChildren(
-        Object.assign(document.createElement('strong'), { textContent: yours ? 'You' : data.you.name }),
-        yours
-          ? `'re #${data.you.rank} on the WeddingRush top list with ${data.you.score} points and ${data.you.squashed} squashed mates. Share it with the guests!`
-          : ` is #${data.you.rank} on the WeddingRush top list with ${data.you.score} points and ${data.you.squashed} squashed mates. Can you beat them?`,
-      );
-      shareButton.hidden = !yours;
-      if (yours) shareButton.focus();
-    } else {
-      topListIntro.textContent = id ? "We couldn't find that score, but here are the top wedding guests." : 'The top wedding guests so far.';
-    }
-  } catch {
-    topListRows.replaceChildren();
-    topListIntro.textContent = 'The top list is offline right now. Try again soon.';
+  if (options.live) {
+    liveScoresTimer = window.setInterval(() => {
+      if (!document.hidden) void refresh();
+    }, 15_000);
   }
+  let refreshing = false;
+  async function refresh(): Promise<void> {
+    if (refreshing) return;
+    refreshing = true;
+    try {
+      const data = options.data ?? await fetchScores(id && ENTRY_ID.test(id) ? id : undefined);
+      if (!topList.open || request !== topListRequest) return;
+      renderScores(topListRows, data.scores, data.you);
+      if (data.you) {
+        const yours = posted?.id === data.you.id;
+        topListIntro.replaceChildren(
+          Object.assign(document.createElement('strong'), { textContent: yours ? 'You' : data.you.name }),
+          yours
+            ? `'re #${data.you.rank} on the WeddingRush top list with ${data.you.score} points and ${data.you.squashed} squashed mates. Share it with the guests!`
+            : ` is #${data.you.rank} on the WeddingRush top list with ${data.you.score} points and ${data.you.squashed} squashed mates. Can you beat them?`,
+        );
+        shareButton.hidden = !yours;
+        if (yours && !options.live) shareButton.focus();
+      } else {
+        topListIntro.textContent = id ? "We couldn't find that score, but here are the top wedding guests."
+          : options.live ? 'The top wedding guests so far. Refreshes every 15 seconds.' : 'The top wedding guests so far.';
+      }
+    } catch {
+      if (!topList.open || request !== topListRequest) return;
+      topListRows.replaceChildren();
+      topListIntro.textContent = 'The top list is offline right now. Try again soon.';
+    } finally {
+      refreshing = false;
+    }
+  }
+  await refresh();
 }
 function reportError(message: string): void {
   analytics.track('error', 'error-dialog');
@@ -344,6 +404,8 @@ function showStatus(message: string, error = false): void {
 async function postScore(): Promise<RankedEntry | undefined> {
   if (!lastRun) return undefined;
   if (posted) return posted;
+  if (submitScore.disabled) return undefined;
+  const run = lastRun;
   const name = cleanName(playerName.value);
   if (!name || isRude(name)) {
     analytics.track('score_invalid', 'submit-score');
@@ -361,6 +423,7 @@ async function postScore(): Promise<RankedEntry | undefined> {
       body: JSON.stringify({ name, score: lastRun.score, squashed: lastRun.squashed, won: lastRun.won, analytics: analytics.scoreEvent() }),
     });
     const data = await response.json() as { error?: string; entry?: RankedEntry; scores?: ScoreEntry[] };
+    if (lastRun !== run) return undefined;
     if (!response.ok || !data.entry || !data.scores) throw new Error(data.error ?? 'The top list is offline right now.');
     posted = data.entry;
     playerName.disabled = true;
@@ -369,6 +432,7 @@ async function postScore(): Promise<RankedEntry | undefined> {
     audio.tada();
     return posted;
   } catch (error) {
+    if (lastRun !== run) return undefined;
     analytics.track('score_failed', 'submit-score');
     submitScore.disabled = false;
     showStatus(error instanceof Error ? error.message : 'The top list is offline right now.', true);
@@ -405,59 +469,120 @@ async function shareLink(entry: RankedEntry): Promise<void> {
   }
 }
 shareButton.addEventListener('click', () => { if (posted) void shareLink(posted); });
+fullResultsOpen.addEventListener('click', async () => {
+  const request = ++fullResultsRequest;
+  fullResultsRows.replaceChildren();
+  fullResultsStatus.textContent = 'Loading the top 50…';
+  fullResults.showModal();
+  try {
+    const data = await fetchScores(undefined, FULL_RESULTS_SIZE);
+    if (!fullResults.open || request !== fullResultsRequest) return;
+    renderScores(fullResultsRows, data.scores, posted && data.scores.some(entry => entry.id === posted?.id) ? posted : undefined);
+    fullResultsStatus.textContent = 'The top 50 wedding guests.';
+  } catch (error) {
+    if (!fullResults.open || request !== fullResultsRequest) return;
+    console.error('Could not load full results:', error);
+    fullResultsStatus.textContent = 'Full results are offline right now. Go back and try again.';
+  }
+});
+element('full-results-back', HTMLButtonElement).addEventListener('click', () => fullResults.close());
+fullResults.addEventListener('close', () => {
+  ++fullResultsRequest;
+  fullResultsOpen.focus();
+});
 scoreForm.addEventListener('submit', async event => {
   event.preventDefault();
+  const run = lastRun;
   const entry = await postScore();
   if (!entry || !result.open) return;
   const scores = await fetchScores(entry.id).catch(() => undefined);
+  if (!result.open || lastRun !== run) return;
   result.close();
   history.replaceState(null, '', topListUrl('', entry.id));
   void openTopList(entry.id, { fromRun: true, data: scores ?? { scores: [], you: entry } });
 });
 element('result-top-list', HTMLButtonElement).addEventListener('click', () => {
   result.close();
-  void openTopList(null, { fromRun: true });
+  void openTopList(posted?.id ?? null, { fromRun: true });
 });
 topList.addEventListener('close', () => {
+  ++topListRequest;
+  window.clearInterval(liveScoresTimer);
   history.replaceState(null, '', '/');
-  const replay = replayFromTopList;
-  replayFromTopList = false;
+  const action = topListAction;
+  topListAction = 'back';
   if (topListFromMenu) {
     topListFromMenu = false;
-    if (replay) { start(); return; }
+    if (action === 'play') { start(); return; }
   } else if (topListFromRun) {
     topListFromRun = false;
-    if (replay) { start(true); return; }
+    if (action === 'play') { start(true); return; }
+    if (action === 'back') {
+      result.showModal();
+      element('result-top-list', HTMLButtonElement).focus();
+      return;
+    }
     audio.stop();
     started = false;
   }
   showMenu();
+  topListOpener?.focus();
 });
-topListPlay.addEventListener('click', () => { replayFromTopList = topListFromRun || topListFromMenu; topList.close(); });
+topListPlay.addEventListener('click', () => { topListAction = 'play'; topList.close(); });
 element('menu-top-list', HTMLButtonElement).addEventListener('click', () => {
   menu.close();
   void openTopList(null, { fromMenu: true });
 });
-topListMenu.addEventListener('click', () => topList.close());
+topListMenu.addEventListener('click', () => { topListAction = 'menu'; topList.close(); });
+topListBack.addEventListener('click', () => topList.close());
+document.querySelectorAll<HTMLAnchorElement>('[data-live-scores]').forEach(link => {
+  link.addEventListener('click', event => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    showMenu();
+    if (!menu.open) return;
+    menu.close();
+    void openTopList(null, { fromMenu: true, live: true });
+  });
+});
 restart.addEventListener('click', () => start(true));
 element('again', HTMLButtonElement).addEventListener('click', () => start(true));
 element('result-menu', HTMLButtonElement).addEventListener('click', () => {
   audio.stop();
   result.close(); started = false; showMenu();
 });
-function returnToResults(): void {
+menuResults.addEventListener('click', () => {
+  menu.close();
+  result.showModal();
+  element('result-menu', HTMLButtonElement).focus();
+});
+function returnFromAchievements(): void {
   challengesDialog.close();
+  if (achievementsFromMenu) {
+    showMenu();
+    menuAchievements.focus();
+    return;
+  }
   result.showModal();
   resultChallengesButton.focus();
 }
+menuAchievements.addEventListener('click', () => {
+  achievementsFromMenu = true;
+  if (!lastRun) renderChallenges(scene?.run ?? new Run(), false);
+  setButtonText(challengesBack, 'Back to menu');
+  menu.close();
+  challengesDialog.showModal();
+});
 resultChallengesButton.addEventListener('click', () => {
+  achievementsFromMenu = false;
+  setButtonText(challengesBack, 'Back to results');
   result.close();
   challengesDialog.showModal();
 });
-challengesBack.addEventListener('click', returnToResults);
+challengesBack.addEventListener('click', returnFromAchievements);
 challengesDialog.addEventListener('cancel', event => {
   event.preventDefault();
-  returnToResults();
+  returnFromAchievements();
 });
 element('menu-button', HTMLButtonElement).addEventListener('click', showMenu);
 const howToPlay = element('how-to-play', HTMLButtonElement);
@@ -476,6 +601,8 @@ document.addEventListener('click', event => {
 });
 element('mobile-pause', HTMLButtonElement).addEventListener('click', showMenu);
 function openShareModal(): void {
+  if (scene?.celebrating) return;
+  if (!menu.open && !result.open && !topList.open) showMenu();
   const url = `${location.origin}/?from=share`;
   shareModalLink.textContent = url;
   shareModalStatus.textContent = '';
@@ -498,7 +625,6 @@ shareModalCopy.addEventListener('click', async () => {
 shareModalClose.addEventListener('click', () => shareModal.close());
 element('header-share-button', HTMLButtonElement).addEventListener('click', openShareModal);
 element('menu-share', HTMLButtonElement).addEventListener('click', () => {
-  menu.close();
   openShareModal();
 });
 shareModal.addEventListener('close', () => {
@@ -528,7 +654,7 @@ let musicMode: MusicMode = 'on';
 const musicToggle = element('music-toggle', HTMLButtonElement);
 function renderMusicToggle(): void {
   const label = musicMode === 'on' ? 'On' : 'Off';
-  musicToggle.textContent = `Music: ${label}`;
+  setButtonText(musicToggle, `Music: ${label}`);
   musicToggle.setAttribute('aria-pressed', String(musicMode === 'on'));
 }
 renderMusicToggle();
@@ -552,20 +678,26 @@ const effectsToggle = element('effects-toggle', HTMLButtonElement);
 effectsToggle.addEventListener('click', () => {
   effectsEnabled = !effectsEnabled;
   audio.setEffectsEnabled(effectsEnabled);
-  effectsToggle.textContent = `Sound effects: ${effectsEnabled ? 'On' : 'Off'}`;
+  setButtonText(effectsToggle, `Sound effects: ${effectsEnabled ? 'On' : 'Off'}`);
   effectsToggle.setAttribute('aria-pressed', String(effectsEnabled));
   analytics.track('setting_changed', effectsEnabled ? 'effects_on' : 'effects_off');
 });
 menu.addEventListener('cancel', event => {
   event.preventDefault();
   if (started) start();
+  else if (!menuResults.hidden) menuResults.click();
 });
 result.addEventListener('cancel', event => event.preventDefault());
 errorDialog.addEventListener('close', showMenu);
 window.addEventListener('keydown', event => {
-  if (event.code === 'Escape' && !menu.open && !result.open && !challengesDialog.open && !errorDialog.open && !topList.open) {
+  if (event.code === 'Escape' && !menu.open && !result.open && !challengesDialog.open && !errorDialog.open && !topList.open && !shareModal.open) {
     event.preventDefault(); showMenu();
   }
+});
+document.querySelector<HTMLAnchorElement>('.wordmark')?.addEventListener('click', event => {
+  if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  showMenu();
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { audio.stop(); if (started) showMenu(); }

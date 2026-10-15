@@ -57,8 +57,8 @@ test('uses the Sean and Becky title and character names throughout the UI', asyn
   await expect(page).toHaveTitle('WeddingRush featuring Sean and Becky');
   await expect(page.getByRole('heading', { name: 'WeddingRush featuring Sean and Becky' })).toBeVisible();
   await expect(page.locator('.audio-controls > #music-toggle + #effects-toggle')).toHaveCount(1);
-  await expect(page.locator('.audio-controls + #menu-share')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Share WeddingRush with friends', exact: true })).toHaveClass('link');
+  await expect(page.locator('.audio-controls + .menu-footer > #menu-share + #live-link')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Share with friends', exact: true })).toHaveClass('link');
   await expect(page.locator('#objective')).toContainText('get Sean to Becky');
   await expect(page.locator('#notice')).toContainText('Becky is ready. Sean');
   await page.getByRole('button', { name: "I'm coming!" }).click();
@@ -73,7 +73,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     await page.goto('/');
     const howToPlay = page.getByRole('button', { name: 'How to play', exact: true });
     const instructions = page.locator('#play-instructions');
-    await expect(page.locator('#play + #how-to-play')).toBeVisible();
+    await expect(page.locator('.menu-footer > #how-to-play.link')).toBeVisible();
     await expect(instructions).toBeHidden();
     await expect(page.locator('#controls')).toBeHidden();
     await expect(howToPlay).toHaveAttribute('aria-expanded', 'false');
@@ -588,7 +588,11 @@ for (const width of [1280, 390]) {
     await teleport(page, BRIDE.x - 50);
     const badges = page.locator('#result-challenges');
     const challengesDialog = page.locator('#challenges-dialog');
-    await expect(page.getByRole('button', { name: 'Challenges' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'My Achievements' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#result-challenges-button')).toHaveAccessibleName('My Achievements (2/4)');
+    await expect(page.locator('#menu-achievements')).toContainText('My Achievements (2/4)');
+    await expect(page.locator('#result > #result-challenges-button')).toHaveCount(1);
+    await expect(page.locator('#result-challenges-button')).not.toHaveClass('link');
     await expect(challengesDialog).toBeHidden();
     await expect(page.locator('#result-summary')).toBeHidden();
     await expect(page.locator('#result-detail')).toContainText('3/3 lives left');
@@ -596,7 +600,7 @@ for (const width of [1280, 390]) {
       await expect(page.locator('#player-name')).toBeInViewport();
       await expect(page.locator('#submit-score')).toBeInViewport();
     }
-    await page.getByRole('button', { name: 'Challenges' }).click();
+    await page.getByRole('button', { name: 'My Achievements' }).click();
     await expect(page.locator('#result')).toBeHidden();
     await expect(challengesDialog).toBeVisible();
     await expect(badges.locator('li')).toHaveCount(4);
@@ -609,21 +613,72 @@ for (const width of [1280, 390]) {
     await page.keyboard.press('Escape');
     await expect(challengesDialog).toBeHidden();
     await expect(page.locator('#result')).toBeVisible();
-    await page.getByRole('button', { name: 'Challenges' }).click();
+    await page.getByRole('button', { name: 'My Achievements' }).click();
     await page.getByRole('button', { name: 'Back to results' }).click();
     await expect(challengesDialog).toBeHidden();
     await expect(page.locator('#result')).toBeVisible();
     await page.reload();
+    await expect(page.locator('#menu-achievements')).toHaveAccessibleName('My Achievements (2/4)');
     await page.getByRole('button', { name: "I'm coming!" }).click();
     await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
     await exposeScene(page);
     await teleport(page, BRIDE.x - 50);
-    await page.getByRole('button', { name: 'Challenges' }).click();
+    await page.getByRole('button', { name: 'My Achievements' }).click();
     await expect(badges.locator('[data-challenge="hat"]')).toContainText('Previously earned on this device');
     await expect(badges.locator('[data-challenge="flawless"]')).toContainText('Earned this run');
     await expect(badges.locator('[data-new]')).toHaveCount(0);
   });
 }
+
+for (const width of [1280, 390]) {
+  test(`menu achievements show saved badges and return without resuming at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.addInitScript(() => localStorage.setItem('wedding-rush-challenges', '["hat"]'));
+    await page.goto('/');
+    await expect(page.locator('#menu-achievements')).toHaveAccessibleName('My Achievements (1/4)');
+    await page.locator('#menu-achievements').click();
+    const achievements = page.getByRole('dialog', { name: 'My Achievements' });
+    await expect(achievements).toBeVisible();
+    await expect(achievements.locator('[data-challenge="hat"]')).toContainText('Previously earned on this device');
+    await expect(achievements.locator('li')).toHaveCount(4);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#menu-achievements')).toBeFocused();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'ready');
+    await page.getByRole('button', { name: "I'm coming!" }).click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+    await page.keyboard.press('Escape');
+    const paused = await state(page);
+    await page.locator('#menu-achievements').click();
+    await expect(achievements).toBeVisible();
+    await achievements.getByRole('button', { name: 'Back to menu' }).click();
+    await expect(page.locator('#menu-achievements')).toBeFocused();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'paused');
+    expect(await state(page)).toEqual(paused);
+    expect(await page.evaluate(() => localStorage.getItem('wedding-rush-challenges'))).toBe('["hat"]');
+    await expect(page.locator('#menu-achievements')).toHaveAccessibleName('My Achievements (1/4)');
+  });
+}
+
+test('menu buttons keep decorative emoji icons and dynamic labels', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#menu-achievements')).toHaveAccessibleName('My Achievements (0/4)');
+  const buttons = page.locator('dialog button');
+  for (const button of await buttons.all()) {
+    const icon = button.locator('span[aria-hidden="true"]');
+    await expect(icon).toHaveCount(1);
+    expect(await icon.textContent()).toMatch(/\p{Extended_Pictographic}/u);
+  }
+  await page.getByRole('button', { name: 'Music: On', exact: true }).click();
+  await expect(page.locator('#music-toggle')).toHaveAccessibleName('Music: Off');
+  await expect(page.locator('#music-toggle span')).toHaveText('🎵 ');
+  await page.getByRole('button', { name: 'Sound effects: On', exact: true }).click();
+  await expect(page.locator('#effects-toggle')).toHaveAccessibleName('Sound effects: Off');
+  await expect(page.locator('#effects-toggle span')).toHaveText('🔊 ');
+  await page.getByRole('button', { name: "I'm coming!" }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#play')).toHaveAccessibleName('Back to Becky ↗');
+  await expect(page.locator('#play span')).toHaveText('🏃 ');
+});
 
 test('challenge storage failure is visible without preventing results', async ({ page }) => {
   await page.addInitScript(() => {
@@ -632,7 +687,7 @@ test('challenge storage failure is visible without preventing results', async ({
   await start(page);
   await exposeScene(page);
   await teleport(page, BRIDE.x - 50);
-  await page.getByRole('button', { name: 'Challenges' }).click();
+  await page.getByRole('button', { name: 'My Achievements' }).click();
   await expect(page.locator('#challenges-status')).toContainText('Badges could not be saved on this device');
   await expect(page.locator('#result-challenges [data-challenge="flawless"]')).toContainText('NEW BADGE!');
 });
@@ -1563,6 +1618,16 @@ test('best score, name filter and share link to a highlighted top list', async (
   expect(shared.url).toMatch(/\/top\?you=[a-z0-9]{12}$/);
   expect(shared.text).toContain(name);
   await expect(posted.getByRole('button', { name: 'One more big day ↗' })).toBeVisible();
+  await posted.getByRole('button', { name: 'Back to results' }).click();
+  await expect(page.locator('#player-name')).toHaveValue(name);
+  await expect(page.locator('#player-name')).toBeDisabled();
+  await expect(page.locator('#submit-score')).toBeDisabled();
+  await expect(page.locator('#score-status')).toContainText('Posted!');
+  await page.getByRole('button', { name: 'My Achievements' }).click();
+  await page.getByRole('button', { name: 'Back to results' }).click();
+  await page.getByRole('button', { name: 'See the top list' }).click();
+  await expect(posted.locator('tr[data-you]')).toContainText(name);
+  expect(await page.evaluate(() => (window as any).__tadas)).toBe(1);
   await posted.getByRole('button', { name: 'Back to menu' }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.locator('#menu')).toBeVisible();
@@ -1621,6 +1686,203 @@ test('the main menu opens the guest top list and returns or starts a run', async
   await expect(list).not.toBeVisible();
   await expect(page.locator('#menu')).not.toBeVisible();
   await expect(page).toHaveURL(/\/$/);
+});
+
+for (const width of [1280, 390]) {
+  test(`full results show the top 50 and return to the top list at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.route('**/api/scores?limit=50', route => route.fulfill({
+      json: { scores: Array.from({ length: 50 }, (_, index) => ({
+        id: String(index).padStart(12, '0'), name: `Guest ${index + 1}`, score: 100 - index,
+        squashed: 0, won: false, at: '2026-10-15T12:00:00Z',
+      })) },
+    }));
+    await start(page);
+    await exposeScene(page);
+    await teleport(page, BRIDE.x - 50);
+    await expect(page.locator('#result')).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'See the top list' }).click();
+    const back = await page.locator('#top-list-back').boundingBox();
+    const menu = await page.locator('#top-list-menu').boundingBox();
+    if (!back || !menu) throw new Error('Top list navigation is not visible.');
+    expect(Math.abs(back.y - menu.y)).toBeLessThan(1);
+    await page.getByRole('button', { name: 'Full results — top 50' }).click();
+    await expect(page.getByRole('dialog', { name: 'Full results', exact: true })).toBeVisible();
+    await expect(page.locator('#full-results-rows tr')).toHaveCount(50);
+    await expect(page.locator('#full-results-rows tr').last()).toContainText('Guest 50');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#full-results-open')).toBeFocused();
+    await page.locator('#top-list-back').click();
+    await expect(page.locator('#result')).toBeVisible();
+  });
+
+  test(`results navigation preserves the run and unsent name at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    let posts = 0;
+    page.on('request', request => {
+      if (request.method() === 'POST' && request.url().endsWith('/api/scores')) posts++;
+    });
+    await start(page);
+    await exposeScene(page);
+    await teleport(page, BRIDE.x - 50);
+    await expect(page.locator('#result')).toBeVisible({ timeout: 10_000 });
+    await page.locator('#player-name').fill('Wedding Guest');
+    const stats = await page.locator('#result-detail').textContent();
+    const best = await page.locator('#result-best').textContent();
+    await page.getByRole('button', { name: 'My Achievements' }).click();
+    await expect(page.getByRole('dialog', { name: 'My Achievements' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to results' }).click();
+    await page.getByRole('button', { name: 'See the top list' }).click();
+    await expect(page.locator('#top-list')).toBeVisible();
+    await page.getByRole('button', { name: 'Back to results' }).click();
+    await expect(page.locator('#result-top-list')).toBeFocused();
+    await page.getByRole('button', { name: 'See the top list' }).click();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#result')).toBeVisible();
+    await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
+    await page.locator('#live-link').click();
+    await expect(page.getByRole('dialog', { name: 'Live scores' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
+    await page.getByRole('button', { name: 'Back to results' }).click();
+    await expect(page.locator('#player-name')).toHaveValue('Wedding Guest');
+    await expect(page.locator('#result-detail')).toHaveText(stats!);
+    await expect(page.locator('#result-best')).toHaveText(best!);
+    await expect(page.locator('#submit-score')).toBeEnabled();
+    expect(posts).toBe(0);
+    await page.getByRole('button', { name: 'One more big day' }).click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#menu-results')).toBeHidden();
+  });
+
+  test(`sharing and live scores return to a paused run at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await start(page);
+    await page.keyboard.press('Escape');
+    const shareBox = await page.locator('#menu-share').boundingBox();
+    const liveBox = await page.locator('#live-link').boundingBox();
+    if (!shareBox || !liveBox) throw new Error('Menu footer actions are not visible.');
+    expect(Math.abs(shareBox.y + shareBox.height / 2 - liveBox.y - liveBox.height / 2)).toBeLessThan(1);
+    expect(liveBox.x).toBeGreaterThanOrEqual(shareBox.x + shareBox.width);
+    const paused = await state(page);
+    for (const closeWithEscape of [false, true]) {
+      await page.locator('#menu-share').click();
+      await expect(page.locator('#share-modal')).toBeVisible();
+      if (closeWithEscape) await page.keyboard.press('Escape');
+      else await page.locator('#share-modal-close').click();
+      await expect(page.locator('#menu')).toBeVisible();
+      await expect(page.locator('#game')).toHaveAttribute('data-phase', 'paused');
+      expect(await state(page)).toEqual(paused);
+    }
+    await page.locator('#live-link').click();
+    await expect(page.getByRole('dialog', { name: 'Live scores' })).toBeVisible();
+    await expect(page.locator('#top-list-intro')).toContainText('Refreshes every 15 seconds');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#live-link')).toBeFocused();
+    expect(await state(page)).toEqual(paused);
+    await page.getByRole('button', { name: 'Back to Becky' }).click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+    await page.waitForFunction(x => Number(document.getElementById('game')?.dataset.x) > x, paused.x);
+  });
+}
+
+test('live scores refresh only while open and can recover from an offline response', async ({ page }) => {
+  let requests = 0;
+  await page.route('**/api/scores', route => {
+    requests++;
+    return requests === 1 ? route.fulfill({ status: 503, body: '{}' })
+      : route.fulfill({ json: { scores: [{
+        id: 'abcdefghijkl', name: `Guest ${requests}`, score: requests, squashed: 0, won: false,
+      }] } });
+  });
+  await page.goto('/');
+  await page.clock.install();
+  await page.locator('#live-link').click();
+  await expect(page.locator('#top-list-intro')).toContainText('offline');
+  await page.clock.fastForward(15_000);
+  await expect(page.locator('#top-list-rows')).toContainText('Guest 2');
+  await page.getByRole('button', { name: 'Back to menu' }).click();
+  await expect(page.locator('#menu')).toBeVisible();
+  await page.clock.fastForward(30_000);
+  expect(requests).toBe(2);
+});
+
+test('a late score response does not replace a newer run or navigate away', async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/scores', async route => {
+    if (route.request().method() !== 'POST') return route.continue();
+    await pending;
+    await route.fulfill({ json: {
+      entry: { id: 'abcdefghijkl', name: 'Previous Guest', score: 25, squashed: 0, won: false, rank: 1 },
+      scores: [],
+    } });
+  });
+  await start(page);
+  await ringThenCrash(page);
+  await page.locator('#player-name').fill('Previous Guest');
+  await page.locator('#submit-score').click();
+  await expect(page.locator('#score-status')).toHaveText('Posting…');
+  await page.getByRole('button', { name: 'One more big day' }).click();
+  await ringThenCrash(page);
+  const response = page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/api/scores'));
+  release();
+  await response;
+  await expect(page.locator('#result')).toBeVisible();
+  await expect(page.locator('#top-list')).toBeHidden();
+  await expect(page.locator('#player-name')).toBeEnabled();
+  await expect(page.locator('#submit-score')).toBeEnabled();
+  await expect(page.locator('#score-status')).toBeEmpty();
+});
+
+test('live scores do not overlap slow refreshes or update a reopened list', async ({ page }) => {
+  let requests = 0;
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/scores', async route => {
+    const number = ++requests;
+    if (number === 1) await pending;
+    await route.fulfill({ json: { scores: [{
+      id: 'abcdefghijkl', name: `Guest ${number}`, score: number, squashed: 0, won: false,
+    }] } });
+  });
+  await page.goto('/');
+  await page.clock.install();
+  await page.locator('#live-link').click();
+  await expect.poll(() => requests).toBe(1);
+  await page.clock.fastForward(30_000);
+  expect(requests).toBe(1);
+  await page.getByRole('button', { name: 'Back to menu' }).click();
+  await page.locator('#menu-top-list').click();
+  await expect(page.locator('#top-list-rows')).toContainText('Guest 2');
+  const response = page.waitForResponse(response => response.url().endsWith('/api/scores'));
+  release();
+  await response;
+  await expect(page.locator('#top-list-rows')).toContainText('Guest 2');
+  await expect(page.locator('#top-list-rows')).not.toContainText('Guest 1');
+});
+
+test('a direct top list link has a menu return path', async ({ page }) => {
+  await page.goto('/top');
+  await page.getByRole('button', { name: 'Back to menu' }).click();
+  await expect(page.locator('#menu')).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test('footer and share navigation cannot interrupt the wedding celebration', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 844 });
+  await start(page);
+  await exposeScene(page);
+  await teleport(page, BRIDE.x - 50);
+  await expect(page.locator('#game')).toHaveAttribute('data-celebrating', 'true');
+  await page.locator('footer').getByRole('link', { name: 'Live scores' }).click();
+  await page.locator('#header-share-button').click();
+  await expect(page.locator('#top-list')).toBeHidden();
+  await expect(page.locator('#share-modal')).toBeHidden();
+  await expect(page.locator('#result')).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'One more big day' }).click();
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
 });
 
 test('plays recorded effects for corks, rings, pigeons, texts and hits', async ({ page }) => {
