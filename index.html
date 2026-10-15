@@ -34,7 +34,7 @@
           <button type="button" data-control="jump" aria-label="Jump">JUMP ↗</button>
         </div>
       </section>
-      <footer><span>JUMP THE HURDLES. IGNORE THE LADS. MAKE THE WEDDING.</span><span>SPACE OR TAP TO JUMP. ↓ TO DUCK.</span></footer>
+      <footer><span>JUMP THE HURDLES. IGNORE THE LADS. MAKE THE WEDDING.</span><a href="/live" data-live-scores>Live scores</a><span>SPACE OR TAP TO JUMP. ↓ TO DUCK.</span></footer>
       <dialog id="menu" aria-labelledby="menu-title">
         <span class="stamp">YOU HAD ONE JOB / BE ON TIME</span>
         <h1 id="menu-title">Wedding<span>Rush</span><i>♥</i><small>featuring Sean and Becky</small></h1>
@@ -51,11 +51,13 @@
         </div>
         <button id="restart" type="button" hidden>Start a fresh run</button>
         <button id="menu-top-list" type="button">🏆 View the guest top list</button>
+        <button id="menu-results" type="button" hidden>Back to results</button>
         <div class="audio-controls">
           <button id="music-toggle" type="button" aria-pressed="true">Music: On</button>
           <button id="effects-toggle" type="button" aria-pressed="true">Sound effects: On</button>
         </div>
         <button id="menu-share" class="link" type="button">Share WeddingRush with friends</button>
+        <nav class="menu-footer" aria-label="Menu footer"><a id="live-link" href="/live" data-live-scores>Live scores</a></nav>
       </dialog>
       <dialog id="result" aria-labelledby="result-title">
         <span class="stamp" id="result-kicker">THE BIG DAY</span>
@@ -75,13 +77,13 @@
         <button id="again" type="button" class="primary" autofocus>One more big day ↗</button>
         <div class="text-links">
           <button id="result-top-list" type="button" class="link">See the top list</button>
-          <button id="result-challenges-button" type="button" class="link" aria-haspopup="dialog" aria-controls="challenges-dialog">Challenges</button>
+          <button id="result-challenges-button" type="button" class="link" aria-haspopup="dialog" aria-controls="challenges-dialog">My badges</button>
           <button id="result-menu" type="button" class="link">Back to menu</button>
         </div>
       </dialog>
       <dialog id="challenges-dialog" aria-labelledby="challenges-title">
-        <span class="stamp">YOUR WEDDINGRUSH CHALLENGES</span>
-        <h2 id="challenges-title">Personal challenges</h2>
+        <span class="stamp">YOUR WEDDINGRUSH BADGES</span>
+        <h2 id="challenges-title">My badges</h2>
         <p>See your progress this run and the badges you have earned on this device.</p>
         <ul id="result-challenges" class="challenges"></ul>
         <p id="challenges-status"></p>
@@ -99,7 +101,8 @@
         <button id="share" type="button" class="share" hidden>Share my place on the top list ↗</button>
         <p id="share-status" role="status"></p>
         <button id="top-list-play" type="button" class="primary" autofocus>Beat them! Play WeddingRush ↗</button>
-        <button id="top-list-menu" type="button" class="link" hidden>Back to menu</button>
+        <button id="top-list-back" type="button" class="link" hidden>Back to results</button>
+        <button id="top-list-menu" type="button" class="link">Back to menu</button>
       </dialog>
       <dialog id="share-modal" aria-labelledby="share-modal-title">
         <span class="stamp">SPREAD THE WORD</span>
