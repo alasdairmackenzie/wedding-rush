@@ -19,7 +19,12 @@
       </form>
       <div id="dashboard" hidden>
         <p class="row links"><a href="/" target="_blank">Open the game ↗</a><a href="/live" target="_blank">Open the live screen ↗</a><button type="button" id="logout" class="link">Sign out</button></p>
-        <section class="panel" aria-labelledby="analytics-title">
+        <nav class="row links admin-nav" aria-label="Admin sections">
+          <a href="/admin/stats" data-admin-page="stats">Stats</a>
+          <a href="/admin/photos" data-admin-page="photos">Photos</a>
+          <a href="/admin/scores" data-admin-page="scores">Scores</a>
+        </nav>
+        <section class="panel" aria-labelledby="analytics-title" data-admin-section="stats" hidden>
           <div class="row">
             <h2 id="analytics-title">Usage analytics</h2>
             <label for="analytics-days">Period</label>
@@ -48,16 +53,16 @@
             <div><h3>Entry source</h3><div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Source</th><th scope="col">Events</th><th scope="col">Browsers</th><th scope="col">Sessions</th></tr></thead><tbody id="analytics-sources"></tbody></table></div></div>
           </div>
         </section>
-        <section class="panel" aria-labelledby="faces-title">
-          <h2 id="faces-title">Faces</h2>
+        <section class="panel" aria-labelledby="faces-title" data-admin-section="photos" hidden>
+          <h2 id="faces-title">Photos</h2>
           <p class="hint">Pick a photo of a face. Tick “Auto-remove background” to erase backgrounds with AI, or “Crop to a circle”. New faces show up the next time someone loads the game.</p>
           <ul id="faces" class="faces"></ul>
         </section>
-        <section class="panel" aria-labelledby="scores-title">
+        <section class="panel" aria-labelledby="scores-title" data-admin-section="scores" hidden>
           <h2 id="scores-title">Scores</h2>
           <p id="scores-status" role="status"></p>
           <div class="table-wrap">
-            <table class="toplist">
+            <table class="toplist" id="admin-scores-table">
               <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Points</th><th scope="col">Squashed</th><th scope="col">Posted</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
               <tbody id="scores"></tbody>
             </table>

@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { imageType, isFaceKind, MAX_FACE_BYTES } from '../shared/faces.ts';
-import { cleanName, ENTRY_ID, isRude, NAME_MAX, validateSubmission } from '../shared/leaderboard.ts';
+import { cleanName, ENTRY_ID, FULL_RESULTS_SIZE, isRude, LEADERBOARD_SIZE, NAME_MAX, validateSubmission } from '../shared/leaderboard.ts';
 import { ADMIN_LIST_SIZE, type ScoreStore } from './store.ts';
 import { analyticsBatch, isAnalyticsEvent, type AnalyticsEvent } from '../shared/analytics.ts';
 
@@ -199,9 +199,14 @@ export function createApi(getStore: () => Promise<ScoreStore>, options: { adminT
       if (isFaces) return await faces(req, res, store, path);
       if (isAdmin) return await admin(req, res, store, path, options.adminToken);
       if (req.method === 'GET') {
+        const limit = url.searchParams.get('limit');
+        if (limit !== null && limit !== String(LEADERBOARD_SIZE) && limit !== String(FULL_RESULTS_SIZE)) {
+          send(res, 400, { error: 'Score limit must be 10 or 50.' });
+          return true;
+        }
         const id = url.searchParams.get('you');
         const you = id && ENTRY_ID.test(id) ? await store.find(id) : undefined;
-        send(res, 200, { scores: await store.top(), you });
+        send(res, 200, { scores: await store.top(limit === String(FULL_RESULTS_SIZE) ? FULL_RESULTS_SIZE : LEADERBOARD_SIZE), you });
         return true;
       }
       if (req.method !== 'POST') {
