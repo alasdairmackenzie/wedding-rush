@@ -33,6 +33,7 @@ describe('leaderboard names', () => {
       ok: true, value: { name: 'Gran', score: 120, squashed: 7, won: true },
     });
     expect(validateSubmission({ name: 'Gran', score: MAX_SCORE + 1, squashed: 0, won: true }).ok).toBe(false);
+    expect(validateSubmission({ name: 'Gran', score: MAX_SCORE, squashed: 7, won: true }).ok).toBe(true);
     expect(validateSubmission({ name: 'Gran', score: 1.5, squashed: 0, won: true }).ok).toBe(false);
     expect(validateSubmission({ name: 'Gran', score: 10, squashed: 8, won: true }).ok).toBe(false);
     expect(validateSubmission({ name: 'Gran', score: 10, squashed: 1 }).ok).toBe(false);
