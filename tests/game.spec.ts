@@ -1748,6 +1748,33 @@ test('a late score response does not replace a newer run or navigate away', asyn
   await expect(page.locator('#score-status')).toBeEmpty();
 });
 
+test('live scores do not overlap slow refreshes or update a reopened list', async ({ page }) => {
+  let requests = 0;
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/scores', async route => {
+    const number = ++requests;
+    if (number === 1) await pending;
+    await route.fulfill({ json: { scores: [{
+      id: 'abcdefghijkl', name: `Guest ${number}`, score: number, squashed: 0, won: false,
+    }] } });
+  });
+  await page.goto('/');
+  await page.clock.install();
+  await page.locator('#live-link').click();
+  await expect.poll(() => requests).toBe(1);
+  await page.clock.fastForward(30_000);
+  expect(requests).toBe(1);
+  await page.getByRole('button', { name: 'Back to menu' }).click();
+  await page.locator('#menu-top-list').click();
+  await expect(page.locator('#top-list-rows')).toContainText('Guest 2');
+  const response = page.waitForResponse(response => response.url().endsWith('/api/scores'));
+  release();
+  await response;
+  await expect(page.locator('#top-list-rows')).toContainText('Guest 2');
+  await expect(page.locator('#top-list-rows')).not.toContainText('Guest 1');
+});
+
 test('a direct top list link has a menu return path', async ({ page }) => {
   await page.goto('/top');
   await page.getByRole('button', { name: 'Back to menu' }).click();

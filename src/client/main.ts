@@ -224,7 +224,10 @@ async function openTopList(
       if (!document.hidden) void refresh();
     }, 15_000);
   }
+  let refreshing = false;
   async function refresh(): Promise<void> {
+    if (refreshing) return;
+    refreshing = true;
     try {
       const data = options.data ?? await fetchScores(id && ENTRY_ID.test(id) ? id : undefined);
       if (!topList.open || request !== topListRequest) return;
@@ -247,6 +250,8 @@ async function openTopList(
       if (!topList.open || request !== topListRequest) return;
       topListRows.replaceChildren();
       topListIntro.textContent = 'The top list is offline right now. Try again soon.';
+    } finally {
+      refreshing = false;
     }
   }
   await refresh();
