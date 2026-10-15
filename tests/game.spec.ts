@@ -588,7 +588,7 @@ for (const width of [1280, 390]) {
     await teleport(page, BRIDE.x - 50);
     const badges = page.locator('#result-challenges');
     const challengesDialog = page.locator('#challenges-dialog');
-    await expect(page.getByRole('button', { name: 'Challenges' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'My badges' })).toBeVisible({ timeout: 10_000 });
     await expect(challengesDialog).toBeHidden();
     await expect(page.locator('#result-summary')).toBeHidden();
     await expect(page.locator('#result-detail')).toContainText('3/3 lives left');
@@ -596,7 +596,7 @@ for (const width of [1280, 390]) {
       await expect(page.locator('#player-name')).toBeInViewport();
       await expect(page.locator('#submit-score')).toBeInViewport();
     }
-    await page.getByRole('button', { name: 'Challenges' }).click();
+    await page.getByRole('button', { name: 'My badges' }).click();
     await expect(page.locator('#result')).toBeHidden();
     await expect(challengesDialog).toBeVisible();
     await expect(badges.locator('li')).toHaveCount(4);
@@ -609,7 +609,7 @@ for (const width of [1280, 390]) {
     await page.keyboard.press('Escape');
     await expect(challengesDialog).toBeHidden();
     await expect(page.locator('#result')).toBeVisible();
-    await page.getByRole('button', { name: 'Challenges' }).click();
+    await page.getByRole('button', { name: 'My badges' }).click();
     await page.getByRole('button', { name: 'Back to results' }).click();
     await expect(challengesDialog).toBeHidden();
     await expect(page.locator('#result')).toBeVisible();
@@ -618,7 +618,7 @@ for (const width of [1280, 390]) {
     await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
     await exposeScene(page);
     await teleport(page, BRIDE.x - 50);
-    await page.getByRole('button', { name: 'Challenges' }).click();
+    await page.getByRole('button', { name: 'My badges' }).click();
     await expect(badges.locator('[data-challenge="hat"]')).toContainText('Previously earned on this device');
     await expect(badges.locator('[data-challenge="flawless"]')).toContainText('Earned this run');
     await expect(badges.locator('[data-new]')).toHaveCount(0);
@@ -632,7 +632,7 @@ test('challenge storage failure is visible without preventing results', async ({
   await start(page);
   await exposeScene(page);
   await teleport(page, BRIDE.x - 50);
-  await page.getByRole('button', { name: 'Challenges' }).click();
+  await page.getByRole('button', { name: 'My badges' }).click();
   await expect(page.locator('#challenges-status')).toContainText('Badges could not be saved on this device');
   await expect(page.locator('#result-challenges [data-challenge="flawless"]')).toContainText('NEW BADGE!');
 });
@@ -1563,6 +1563,16 @@ test('best score, name filter and share link to a highlighted top list', async (
   expect(shared.url).toMatch(/\/top\?you=[a-z0-9]{12}$/);
   expect(shared.text).toContain(name);
   await expect(posted.getByRole('button', { name: 'One more big day ↗' })).toBeVisible();
+  await posted.getByRole('button', { name: 'Back to results' }).click();
+  await expect(page.locator('#player-name')).toHaveValue(name);
+  await expect(page.locator('#player-name')).toBeDisabled();
+  await expect(page.locator('#submit-score')).toBeDisabled();
+  await expect(page.locator('#score-status')).toContainText('Posted!');
+  await page.getByRole('button', { name: 'My badges' }).click();
+  await page.getByRole('button', { name: 'Back to results' }).click();
+  await page.getByRole('button', { name: 'See the top list' }).click();
+  await expect(posted.locator('tr[data-you]')).toContainText(name);
+  expect(await page.evaluate(() => (window as any).__tadas)).toBe(1);
   await posted.getByRole('button', { name: 'Back to menu' }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.locator('#menu')).toBeVisible();
@@ -1620,6 +1630,128 @@ test('the main menu opens the guest top list and returns or starts a run', async
   await list.getByRole('button', { name: "I'm coming! ↗" }).click();
   await expect(list).not.toBeVisible();
   await expect(page.locator('#menu')).not.toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
+});
+
+for (const width of [1280, 390]) {
+  test(`results navigation preserves the run and unsent name at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    let posts = 0;
+    page.on('request', request => {
+      if (request.method() === 'POST' && request.url().endsWith('/api/scores')) posts++;
+    });
+    await start(page);
+    await exposeScene(page);
+    await teleport(page, BRIDE.x - 50);
+    await expect(page.locator('#result')).toBeVisible({ timeout: 10_000 });
+    await page.locator('#player-name').fill('Wedding Guest');
+    const stats = await page.locator('#result-detail').textContent();
+    const best = await page.locator('#result-best').textContent();
+    await page.getByRole('button', { name: 'My badges' }).click();
+    await expect(page.getByRole('dialog', { name: 'My badges' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to results' }).click();
+    await page.getByRole('button', { name: 'See the top list' }).click();
+    await expect(page.locator('#top-list')).toBeVisible();
+    await page.getByRole('button', { name: 'Back to results' }).click();
+    await expect(page.locator('#result-top-list')).toBeFocused();
+    await page.getByRole('button', { name: 'See the top list' }).click();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#result')).toBeVisible();
+    await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
+    await page.locator('#live-link').click();
+    await expect(page.getByRole('dialog', { name: 'Live scores' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
+    await page.getByRole('button', { name: 'Back to results' }).click();
+    await expect(page.locator('#player-name')).toHaveValue('Wedding Guest');
+    await expect(page.locator('#result-detail')).toHaveText(stats!);
+    await expect(page.locator('#result-best')).toHaveText(best!);
+    await expect(page.locator('#submit-score')).toBeEnabled();
+    expect(posts).toBe(0);
+    await page.getByRole('button', { name: 'One more big day' }).click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#menu-results')).toBeHidden();
+  });
+
+  test(`sharing and live scores return to a paused run at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await start(page);
+    await page.keyboard.press('Escape');
+    const paused = await state(page);
+    for (const closeWithEscape of [false, true]) {
+      await page.locator('#menu-share').click();
+      await expect(page.locator('#share-modal')).toBeVisible();
+      if (closeWithEscape) await page.keyboard.press('Escape');
+      else await page.locator('#share-modal-close').click();
+      await expect(page.locator('#menu')).toBeVisible();
+      await expect(page.locator('#game')).toHaveAttribute('data-phase', 'paused');
+      expect(await state(page)).toEqual(paused);
+    }
+    await page.locator('#live-link').click();
+    await expect(page.getByRole('dialog', { name: 'Live scores' })).toBeVisible();
+    await expect(page.locator('#top-list-intro')).toContainText('Refreshes every 15 seconds');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#live-link')).toBeFocused();
+    expect(await state(page)).toEqual(paused);
+    await page.getByRole('button', { name: 'Back to Becky' }).click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+    await page.waitForFunction(x => Number(document.getElementById('game')?.dataset.x) > x, paused.x);
+  });
+}
+
+test('live scores refresh only while open and can recover from an offline response', async ({ page }) => {
+  let requests = 0;
+  await page.route('**/api/scores', route => {
+    requests++;
+    return requests === 1 ? route.fulfill({ status: 503, body: '{}' })
+      : route.fulfill({ json: { scores: [{
+        id: 'abcdefghijkl', name: `Guest ${requests}`, score: requests, squashed: 0, won: false,
+      }] } });
+  });
+  await page.goto('/');
+  await page.clock.install();
+  await page.locator('#live-link').click();
+  await expect(page.locator('#top-list-intro')).toContainText('offline');
+  await page.clock.fastForward(15_000);
+  await expect(page.locator('#top-list-rows')).toContainText('Guest 2');
+  await page.getByRole('button', { name: 'Back to menu' }).click();
+  await expect(page.locator('#menu')).toBeVisible();
+  await page.clock.fastForward(30_000);
+  expect(requests).toBe(2);
+});
+
+test('a late score response does not replace a newer run or navigate away', async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/scores', async route => {
+    if (route.request().method() !== 'POST') return route.continue();
+    await pending;
+    await route.fulfill({ json: {
+      entry: { id: 'abcdefghijkl', name: 'Previous Guest', score: 25, squashed: 0, won: false, rank: 1 },
+      scores: [],
+    } });
+  });
+  await start(page);
+  await ringThenCrash(page);
+  await page.locator('#player-name').fill('Previous Guest');
+  await page.locator('#submit-score').click();
+  await expect(page.locator('#score-status')).toHaveText('Posting…');
+  await page.getByRole('button', { name: 'One more big day' }).click();
+  await ringThenCrash(page);
+  const response = page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/api/scores'));
+  release();
+  await response;
+  await expect(page.locator('#result')).toBeVisible();
+  await expect(page.locator('#top-list')).toBeHidden();
+  await expect(page.locator('#player-name')).toBeEnabled();
+  await expect(page.locator('#submit-score')).toBeEnabled();
+  await expect(page.locator('#score-status')).toBeEmpty();
+});
+
+test('a direct top list link has a menu return path', async ({ page }) => {
+  await page.goto('/top');
+  await page.getByRole('button', { name: 'Back to menu' }).click();
+  await expect(page.locator('#menu')).toBeVisible();
   await expect(page).toHaveURL(/\/$/);
 });
 

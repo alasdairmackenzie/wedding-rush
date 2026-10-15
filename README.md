@@ -31,9 +31,11 @@ a password when you start the server, for example
 
 ## Live screen and admin
 
-- `/live` is a display-only top list for a TV or projector at the venue. It
-  shows the address to play at, has no buttons and refreshes every 15 seconds.
+- `/live` is a top list for a TV or projector at the venue. It
+  shows the address to play at, has a **Back to game** link and refreshes every 15 seconds.
   Add `?url=seanandbeckywedding.run` to override the address it shows.
+  The home menu footer's **Live scores** link opens an auto-refreshing list
+  in the game, so returning to the menu preserves a paused run or completed result.
 - `/admin` lets you upload faces for Becky and the mates, and rename or delete
   scores. Sign in with the `ADMIN_TOKEN` password; without it the admin page is
   turned off. Tick **Auto-remove background** to erase the background with
@@ -130,7 +132,7 @@ character's line waits until the intro finishes. Later encounter spacing stays u
   pixels above it, or duck 0–18 pixels below a pigeon, then pass it without a hit.
   Each obstacle awards a flat **5 points** once, without a combo multiplier.
   Squash invincibility and disco-mode passes are excluded.
-- **Personal challenges**: results show all seven mates squashed, all three
+- **My badges**: results show all seven mates squashed, all three
   rings collected, bucket hat found, and finishing without a hit. Badges add no
   points; earned badges persist on this device, with newly earned badges
   highlighted and current-run progress shown. Storage failures are reported.
@@ -152,6 +154,10 @@ character's line waits until the intro finishes. Later encounter spacing stays u
   **Share my place on the top list** shares (or copies) a `/top?you=<id>` link
   that opens the top 10 with your row highlighted, plus your rank if you are
   outside the top 10. The top list can also be opened from the main menu.
+  **Back to results** returns from the top list or **My badges** without losing
+  your score, name or posting status. The menu also offers **Back to results**
+  until you start another run. Closing Share returns to the menu without resuming
+  a paused game.
 - Leaving the app pauses the run and sound; tapping again on return restarts
   the audio.
 - Replay resets the route, chances, hurdle and person states, lighting and score.

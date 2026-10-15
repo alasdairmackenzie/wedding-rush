@@ -23,7 +23,7 @@ async function signIn(page: Page): Promise<void> {
   await expect(page.locator('#dashboard')).toBeVisible();
 }
 
-test('live screen shows the top list and where to play, with nothing to press', async ({ page, request }) => {
+test('live screen shows scores, where to play and a return link', async ({ page, request }) => {
   const name = `Live ${Date.now() % 1000000}`;
   await seed(request, name, MAX_SCORE);
   await page.goto('/live?url=seanandbeckywedding.run');
@@ -31,10 +31,12 @@ test('live screen shows the top list and where to play, with nothing to press', 
   await expect(page.locator('#live-rows tr').first()).toContainText(name);
   await expect(page.locator('#live-rows tr').first()).toContainText('💍');
   await expect(page.getByRole('button')).toHaveCount(0);
-  await expect(page.getByRole('link')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Back to game' })).toHaveAttribute('href', '/');
 
   await page.goto('/live');
   await expect(page.locator('#live-url')).toHaveText('127.0.0.1:5300');
+  await page.getByRole('link', { name: 'Back to game' }).click();
+  await expect(page.locator('#menu')).toBeVisible();
 });
 
 test('admin needs the password, then renames and deletes scores', async ({ page, request }) => {
