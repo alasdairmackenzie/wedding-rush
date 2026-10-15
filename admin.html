@@ -39,6 +39,34 @@
           <p class="hint">Unique browsers, not identifiable people. Anonymous IDs; no names, stored IP addresses or fingerprints. Activity starts when this feature is deployed.</p>
           <p id="analytics-status" role="status"></p>
           <dl id="analytics-metrics" class="analytics-metrics"></dl>
+          <figure class="analytics-chart analytics-flow">
+            <figcaption>Player journey</figcaption>
+            <p class="hint">Open → play counts tab sessions with both events recorded. Gameplay counts distinct runs started in this period. Menu visits can overlap win/loss outcomes; unfinished is not confirmed abandonment. Arrows show stage relationships, not a time-ordered clickstream or proportional traffic widths.</p>
+            <div class="analytics-flow-scroll" tabindex="0" role="region" aria-label="Player journey diagram, scroll horizontally on small screens">
+              <div id="analytics-flow-chart"></div>
+            </div>
+            <details><summary>View journey counts</summary><div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Stage</th><th scope="col">Count</th><th scope="col">Measure</th></tr></thead><tbody id="analytics-flow-table"></tbody></table></div></details>
+          </figure>
+          <div class="analytics-charts" aria-label="Analytics charts">
+            <figure class="analytics-chart analytics-hourly">
+              <figcaption>Devices playing by hour — last 12 hours (UTC)</figcaption>
+              <p class="hint">Unique game browsers starting a game each hour, not physical devices or people. Includes the current, incomplete hour and the previous 11 hours, regardless of the period filter. Repeat plays count once per browser per hour.</p>
+              <div id="analytics-hourly-chart"></div>
+              <details><summary>View hourly counts</summary><div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Hour starting (UTC)</th><th scope="col">Devices / browsers</th></tr></thead><tbody id="analytics-hourly-table"></tbody></table></div></details>
+            </figure>
+            <figure class="analytics-chart">
+              <figcaption>Daily activity (UTC)</figcaption>
+              <div id="analytics-daily-chart"></div>
+            </figure>
+            <figure class="analytics-chart">
+              <figcaption>Run outcomes</figcaption>
+              <div id="analytics-outcomes-chart"></div>
+            </figure>
+            <figure class="analytics-chart">
+              <figcaption>Average games per gamer browser</figcaption>
+              <div id="analytics-devices-chart"></div>
+            </figure>
+          </div>
           <h3>Run funnel</h3>
           <p class="hint">Distinct runs started during the selected period, with outcomes recorded in that period. Unfinished includes active runs, restarts and exits; it is not a confirmed abandonment count.</p>
           <div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Stage</th><th scope="col">Runs</th><th scope="col">Of starts</th></tr></thead><tbody id="analytics-funnel"></tbody></table></div>
@@ -49,7 +77,7 @@
           <div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Event</th><th scope="col">Control / outcome</th><th scope="col">Total</th><th scope="col">Browsers</th><th scope="col">Runs</th></tr></thead><tbody id="analytics-actions"></tbody></table></div>
           <div class="analytics-breakdowns">
             <div><h3>Daily activity (UTC)</h3><div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Day</th><th scope="col">Events</th><th scope="col">Browsers</th><th scope="col">Sessions</th></tr></thead><tbody id="analytics-daily"></tbody></table></div></div>
-            <div><h3>Device input</h3><div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Input</th><th scope="col">Events</th><th scope="col">Browsers</th><th scope="col">Sessions</th></tr></thead><tbody id="analytics-devices"></tbody></table></div></div>
+            <div><h3>Device input</h3><p class="hint">Average games played per gamer browser for each input type. Browser IDs are anonymous and do not identify people or physical devices.</p><div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Input</th><th scope="col">Events</th><th scope="col">Browsers</th><th scope="col">Sessions</th><th scope="col">Game starts</th><th scope="col">Gamer browsers</th><th scope="col">Avg games / gamer</th></tr></thead><tbody id="analytics-devices"></tbody></table></div></div>
             <div><h3>Entry source</h3><div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Source</th><th scope="col">Events</th><th scope="col">Browsers</th><th scope="col">Sessions</th></tr></thead><tbody id="analytics-sources"></tbody></table></div></div>
           </div>
         </section>

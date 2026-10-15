@@ -1,5 +1,6 @@
 import { ANALYTICS_BATCH_SIZE, ANALYTICS_ID, type AnalyticsContext, type AnalyticsEvent, type AnalyticsTarget, type EventName } from '../shared/analytics';
 import { TOP_LIST_PATH } from '../shared/leaderboard';
+import { PRESENCE_INTERVAL_MS } from '../shared/presence';
 
 const VISITOR_KEY = 'wedding-rush-visitor';
 const SESSION_KEY = 'wedding-rush-session';
@@ -47,6 +48,29 @@ export function createAnalytics(page: AnalyticsContext['page']) {
   let runFinished = false;
   let progress = 0;
   const enabled = () => !privacySignal && !optedOut;
+  let presencePending = false;
+  async function heartbeat(): Promise<void> {
+    if (page !== 'game' || document.hidden || !enabled() || presencePending) return;
+    presencePending = true;
+    try {
+      const response = await fetch('/api/presence', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitor }), signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) throw new Error(`Presence delivery failed (${response.status}).`);
+    } catch (error) {
+      console.warn('Active-user presence could not be delivered.', error);
+    } finally {
+      presencePending = false;
+    }
+  }
+  const presenceTimer = page === 'game' ? window.setInterval(() => { void heartbeat(); }, PRESENCE_INTERVAL_MS) : undefined;
+  if (page === 'game') {
+    void heartbeat();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) void heartbeat(); });
+    window.addEventListener('pageshow', event => { if (event.persisted) void heartbeat(); });
+    window.addEventListener('pagehide', event => { if (!event.persisted) clearInterval(presenceTimer); });
+  }
   function event(name: EventName, target: AnalyticsTarget): AnalyticsEvent | undefined {
     return enabled() ? { ...context, id: newId(), name, target } : undefined;
   }

@@ -75,6 +75,17 @@ body.admin main {
 .analytics-metrics dt { font-size: 13px; }
 .analytics-metrics dd { font-size: 28px; font-weight: 800; margin: 4px 0 0; }
 .analytics-breakdowns { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.analytics-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; margin: 16px 0 24px; }
+.analytics-chart { min-width: 0; margin: 0; padding: 12px; border: 2px solid #302825; background: #f8efe3; }
+.analytics-chart figcaption { margin-bottom: 8px; font-weight: 700; }
+.analytics-hourly { grid-column: 1 / -1; }
+.analytics-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.analytics-flow { margin: 16px 0 24px; }
+.analytics-flow-scroll { overflow-x: auto; }
+.analytics-flow-scroll:focus-visible { outline: 3px solid #302825; outline-offset: 3px; }
+#analytics-flow-chart { min-width: 850px; }
+.analytics-flow details { margin-top: 12px; }
+.analytics-flow summary { cursor: pointer; font-weight: 700; }
 #analytics-title { margin-right: auto; }
 .admin select { padding: 8px; border: 2px solid #302825; background: #fff; color: #302825; font: inherit; }
 .admin #analytics-title ~ button { font-size: 14px; }

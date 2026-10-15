@@ -1,5 +1,6 @@
 import QRCode from 'qrcode';
 import type { ScoreEntry } from '../shared/leaderboard';
+import type { ActiveUsers } from '../shared/presence';
 import { createAnalytics } from './analytics';
 import './live.css';
 
@@ -8,6 +9,8 @@ const analytics = createAnalytics('live');
 analytics.track('screen_view', 'live');
 const rows = document.getElementById('live-rows') as HTMLTableSectionElement;
 const status = document.getElementById('live-status') as HTMLElement;
+const activeCount = document.getElementById('live-active-count') as HTMLElement;
+const activeStatus = document.getElementById('live-active-status') as HTMLElement;
 const link = document.getElementById('live-url') as HTMLElement;
 const qrContainer = document.getElementById('live-qr') as HTMLElement | null;
 const params = new URLSearchParams(location.search);
@@ -48,7 +51,27 @@ function render(scores: ScoreEntry[]): void {
   seen = fresh;
 }
 
-async function refresh(): Promise<void> {
+async function refreshActiveUsers(): Promise<void> {
+  try {
+    const response = await fetch('/api/presence', {
+      headers: { Accept: 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new Error(String(response.status));
+    const data: ActiveUsers = await response.json();
+    if (!Number.isSafeInteger(data.activeUsers) || data.activeUsers < 0 || data.windowMinutes !== 15) {
+      throw new Error('Invalid active-user count.');
+    }
+    activeCount.textContent = data.activeUsers.toLocaleString();
+    activeStatus.textContent = 'Unique game browsers, not people.';
+    activeStatus.parentElement?.removeAttribute('data-error');
+  } catch (error) {
+    console.warn('Active-user count could not be loaded.', error);
+    activeCount.textContent = '—';
+    activeStatus.textContent = 'Active count unavailable. Trying again shortly.';
+    activeStatus.parentElement?.setAttribute('data-error', '');
+  }
+}
+async function refreshScores(): Promise<void> {
   try {
     const response = await fetch('/api/scores', { headers: { Accept: 'application/json' }, cache: 'no-store' });
     if (!response.ok) throw new Error(String(response.status));
@@ -63,6 +86,9 @@ async function refresh(): Promise<void> {
   }
 }
 
+async function refresh(): Promise<void> {
+  await Promise.all([refreshScores(), refreshActiveUsers()]);
+}
 void refresh();
 window.setInterval(() => { if (!document.hidden) void refresh(); }, REFRESH_MS);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(); });

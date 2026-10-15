@@ -220,7 +220,34 @@ The `/admin` page includes anonymous usage analytics with 24-hour, 7-day,
 started, fresh restarts, play-again runs, resumes, wins/losses, score attempts
 and saved scores, successful sharing and live-page visits. Screen and action
 tables include unique browsers; daily UTC activity, input-device and entry-source
-breakdowns help explain usage. Refresh manually to update the dashboard.
+breakdowns help explain usage. The input-device table also shows game starts and
+the average games played per unique browser that started a game, grouped by
+touch or desktop input. These anonymous browser IDs are not a count of people or
+physical devices. Refresh manually to update the dashboard.
+
+The **Player journey** diagram connects game opens and play sessions to runs,
+menu/pause and resume, win/loss, unfinished runs and server-confirmed score posts.
+Opens and play conversion use correlated tab sessions; later stages use distinct
+started runs. Menu visits can overlap outcomes. Arrows show stage relationships,
+not a chronological clickstream or traffic volume. Only events received within
+the selected period are included. Expand **View journey counts** for the text
+alternative, including score-post attempts.
+
+**Devices playing by hour** shows 12 UTC hourly buckets (the current partial
+hour and previous 11), independently of the selected reporting period. Each
+browser starting a game counts once in that hour, even across multiple tabs or
+replays. Empty hours show zero; these are browser counts, not physical devices
+or identifiable people. Expand **View hourly counts** for exact dates and values.
+
+The public live scores page also shows **Active in the last 15 minutes**:
+unique anonymous browsers with a visible game page during that rolling window.
+Visible game pages send a heartbeat on entry/return and once a minute; hidden
+tabs and the live scores display do not send presence heartbeats. The count
+refreshes every 15 seconds, independently of leaderboard failures. It respects
+analytics opt-out, Do Not Track and Global Privacy Control, so it can undercount.
+Presence stores only a browser UUID and its latest server receipt time, separate
+from analytics events. PostgreSQL shares presence across app instances and removes
+expired records at startup and at most hourly on use; memory mode resets on restart.
 
 Tracking uses a random UUID in localStorage and a tab-session UUID in
 sessionStorage, plus a fresh run UUID for each new game. It does **not** fingerprint

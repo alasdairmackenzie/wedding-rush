@@ -32,6 +32,11 @@ export interface AnalyticsEvent extends AnalyticsContext {
 }
 export interface StoredEvent extends AnalyticsEvent { at: string }
 export interface AnalyticsCount { label: string; count: number; visitors: number; sessions: number }
+export interface AnalyticsDeviceCount extends AnalyticsCount {
+  games: number;
+  gamers: number;
+  averageGamesPerGamer: number;
+}
 export interface AnalyticsEventCount extends AnalyticsCount { name: EventName; target: AnalyticsTarget; runs: number }
 export interface AnalyticsReport {
   days: number;
@@ -40,8 +45,10 @@ export interface AnalyticsReport {
   totals: AnalyticsCount;
   events: AnalyticsEventCount[];
   daily: AnalyticsCount[];
-  devices: AnalyticsCount[];
+  hourlyPlayers: { hour: string; devices: number }[];
+  devices: AnalyticsDeviceCount[];
   sources: AnalyticsCount[];
+  flow: { openedSessions: number; playedSessions: number; menuRuns: number; resumedRuns: number; attemptedRuns: number };
   funnel: { started: number; won: number; lost: number; submitted: number; wonSubmitted: number; lostSubmitted: number; unfinished: number };
 }
 const isRecord = (value: unknown): value is Record<string, unknown> =>

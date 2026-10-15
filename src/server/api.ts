@@ -3,7 +3,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { imageType, isFaceKind, MAX_FACE_BYTES } from '../shared/faces.ts';
 import { cleanName, ENTRY_ID, FULL_RESULTS_SIZE, isRude, LEADERBOARD_SIZE, NAME_MAX, validateSubmission } from '../shared/leaderboard.ts';
 import { ADMIN_LIST_SIZE, type ScoreStore } from './store.ts';
-import { analyticsBatch, isAnalyticsEvent, type AnalyticsEvent } from '../shared/analytics.ts';
+import { ANALYTICS_ID, analyticsBatch, isAnalyticsEvent, type AnalyticsEvent } from '../shared/analytics.ts';
+import { ACTIVE_WINDOW_MS } from '../shared/presence.ts';
 
 const MAX_BODY = 1024;
 const WINDOW_MS = 60_000;
@@ -161,12 +162,17 @@ export function createApi(getStore: () => Promise<ScoreStore>, options: { adminT
     const path = url.pathname;
     const isFaces = path === '/api/faces' || path.startsWith('/api/faces/');
     const isAdmin = path.startsWith('/api/admin/');
-    if (path !== '/api/scores' && path !== '/api/analytics' && !isFaces && !isAdmin) return false;
+    if (path !== '/api/scores' && path !== '/api/analytics' && path !== '/api/presence' && !isFaces && !isAdmin) return false;
     try {
-      if (path === '/api/analytics') {
-        if (req.method !== 'POST') return notAllowed(res, 'POST');
+      if (path === '/api/presence' && req.method === 'GET') {
+        send(res, 200, { activeUsers: await (await getStore()).activeUsers(), windowMinutes: ACTIVE_WINDOW_MS / 60_000 });
+        return true;
+      }
+      if (path === '/api/analytics' || path === '/api/presence') {
+        const isPresence = path === '/api/presence';
+        if (req.method !== 'POST') return notAllowed(res, isPresence ? 'GET, POST' : 'POST');
         if (req.headers['sec-fetch-site'] === 'cross-site') {
-          send(res, 403, { error: 'Analytics must be sent from this site.' });
+          send(res, 403, { error: isPresence ? 'Presence must be sent from this site.' : 'Analytics must be sent from this site.' });
           return true;
         }
         if (!String(req.headers['content-type'] ?? '').startsWith('application/json')) {
@@ -178,15 +184,26 @@ export function createApi(getStore: () => Promise<ScoreStore>, options: { adminT
         const ip = clientIp(req);
         const rate = analyticsPosts.get(ip) ?? { count: 0, until: now + WINDOW_MS };
         if (rate.count >= 300 || analyticsPosts.size >= 5000 && !analyticsPosts.has(ip)) {
-          send(res, 429, { error: 'Too many analytics requests. Try again shortly.' });
+          send(res, 429, { error: isPresence ? 'Too many presence requests. Try again shortly.' : 'Too many analytics requests. Try again shortly.' });
           return true;
         }
         rate.count++;
         analyticsPosts.set(ip, rate);
         let body: unknown;
-        try { body = JSON.parse((await readBytes(req, 16_384)).toString('utf8')); }
+        try { body = JSON.parse((await readBytes(req, isPresence ? MAX_BODY : 16_384)).toString('utf8')); }
         catch (error) {
-          send(res, error instanceof TooLarge ? 413 : 400, { error: 'Analytics request could not be read.' });
+          send(res, error instanceof TooLarge ? 413 : 400, { error: isPresence ? 'Presence request could not be read.' : 'Analytics request could not be read.' });
+          return true;
+        }
+        if (isPresence) {
+          if (typeof body !== 'object' || body === null || Array.isArray(body)
+            || Object.keys(body).length !== 1 || !('visitor' in body)
+            || typeof body.visitor !== 'string' || !ANALYTICS_ID.test(body.visitor)) {
+            send(res, 400, { error: 'Invalid presence.' });
+            return true;
+          }
+          await (await getStore()).recordPresence(body.visitor);
+          send(res, 202, { ok: true });
           return true;
         }
         const events = analyticsBatch(body);

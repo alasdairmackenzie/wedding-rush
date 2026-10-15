@@ -50,6 +50,98 @@ describe('analytics validation and aggregation', () => {
     expect(JSON.stringify(report)).not.toContain('Guest');
   });
 
+  it('averages game starts per gamer browser for each input device', async () => {
+    const store = memoryStore();
+    const desktopRun = randomUUID();
+    const otherDesktopRun = randomUUID();
+    const touchVisitor = randomUUID();
+    const touchRun = randomUUID();
+    const touchEvent = (runId: string) => event('game_start', 'game', {
+      visitor: touchVisitor, session: randomUUID(), run: runId, device: 'touch',
+    });
+    await store.track([
+      event('game_start'),
+      event('game_start', 'game', { run: desktopRun }),
+      event('game_start', 'game', { run: otherDesktopRun, visitor: randomUUID(), session: randomUUID() }),
+      touchEvent(touchRun),
+    ]);
+
+    const report = await store.analytics(7);
+    expect(report.devices.find(device => device.label === 'desktop')).toMatchObject({
+      games: 3, gamers: 2, averageGamesPerGamer: 1.5,
+    });
+    expect(report.devices.find(device => device.label === 'touch')).toMatchObject({
+      games: 1, gamers: 1, averageGamesPerGamer: 1,
+    });
+  });
+
+  it('correlates journey sessions and run stages without counting repeated menu visits or orphan outcomes', async () => {
+    const store = memoryStore();
+    const losingRun = randomUUID();
+    const unfinishedRun = randomUUID();
+    await store.track([
+      event('page_view', 'game', { run: undefined }),
+      event('page_view', 'game', { run: undefined }),
+      event('game_start'),
+      event('screen_view', 'pause'),
+      event('screen_view', 'pause'),
+      event('game_resume', 'play'),
+      event('game_won'),
+      event('score_attempt', 'submit-score'),
+      event('score_attempt', 'submit-score'),
+      event('game_start', 'game', { run: losingRun }),
+      event('game_lost', 'result_lost', { run: losingRun }),
+      event('game_start', 'game', { run: unfinishedRun }),
+      event('screen_view', 'pause', { run: unfinishedRun }),
+      event('page_view', 'game', { run: undefined, session: randomUUID() }),
+      event('page_view', 'live', { run: undefined, session: randomUUID(), page: 'live' }),
+      event('game_won', 'result_won', { run: randomUUID() }),
+    ]);
+    await store.add({ name: 'Guest', score: 10, squashed: 0, won: true }, event('score_saved', 'submit-score'));
+    await store.add({ name: 'Guest', score: 5, squashed: 0, won: false },
+      event('score_saved', 'submit-score', { run: losingRun }));
+    const report = await store.analytics(7);
+    expect(report.flow).toEqual({
+      openedSessions: 2, playedSessions: 1, menuRuns: 2, resumedRuns: 1, attemptedRuns: 1,
+    });
+    expect(report.funnel).toMatchObject({
+      started: 3, won: 1, lost: 1, unfinished: 1, wonSubmitted: 1, lostSubmitted: 1, submitted: 2,
+    });
+    expect((await memoryStore().analytics(7)).flow).toEqual({
+      openedSessions: 0, playedSessions: 0, menuRuns: 0, resumedRuns: 0, attemptedRuns: 0,
+    });
+  });
+
+  it('returns twelve UTC hourly browser counts, deduplicating plays and filling empty hours across midnight', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = memoryStore();
+      vi.setSystemTime(new Date('2026-10-14T13:59:59Z'));
+      await store.track([event('game_start')]);
+      vi.setSystemTime(new Date('2026-10-14T14:00:00Z'));
+      await store.track([event('game_start')]);
+      vi.setSystemTime(new Date('2026-10-15T00:59:59Z'));
+      await store.track([
+        event('game_start'), event('game_start', 'game', { run: randomUUID(), session: randomUUID() }),
+        event('game_start', 'game', { visitor: randomUUID() }),
+        event('page_view', 'game', { visitor: randomUUID(), run: undefined }),
+        event('page_view', 'live', { visitor: randomUUID(), run: undefined, page: 'live' }),
+      ]);
+      vi.setSystemTime(new Date('2026-10-15T01:00:00Z'));
+      await store.track([event('game_start')]);
+      vi.setSystemTime(new Date('2026-10-15T01:30:00Z'));
+      const report = await store.analytics(1);
+      expect(report.hourlyPlayers).toHaveLength(12);
+      expect(report.hourlyPlayers[0]).toEqual({ hour: '2026-10-14T14:00:00.000Z', devices: 1 });
+      expect(report.hourlyPlayers[1]).toEqual({ hour: '2026-10-14T15:00:00.000Z', devices: 0 });
+      expect(report.hourlyPlayers[10]).toEqual({ hour: '2026-10-15T00:00:00.000Z', devices: 2 });
+      expect(report.hourlyPlayers[11]).toEqual({ hour: '2026-10-15T01:00:00.000Z', devices: 1 });
+      expect((await store.analytics(30)).hourlyPlayers).toEqual(report.hourlyPlayers);
+      expect((await memoryStore().analytics(7)).hourlyPlayers).toHaveLength(12);
+      expect((await memoryStore().analytics(7)).hourlyPlayers.every(row => row.devices === 0)).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('filters by server receipt time and removes events older than 90 days', async () => {
     vi.useFakeTimers();
     try {

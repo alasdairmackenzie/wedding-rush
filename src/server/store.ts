@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { LEADERBOARD_SIZE, type RankedEntry, type ScoreEntry, type ScoreSubmission } from '../shared/leaderboard.ts';
 import { ANALYTICS_RETENTION_DAYS, type AnalyticsEvent, type AnalyticsReport, type StoredEvent } from '../shared/analytics.ts';
 import { summarize } from './analytics.ts';
+import { ACTIVE_WINDOW_MS } from '../shared/presence.ts';
 
 export interface Face { mime: string; data: Buffer; version: number }
 export interface ScoreStore {
@@ -10,6 +11,8 @@ export interface ScoreStore {
   add(entry: ScoreSubmission, analytics?: AnalyticsEvent): Promise<RankedEntry>;
   track(events: AnalyticsEvent[]): Promise<void>;
   analytics(days: number): Promise<AnalyticsReport>;
+  recordPresence(visitor: string): Promise<void>;
+  activeUsers(): Promise<number>;
   find(id: string): Promise<RankedEntry | undefined>;
   rename(id: string, name: string): Promise<boolean>;
   remove(id: string): Promise<boolean>;
@@ -31,6 +34,11 @@ export function memoryStore(): ScoreStore {
   const entries: ScoreEntry[] = [];
   const faces = new Map<string, Face>();
   const events = new Map<string, StoredEvent>();
+  const presence = new Map<string, number>();
+  const prunePresence = () => {
+    const cutoff = Date.now() - ACTIVE_WINDOW_MS;
+    for (const [visitor, at] of presence) if (at <= cutoff) presence.delete(visitor);
+  };
   const prune = () => {
     const cutoff = Date.now() - ANALYTICS_RETENTION_DAYS * 86400_000;
     for (const [id, event] of events) if (Date.parse(event.at) < cutoff) events.delete(id);
@@ -40,6 +48,14 @@ export function memoryStore(): ScoreStore {
     return index < 0 ? undefined : { ...entries[index], rank: index + 1 };
   };
   return {
+    async recordPresence(visitor) {
+      prunePresence();
+      presence.set(visitor, Date.now());
+    },
+    async activeUsers() {
+      prunePresence();
+      return presence.size;
+    },
     async top(limit = LEADERBOARD_SIZE) {
       return entries.slice(0, limit);
     },
@@ -137,6 +153,11 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   await pool.query('CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_events_time ON analytics_events (created_at)');
+  await pool.query(`CREATE TABLE IF NOT EXISTS game_presence (
+    visitor UUID PRIMARY KEY,
+    last_seen TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query('CREATE INDEX IF NOT EXISTS game_presence_time ON game_presence (last_seen)');
   const insertEvents = async (batch: AnalyticsEvent[], query: Pool['query']) => {
     await query(`INSERT INTO analytics_events (id, visitor, session, run, name, target, page, device, source)
       SELECT id, visitor, session, run, name, target, page, device, source
@@ -148,6 +169,7 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
   const prune = async () => {
     if (Date.now() - lastPrune < 3600_000) return;
     await pool.query("DELETE FROM analytics_events WHERE created_at < now() - interval '90 days'");
+    await pool.query("DELETE FROM game_presence WHERE last_seen <= now() - $1::int * interval '1 millisecond'", [ACTIVE_WINDOW_MS]);
     lastPrune = Date.now();
   };
   await prune();
@@ -156,6 +178,19 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
     return rows[0] && { ...toEntry(rows[0]), rank: Number(rows[0].rank) };
   };
   return {
+    async recordPresence(visitor) {
+      await prune();
+      await pool.query(`INSERT INTO game_presence (visitor, last_seen) VALUES ($1, now())
+        ON CONFLICT (visitor) DO UPDATE SET last_seen = EXCLUDED.last_seen`, [visitor]);
+    },
+    async activeUsers() {
+      await prune();
+      const { rows } = await pool.query<{ count: number }>(
+        "SELECT count(*)::int AS count FROM game_presence WHERE last_seen > now() - $1::int * interval '1 millisecond'",
+        [ACTIVE_WINDOW_MS],
+      );
+      return rows[0].count;
+    },
     async track(batch) {
       await prune();
       await insertEvents(batch, pool.query.bind(pool));
@@ -173,19 +208,57 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
             count(DISTINCT session)::int AS sessions,
             count(DISTINCT (visitor, run)) FILTER (WHERE run IS NOT NULL)::int AS runs
           FROM filtered GROUP BY GROUPING SETS ((), (name, target), (day), (device), (source))
+        ), device_games AS (
+          SELECT device,
+            count(DISTINCT (visitor, run)) FILTER (WHERE name = 'game_start')::int AS games,
+            count(DISTINCT visitor) FILTER (WHERE name = 'game_start')::int AS gamers
+          FROM filtered GROUP BY device
         ), runs AS (
           SELECT visitor, run, bool_or(name = 'game_start') AS started,
             bool_or(name = 'game_won') AS won, bool_or(name = 'game_lost') AS lost,
-            bool_or(name = 'score_saved') AS submitted
+            bool_or(name = 'score_saved') AS submitted,
+            bool_or(name = 'screen_view' AND target = 'pause') AS menu,
+            bool_or(name = 'game_resume') AS resumed,
+            bool_or(name = 'score_attempt') AS attempted
           FROM filtered WHERE run IS NOT NULL GROUP BY visitor, run
+        ), sessions AS (
+          SELECT visitor, session,
+            bool_or(name = 'page_view' AND page = 'game' AND target = 'game') AS opened,
+            bool_or(name = 'game_start') AS played
+          FROM filtered GROUP BY visitor, session
+        ), hours AS (
+          SELECT generate_series(
+            date_trunc('hour', $3::timestamptz AT TIME ZONE 'UTC') - interval '11 hours',
+            date_trunc('hour', $3::timestamptz AT TIME ZONE 'UTC'), interval '1 hour') AS hour
+        ), hourly_players AS (
+          SELECT hours.hour, count(DISTINCT filtered.visitor)::int AS devices
+          FROM hours LEFT JOIN filtered ON filtered.name = 'game_start' AND filtered.page = 'game'
+            AND filtered.created_at AT TIME ZONE 'UTC' >= hours.hour
+            AND filtered.created_at AT TIME ZONE 'UTC' < hours.hour + interval '1 hour'
+          GROUP BY hours.hour
         )
         SELECT jsonb_build_object(
           'days', $2::int, 'since', $1::text, 'storage', 'postgres',
           'totals', (SELECT jsonb_build_object('label', 'All activity', 'count', count, 'visitors', visitors, 'sessions', sessions) FROM grouped WHERE kind = 15),
           'events', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', target, 'name', name, 'target', target, 'count', count, 'visitors', visitors, 'sessions', sessions, 'runs', runs) ORDER BY name, target) FROM grouped WHERE kind = 7), '[]'::jsonb),
           'daily', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', day, 'count', count, 'visitors', visitors, 'sessions', sessions) ORDER BY day) FROM grouped WHERE kind = 11), '[]'::jsonb),
-          'devices', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', device, 'count', count, 'visitors', visitors, 'sessions', sessions) ORDER BY count DESC) FROM grouped WHERE kind = 13), '[]'::jsonb),
+          'hourlyPlayers', (SELECT jsonb_agg(jsonb_build_object(
+            'hour', to_char(hour, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'devices', devices) ORDER BY hour) FROM hourly_players),
+          'devices', COALESCE((SELECT jsonb_agg(jsonb_build_object(
+            'label', grouped.device, 'count', grouped.count, 'visitors', grouped.visitors, 'sessions', grouped.sessions,
+            'games', COALESCE(device_games.games, 0), 'gamers', COALESCE(device_games.gamers, 0),
+            'averageGamesPerGamer', CASE WHEN COALESCE(device_games.gamers, 0) > 0
+              THEN device_games.games::numeric / device_games.gamers ELSE 0 END
+          ) ORDER BY grouped.count DESC)
+            FROM grouped LEFT JOIN device_games ON device_games.device = grouped.device
+            WHERE grouped.kind = 13), '[]'::jsonb),
           'sources', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', source, 'count', count, 'visitors', visitors, 'sessions', sessions) ORDER BY count DESC) FROM grouped WHERE kind = 14), '[]'::jsonb),
+          'flow', jsonb_build_object(
+            'openedSessions', (SELECT count(*) FROM sessions WHERE opened),
+            'playedSessions', (SELECT count(*) FROM sessions WHERE opened AND played),
+            'menuRuns', (SELECT count(*) FROM runs WHERE started AND menu),
+            'resumedRuns', (SELECT count(*) FROM runs WHERE started AND menu AND resumed),
+            'attemptedRuns', (SELECT count(*) FROM runs WHERE started AND attempted)),
           'funnel', (SELECT jsonb_build_object(
             'started', count(*) FILTER (WHERE started),
             'won', count(*) FILTER (WHERE started AND won),
@@ -194,7 +267,7 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
             'wonSubmitted', count(*) FILTER (WHERE started AND won AND submitted),
             'lostSubmitted', count(*) FILTER (WHERE started AND lost AND submitted),
             'unfinished', count(*) FILTER (WHERE started AND NOT won AND NOT lost)) FROM runs)
-        ) AS report`, [since, days]);
+        ) AS report`, [since, days, new Date().toISOString()]);
       return rows[0].report;
     },
     async top(limit = LEADERBOARD_SIZE) {
