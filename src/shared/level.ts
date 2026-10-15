@@ -91,8 +91,21 @@ const sweetPositions = [
   ...[0, 2, 5].map(after => ({ x: hurdles[after + 1].x - 350, y: 450 })),
   { x: (people[0].x + hurdles[1].x - 350) / 2, y: 450 },
 ];
-export const sweets = sweetPositions.map((position, index) => ({ ...position, value: index % 6 + 1 }));
-export const TOTAL_SCORE = sweets.reduce((total, sweet) => total + sweet.value, 0);
+export const sweets = sweetPositions;
+export const MIN_SWEET_SCORE = 90;
+export const MAX_SWEET_SCORE = sweets.length * 6;
+
+function rollSweetValues(random: () => number): number[] {
+  const total = MIN_SWEET_SCORE + Math.floor(random() * (MAX_SWEET_SCORE - MIN_SWEET_SCORE + 1));
+  const values = sweets.map(() => 1);
+  const available = values.map((_value, id) => id);
+  for (let remaining = total - values.length; remaining > 0; remaining--) {
+    const index = Math.floor(random() * available.length);
+    const id = available[index];
+    if (++values[id] === 6) available.splice(index, 1);
+  }
+  return values;
+}
 
 export function runnerSpeed(x: number): number {
   const progress = Math.min(1, Math.max(0, (x - START.x) / (BRIDE.x - START.x)));
@@ -126,7 +139,12 @@ export class Run {
   comboScore = 0;
   hatCollected = false;
 
-  get sweetScore(): number { return [...this.collected].reduce((sum, id) => sum + sweets[id].value, 0); }
+  readonly sweetValues: readonly number[];
+  constructor(random: () => number = Math.random) {
+    this.sweetValues = Object.freeze(rollSweetValues(random));
+  }
+  get totalSweetScore(): number { return this.sweetValues.reduce((sum, value) => sum + value, 0); }
+  get sweetScore(): number { return [...this.collected].reduce((sum, id) => sum + this.sweetValues[id], 0); }
   get bonusScore(): number { return this.squashed.size * SQUASH_BONUS; }
   get ringScore(): number { return this.rings.size * RING_VALUE; }
   get hatScore(): number { return this.hatCollected ? BUCKET_HAT_VALUE : 0; }
@@ -168,7 +186,7 @@ export class Run {
   collect(id: number): boolean {
     if (this.phase !== 'playing' || !Number.isInteger(id) || id < 0 || id >= sweets.length || this.collected.has(id)) return false;
     this.collected.add(id);
-    this.earn(sweets[id].value);
+    this.earn(this.sweetValues[id]);
     return true;
   }
   hitHurdle(id: number): boolean {
@@ -236,7 +254,7 @@ export class Run {
   }
 }
 
-export const MAX_SCORE = (TOTAL_SCORE + SQUASH_BONUS * people.length + RING_VALUE * rings.length) * MAX_COMBO
+export const MAX_SCORE = (MAX_SWEET_SCORE + SQUASH_BONUS * people.length + RING_VALUE * rings.length) * MAX_COMBO
   + BUCKET_HAT_VALUE + NEAR_MISS_VALUE * movers.length;
 
 export function runChallenges(run: Run) {

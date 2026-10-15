@@ -35,7 +35,9 @@ test('runs automatically, collects exact sweet values, pauses and resets', async
   await page.getByRole('button', { name: "I'm coming!" }).click();
   await expect(page.locator('#notice')).toHaveText(RUN_OBJECTIVE);
   await page.waitForFunction(() => Number(document.getElementById('game')?.dataset.x) >= 280);
-  await expect(page.locator('#score')).toHaveText('3 points');
+  await exposeScene(page);
+  const starterPoints = await page.evaluate<number>('window.__scene.run.sweetValues[0] + window.__scene.run.sweetValues[1]');
+  await expect(page.locator('#score')).toHaveText(`${starterPoints} points`);
   await expect(page.locator('#game')).toHaveAttribute('data-collected', '2');
   await page.keyboard.press('Escape');
   await expect(page.locator('#game')).toHaveAttribute('data-phase', 'paused');
@@ -101,6 +103,39 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
 }
 
 for (const width of [1280, 390]) {
+  test(`random dice faces match scoring, persist on resume and reset on replay at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await start(page);
+    await exposeScene(page);
+    const readDice = () => page.evaluate<{ values: number[]; textures: string[]; total: number }>(`(() => {
+      const scene = window.__scene;
+      return { values: [...scene.run.sweetValues], textures: scene.pickups.getChildren().map(p => p.texture.key), total: scene.run.totalSweetScore };
+    })()`);
+    const initial = await readDice();
+    expect(initial.values).toHaveLength(27);
+    expect(initial.total).toBeGreaterThanOrEqual(90);
+    expect(initial.total).toBeLessThanOrEqual(162);
+    expect(initial.textures).toEqual(initial.values.map(value => `sweet-${value}`));
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Back to Becky' }).click();
+    expect(await readDice()).toEqual(initial);
+    await page.keyboard.press('Escape');
+    await page.evaluate('window.__previousDiceRun = window.__scene.run');
+    await page.getByRole('button', { name: 'Start a fresh run' }).click();
+    expect(await page.evaluate('window.__previousDiceRun !== window.__scene.run')).toBe(true);
+    const replay = await readDice();
+    expect(replay.total).toBeGreaterThanOrEqual(90);
+    expect(replay.total).toBeLessThanOrEqual(162);
+    expect(replay.textures).toEqual(replay.values.map(value => `sweet-${value}`));
+    await teleport(page, BRIDE.x - 50);
+    await expect(page.locator('#result')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#result-detail')).toContainText(` / ${replay.total} sweet points`);
+    await page.getByRole('button', { name: 'One more big day', exact: false }).click();
+    expect(await page.evaluate('window.__scene.run.collected.size')).toBe(0);
+    const next = await readDice();
+    expect(next.textures).toEqual(next.values.map(value => `sweet-${value}`));
+  });
+
   test(`extra gap dice score normally on a full jump and reset on replay at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await start(page);
@@ -114,8 +149,9 @@ for (const width of [1280, 390]) {
         `(() => { const run = window.__scene.run; return { score: run.score, multiplier: run.multiplier, lives: run.lives }; })()`);
       await page.keyboard.press('Space');
       await expect.poll(() => page.evaluate<boolean>(`window.__scene.run.collected.has(${id})`)).toBe(true);
-      expect(await page.evaluate<number>('window.__scene.run.score')).toBe(before.score + sweets[id].value * before.multiplier);
-      await expect(page.locator('#score')).toHaveText(`${before.score + sweets[id].value * before.multiplier} points`);
+      const value = await page.evaluate<number>(`window.__scene.run.sweetValues[${id}]`);
+      expect(await page.evaluate<number>('window.__scene.run.score')).toBe(before.score + value * before.multiplier);
+      await expect(page.locator('#score')).toHaveText(`${before.score + value * before.multiplier} points`);
       expect(await page.evaluate<number>('window.__scene.run.lives')).toBe(before.lives);
       expect(await page.evaluate<boolean>(`window.__scene.pickups.getChildren()[${id}].active`)).toBe(false);
     }
@@ -139,7 +175,8 @@ test('both dice before the dealer are collectible on consecutive full jumps', as
     await expect.poll(() => page.evaluate<boolean>(`window.__scene.run.collected.has(${id})`)).toBe(true);
     await page.waitForFunction(() => document.getElementById('game')?.dataset.grounded === 'true');
   }
-  await expect(page.locator('#score')).toHaveText(`${ids.reduce((sum, id) => sum + sweets[id].value, 0)} points`);
+  const points = await page.evaluate<number>(`[${ids}].reduce((sum, id) => sum + window.__scene.run.sweetValues[id], 0)`);
+  await expect(page.locator('#score')).toHaveText(`${points} points`);
   await expect(page.locator('#lives')).toHaveText('3 / 3');
 });
 

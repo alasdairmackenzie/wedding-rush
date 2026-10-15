@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { beckyTexts, BRIDE, BUCKET_HAT, BUCKET_HAT_VALUE, concentrates, CONCENTRATE_DURATION, corks, daylightProgress, GROOM, hurdles, MAX_SCORE, movers, moverStart, MOVER_TRIGGER, people,
-  isNearMiss, NEAR_MISS_GAP, NEAR_MISS_VALUE, platforms, rings, RING_VALUE, Run, runChallenges, runnerSpeed, runTitle, START, sweets, temptations, TOTAL_SCORE, WORLD } from './level';
+  isNearMiss, MIN_SWEET_SCORE, MAX_SWEET_SCORE, NEAR_MISS_GAP, NEAR_MISS_VALUE, platforms, rings, RING_VALUE, Run, runChallenges, runnerSpeed, runTitle, START, sweets, temptations, WORLD } from './level';
 
 function playing(): Run { const run = new Run(); run.phase = 'playing'; return run; }
 
@@ -41,14 +41,15 @@ describe('dice sweets', () => {
     expect(people[1].x).toBe(3500);
     const newDie = sweets.at(-1)!;
     const nextDie = sweets[2 + hurdles.length * 3];
-    expect(newDie).toMatchObject({ x: 2225, y: 450, value: 3 });
+    expect(newDie).toMatchObject({ x: 2225, y: 450 });
     expect(newDie.x - people[0].x).toBe(375);
     expect(nextDie.x - newDie.x).toBe(375);
     expect((nextDie.x - newDie.x) / runnerSpeed(nextDie.x)).toBeGreaterThan(2 * GROOM.jump / GROOM.gravity + .2);
     expect(400 / runnerSpeed(people[1].x)).toBeGreaterThan(1);
     expect(hurdles[2].x - hurdles[1].x).toBe(1900);
     expect(sweets).toHaveLength(27);
-    expect(TOTAL_SCORE).toBe(90);
+    expect(MIN_SWEET_SCORE).toBe(90);
+    expect(MAX_SWEET_SCORE).toBe(162);
   });
   it('adds each exact face value once and resets on replay', () => {
     const run = playing();
@@ -56,9 +57,9 @@ describe('dice sweets', () => {
       expect(run.collect(id)).toBe(true);
       expect(run.collect(id)).toBe(false);
     }
-    expect(run.score).toBe(21);
+    expect(run.score).toBe(run.sweetValues.slice(0, 6).reduce((sum, value) => sum + value, 0));
     for (let id = 6; id < sweets.length; id++) run.collect(id);
-    expect(run.score).toBe(TOTAL_SCORE);
+    expect(run.score).toBe(run.totalSweetScore);
     expect(new Run().score).toBe(0);
   });
   it('rejects invalid pickups and collections outside play', () => {
@@ -69,7 +70,35 @@ describe('dice sweets', () => {
       expect(run.collect(0)).toBe(false);
     }
     expect(run.score).toBe(0);
-    expect(new Set(sweets.map(sweet => sweet.value))).toEqual(new Set([1, 2, 3, 4, 5, 6]));
+  });
+  it('rolls valid faces for every possible total, including 90 and 162', () => {
+    for (let total = MIN_SWEET_SCORE; total <= MAX_SWEET_SCORE; total++) {
+      let first = true;
+      const run = new Run(() => {
+        if (first) {
+          first = false;
+          return (total - MIN_SWEET_SCORE + .5) / (MAX_SWEET_SCORE - MIN_SWEET_SCORE + 1);
+        }
+        return .42;
+      });
+      expect(run.sweetValues).toHaveLength(sweets.length);
+      expect(run.sweetValues.every(value => Number.isInteger(value) && value >= 1 && value <= 6)).toBe(true);
+      expect(run.totalSweetScore).toBe(total);
+    }
+    expect(new Run(() => 0).totalSweetScore).toBe(90);
+    expect(new Run(() => .999999).totalSweetScore).toBe(162);
+  });
+  it('keeps a run stable through pause and resume and rolls independent fresh runs', () => {
+    const low = new Run(() => 0);
+    const high = new Run(() => .999999);
+    const original = [...low.sweetValues];
+    low.phase = 'paused';
+    low.tick(1000);
+    low.phase = 'playing';
+    low.collect(0);
+    expect(low.sweetValues).toEqual(original);
+    expect(high.sweetValues).not.toEqual(original);
+    expect(Object.isFrozen(low.sweetValues)).toBe(true);
   });
 });
 
@@ -85,7 +114,7 @@ describe('hurdle runner rules', () => {
     }
     expect(run.phase).toBe('late');
     expect(run.distractions).toBe(3);
-    expect(run.score).toBe(1);
+    expect(run.score).toBe(run.sweetValues[0]);
     expect(run.hitHurdle(3)).toBe(false);
     expect(run.finish()).toBe(false);
     const fresh = new Run();
@@ -187,12 +216,12 @@ describe('independent people', () => {
       expect(run.squashPerson(id)).toBe(true);
       expect(run.squashPerson(id)).toBe(false);
       expect(run.bonusScore).toBe((id + 1) * 5);
-      expect(run.score).toBe(3 + (id + 1) * 5 + run.comboScore);
+      expect(run.score).toBe(run.sweetValues[0] + run.sweetValues[1] + (id + 1) * 5 + run.comboScore);
     });
-    expect(run.sweetScore).toBe(3);
+    expect(run.sweetScore).toBe(run.sweetValues[0] + run.sweetValues[1]);
     // Squashes 4-6 land at ×2 (+5 each) and the seventh at ×3 (+10).
     expect(run.comboScore).toBe(25);
-    expect(run.score).toBe(63);
+    expect(run.score).toBe(run.sweetScore + 60);
     const fresh = new Run();
     expect(fresh.bonusScore).toBe(0);
     expect(fresh.score).toBe(0);
@@ -415,9 +444,9 @@ describe('combo, rings and titles', () => {
     run.clearHurdle(0); run.squashPerson(0); run.dodgeMover(0);
     expect(run.multiplier).toBe(2);
     run.collect(5);
-    expect(run.sweetScore).toBe(6);
-    expect(run.comboScore).toBe(6);
-    expect(run.score).toBe(5 + 6 + 6);
+    expect(run.sweetScore).toBe(run.sweetValues[5]);
+    expect(run.comboScore).toBe(run.sweetValues[5]);
+    expect(run.score).toBe(5 + 2 * run.sweetValues[5]);
     run.clearHurdle(1); run.clearHurdle(2); run.clearHurdle(3);
     expect(run.multiplier).toBe(3);
     run.clearHurdle(4); run.clearHurdle(5); run.clearHurdle(6);
@@ -439,7 +468,8 @@ describe('combo, rings and titles', () => {
     expect(run.collectRing(rings.length)).toBe(false);
   });
   it('caps the maximum possible score for the leaderboard', () => {
-    const run = playing();
+    const run = new Run(() => .999999);
+    run.phase = 'playing';
     for (let id = 0; id < hurdles.length; id++) run.clearHurdle(id);
     for (let id = 0; id < movers.length; id++) run.dodgeMover(id, true);
     people.forEach((_p, id) => run.squashPerson(id));
@@ -447,6 +477,7 @@ describe('combo, rings and titles', () => {
     sweets.forEach((_s, id) => run.collect(id));
     run.collectHat();
     expect(run.score).toBeLessThanOrEqual(MAX_SCORE);
+    expect(MAX_SCORE).toBe(886);
   });
   it('names the result after the most memorable thing that happened', () => {
     const run = playing();

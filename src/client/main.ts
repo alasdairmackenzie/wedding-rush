@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import QRCode from 'qrcode';
-import { BRIDE, GROOM, hurdles, people, rings, Run, runChallenges, runnerSpeed, runTitle, START, TOTAL_SCORE } from '../shared/level';
+import { BRIDE, GROOM, hurdles, people, rings, Run, runChallenges, runnerSpeed, runTitle, START } from '../shared/level';
 import { cleanName, ENTRY_ID, FULL_RESULTS_SIZE, isRude, NAME_MAX, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
 import { WeddingScene } from './scene';
 import { GameAudio, type MusicMode } from './audio';
@@ -374,7 +374,7 @@ const wedding = new WeddingScene({
     const stats: [string, string, boolean?][] = [
       ['🏆', `${run.score} total points`, true],
       ['♥', `${run.lives}/3 lives left`],
-      ['🍬', `${run.sweetScore} / ${TOTAL_SCORE} sweet points + ${run.bonusScore} squash bonus${run.comboScore ? ` + ${run.comboScore} combo` : ''}`],
+      ['🍬', `${run.sweetScore} / ${run.totalSweetScore} sweet points + ${run.bonusScore} squash bonus${run.comboScore ? ` + ${run.comboScore} combo` : ''}`],
       ['🚧', `${run.cleared.size} / ${hurdles.length} hurdles cleared`],
       ['💥', `${run.squashed.size} / ${people.length} mates squashed`],
       ['💍', `${run.rings.size} / ${rings.length} rings`],

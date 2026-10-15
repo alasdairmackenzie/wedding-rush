@@ -103,6 +103,10 @@ character's line waits until the intro finishes. Later encounter spacing stays u
   Results show sweet points and squash bonuses separately.
   There is no steering, platform climbing, gap jumping or checkpoint system.
 - Optional dice sweets score their face value, from **1 to 6**.
+  Each fresh run rolls new faces with a uniformly chosen combined base total
+  of **90–162 points** across the 27 dice. Pausing/resuming keeps the same faces;
+  restarting or replaying rolls again. Combo multipliers still apply, so leaderboard
+  scores now reflect luck as well as skill. Results show that run's available sweet total.
   Three extra dice sit in selected gaps between characters at normal jump height,
   with 350 pixels before the next hurdle. They award face-value points with the normal combo multiplier.
   An extra 400 pixels before the dealer's hurdle gives roughly 1.2 seconds more

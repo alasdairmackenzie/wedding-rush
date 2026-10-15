@@ -136,7 +136,7 @@ export class WeddingScene extends Phaser.Scene {
     this.physics.add.collider(this.player, ground);
     this.pickups = this.physics.add.staticGroup();
     sweets.forEach((sweet, id) => {
-      const pickup = this.pickups.create(sweet.x, sweet.y, `sweet-${sweet.value}`);
+      const pickup = this.pickups.create(sweet.x, sweet.y, `sweet-${this.run.sweetValues[id]}`);
       if (!(pickup instanceof Phaser.Physics.Arcade.Sprite)) throw new Error('Could not create a sweet.');
       pickup.setData('sweetId', id);
     });
@@ -147,8 +147,8 @@ export class WeddingScene extends Phaser.Scene {
         pickup.disableBody(true, true);
         this.ui.audio.tone('sweet');
         this.ui.audio.effect('dice');
-        this.floatText(pickup.x, pickup.y - 25, `+${sweets[id].value}`, '#42735a');
-        this.announceEvent('SWEET!', `+${sweets[id].value} POINTS`, '#d68b25');
+        this.floatText(pickup.x, pickup.y - 25, `+${this.run.sweetValues[id]}`, '#42735a');
+        this.announceEvent('SWEET!', `+${this.run.sweetValues[id]} POINTS`, '#d68b25');
         this.ui.update(this.run, this.player.x);
       }
     });
@@ -284,7 +284,10 @@ export class WeddingScene extends Phaser.Scene {
       this.effects.clear(true, true);
       this.eventOverlay = undefined;
       this.pickups.children.each(child => {
-        if (child instanceof Phaser.Physics.Arcade.Sprite) child.enableBody(false, 0, 0, true, true);
+        if (child instanceof Phaser.Physics.Arcade.Sprite) {
+          child.setTexture(`sweet-${this.run.sweetValues[child.getData('sweetId')]}`);
+          child.enableBody(false, 0, 0, true, true);
+        }
         return true;
       });
       this.obstacles.forEach(obstacle => {
