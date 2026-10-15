@@ -1782,6 +1782,22 @@ test('a direct top list link has a menu return path', async ({ page }) => {
   await expect(page).toHaveURL(/\/$/);
 });
 
+test('footer and share navigation cannot interrupt the wedding celebration', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 844 });
+  await start(page);
+  await exposeScene(page);
+  await teleport(page, BRIDE.x - 50);
+  await expect(page.locator('#game')).toHaveAttribute('data-celebrating', 'true');
+  await page.locator('footer').getByRole('link', { name: 'Live scores' }).click();
+  await page.locator('#header-share-button').click();
+  await expect(page.locator('#top-list')).toBeHidden();
+  await expect(page.locator('#share-modal')).toBeHidden();
+  await expect(page.locator('#result')).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'One more big day' }).click();
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+});
+
 test('plays recorded effects for corks, rings, pigeons, texts and hits', async ({ page }) => {
   await start(page);
   await exposeScene(page);
