@@ -34,7 +34,8 @@ a password when you start the server, for example
 - `/live` is a top list for a TV or projector at the venue. It
   shows the address to play at, has a **Back to game** link and refreshes every 15 seconds.
   Add `?url=seanandbeckywedding.run` to override the address it shows.
-  The home menu footer's **Live scores** link opens an auto-refreshing list
+  The home menu footer places **Share WeddingRush with friends** and **Live scores** side by side.
+  Its **Live scores** link opens an auto-refreshing list
   in the game, so returning to the menu preserves a paused run or completed result.
 - `/admin` lets you upload faces for Becky and the mates, and rename or delete
   scores. Sign in with the `ADMIN_TOKEN` password; without it the admin page is
