@@ -4,6 +4,7 @@ import { beckyTexts, BRIDE, BUCKET_HAT, BUCKET_HAT_VALUE, concentrates, corks, d
   RING_VALUE, rings, Run, RUN_OBJECTIVE, runnerSpeed, SQUASH_BONUS, START, sweets, WORLD } from '../shared/level';
 import { drawCity, makeTextures } from './art';
 import { RunnerInput } from './input';
+import { MAX_REPLAY_DURATION, REPLAY_INTERVAL, replayMask, type Replay, type ReplayFrame } from '../shared/replay';
 import { GameAudio } from './audio';
 import groomPhotoUrl from '../assets/art/groom-photo.png';
 import groomPhotoAltUrl from '../assets/art/groom-photo-alt.png';
@@ -80,6 +81,40 @@ export class WeddingScene extends Phaser.Scene {
   private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   private discoMode = false;
   private discoSparkleTimer = 0;
+  private replayFrames: ReplayFrame[] = [];
+  private replayOverflow = false;
+
+  recordedReplay(): Replay | undefined {
+    if (this.replayOverflow || this.replayFrames.length < 2 ||
+      (this.run.phase !== 'won' && this.run.phase !== 'late')) return undefined;
+    return { version: 1, dice: [...this.run.sweetValues], won: this.run.phase === 'won',
+      frames: this.replayFrames.map(frame => [...frame]) };
+  }
+
+  private recordFrame(final = false): void {
+    const time = Math.round(this.run.elapsed);
+    if (time > MAX_REPLAY_DURATION) {
+      this.replayOverflow = true;
+      this.replayFrames = [];
+      return;
+    }
+    if (this.replayOverflow) return;
+    const previous = this.replayFrames.at(-1);
+    if (previous && !final && time - previous[0] < REPLAY_INTERVAL) return;
+    const flags = Number(this.ducking) | Number(this.run.hatCollected) << 1 |
+      Number(!this.player.body?.blocked.down) << 2 | Number(this.run.concentrateRemaining > 0) << 3 |
+      Number(this.discoMode) << 4;
+    const frame: ReplayFrame = [
+      time, Math.round(this.player.x * 10) / 10, Math.round(this.player.y * 10) / 10,
+      this.run.score, this.run.lives, this.run.multiplier, flags,
+      replayMask(this.run.collected), replayMask(this.run.squashed), replayMask(this.run.hit),
+      replayMask(this.run.cleared), replayMask(this.run.hitPeople) | replayMask(this.run.passedPeople), replayMask(this.run.rings),
+      replayMask(this.run.corks), replayMask(this.run.concentrates),
+      ...this.moving.map(mover => Math.round(mover.x * 10) / 10) as [number, number, number, number],
+    ];
+    if (previous?.[0] === time) this.replayFrames[this.replayFrames.length - 1] = frame;
+    else this.replayFrames.push(frame);
+  }
 
   constructor(private readonly ui: GameUI) { super('wedding'); }
 
@@ -321,10 +356,13 @@ export class WeddingScene extends Phaser.Scene {
       this.invulnerableUntil = 0;
     }
     if (newRun) {
+      this.replayFrames = [];
+      this.replayOverflow = false;
       this.setPlayerPhoto('groom-photo');
       this.player.setVelocity(0);
       this.groundedAt = this.jumpUntil = -1000;
       this.doubleJumped = false;
+      this.recordFrame();
     }
     this.run.phase = 'playing';
     this.physics.resume();
@@ -517,6 +555,7 @@ export class WeddingScene extends Phaser.Scene {
     this.syncUI();
   }
   private end(): void {
+    this.recordFrame(true);
     this.player.setVelocity(0);
     this.physics.pause();
     this.ui.audio.finish(this.run.phase === 'won');
@@ -637,6 +676,7 @@ export class WeddingScene extends Phaser.Scene {
       });
       if (this.player.x >= BRIDE.x - 54 && this.run.finish()) this.end();
       this.syncUI();
+      if (this.run.phase === 'playing') this.recordFrame();
     }
     if (this.run.phase === 'playing') {
       const body = this.player.body;

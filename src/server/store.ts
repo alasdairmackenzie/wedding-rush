@@ -4,11 +4,13 @@ import { LEADERBOARD_SIZE, type RankedEntry, type ScoreEntry, type ScoreSubmissi
 import { ANALYTICS_RETENTION_DAYS, type AnalyticsEvent, type AnalyticsReport, type StoredEvent } from '../shared/analytics.ts';
 import { summarize } from './analytics.ts';
 import { ACTIVE_WINDOW_MS } from '../shared/presence.ts';
+import type { Replay } from '../shared/replay.ts';
 
 export interface Face { mime: string; data: Buffer; version: number }
 export interface ScoreStore {
   top(limit?: number, uniqueNames?: boolean): Promise<ScoreEntry[]>;
-  add(entry: ScoreSubmission, analytics?: AnalyticsEvent): Promise<RankedEntry>;
+  add(entry: ScoreSubmission, analytics?: AnalyticsEvent, replay?: Replay): Promise<RankedEntry>;
+  replay(id: string): Promise<Replay | undefined>;
   track(events: AnalyticsEvent[]): Promise<void>;
   analytics(days: number): Promise<AnalyticsReport>;
   recordPresence(visitor: string): Promise<void>;
@@ -32,6 +34,7 @@ const rank = (a: ScoreEntry, b: ScoreEntry): number => b.score - a.score || b.sq
 
 export function memoryStore(): ScoreStore {
   const entries: ScoreEntry[] = [];
+  const replays = new Map<string, Replay>();
   const faces = new Map<string, Face>();
   const events = new Map<string, StoredEvent>();
   const presence = new Map<string, number>();
@@ -75,11 +78,17 @@ export function memoryStore(): ScoreStore {
       const since = new Date(Date.now() - days * 86400_000).toISOString();
       return summarize([...events.values()].filter(e => e.at >= since), days, since);
     },
-    async add(submission, analytics) {
-      const entry = { id: newEntryId(), ...submission, at: new Date().toISOString() };
+    async replay(id) {
+      return replays.get(id);
+    },
+    async add(submission, analytics, replay) {
+      const entry = { id: newEntryId(), ...submission, at: new Date().toISOString(), hasReplay: Boolean(replay) };
       entries.push(entry);
       entries.sort(rank);
       entries.length = Math.min(entries.length, 500);
+      if (replay && entries.some(item => item.id === entry.id)) replays.set(entry.id, replay);
+      const retained = new Set(entries.map(item => item.id));
+      for (const id of replays.keys()) if (!retained.has(id)) replays.delete(id);
       if (analytics) {
         prune();
         if (!events.has(analytics.id)) events.set(analytics.id, { ...analytics, at: new Date().toISOString() });
@@ -109,6 +118,7 @@ export function memoryStore(): ScoreStore {
     async remove(id) {
       const index = entries.findIndex(entry => entry.id === id);
       if (index >= 0) entries.splice(index, 1);
+      replays.delete(id);
       return index >= 0;
     },
     async faces() {
@@ -128,11 +138,11 @@ export function memoryStore(): ScoreStore {
   };
 }
 
-interface ScoreRow { public_id: string; name: string; score: number; squashed: number; won: boolean; created_at: Date; rank?: string }
+interface ScoreRow { public_id: string; name: string; score: number; squashed: number; won: boolean; created_at: Date; has_replay: boolean; rank?: string }
 const toEntry = (row: ScoreRow): ScoreEntry => ({
-  id: row.public_id, name: row.name, score: row.score, squashed: row.squashed, won: row.won, at: row.created_at.toISOString(),
+  id: row.public_id, name: row.name, score: row.score, squashed: row.squashed, won: row.won, at: row.created_at.toISOString(), hasReplay: row.has_replay,
 });
-const COLUMNS = 'public_id, name, score, squashed, won, created_at';
+const COLUMNS = 'public_id, name, score, squashed, won, created_at, has_replay';
 const RANK = `(SELECT count(*) + 1 FROM scores better
   WHERE better.score > s.score
      OR (better.score = s.score AND better.squashed > s.squashed)
@@ -152,6 +162,11 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   await pool.query('ALTER TABLE scores ADD COLUMN IF NOT EXISTS public_id VARCHAR(12) UNIQUE');
+  await pool.query('ALTER TABLE scores ADD COLUMN IF NOT EXISTS has_replay BOOLEAN NOT NULL DEFAULT false');
+  await pool.query(`CREATE TABLE IF NOT EXISTS score_replays (
+    public_id VARCHAR(12) PRIMARY KEY REFERENCES scores(public_id) ON DELETE CASCADE,
+    recording JSONB NOT NULL
+  )`);
   await pool.query('CREATE INDEX IF NOT EXISTS scores_rank ON scores (score DESC, squashed DESC, created_at ASC)');
   await pool.query(`CREATE TABLE IF NOT EXISTS faces (
     kind VARCHAR(16) PRIMARY KEY,
@@ -312,15 +327,20 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
       );
       return rows.map(toEntry);
     },
-    async add({ name, score, squashed, won }, analytics) {
+    async replay(id) {
+      const { rows } = await pool.query<{ recording: Replay }>('SELECT recording FROM score_replays WHERE public_id = $1', [id]);
+      return rows[0]?.recording;
+    },
+    async add({ name, score, squashed, won }, analytics, replay) {
       const id = newEntryId();
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
         await client.query(
-          'INSERT INTO scores (public_id, name, score, squashed, won) VALUES ($1, $2, $3, $4, $5)',
-          [id, name, score, squashed, won],
+          'INSERT INTO scores (public_id, name, score, squashed, won, has_replay) VALUES ($1, $2, $3, $4, $5, $6)',
+          [id, name, score, squashed, won, Boolean(replay)],
         );
+        if (replay) await client.query('INSERT INTO score_replays (public_id, recording) VALUES ($1, $2)', [id, JSON.stringify(replay)]);
         if (analytics) await insertEvents([analytics], client.query.bind(client));
         await client.query('COMMIT');
       } catch (error) {

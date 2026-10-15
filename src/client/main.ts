@@ -3,6 +3,8 @@ import QRCode from 'qrcode';
 import { BRIDE, GROOM, hurdles, people, rings, Run, runChallenges, runnerSpeed, runTitle, START } from '../shared/level';
 import { cleanName, ENTRY_ID, FULL_RESULTS_SIZE, isRude, NAME_MAX, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
 import { WeddingScene } from './scene';
+import { createReplayViewer } from './replay';
+import type { Replay } from '../shared/replay';
 import { GameAudio, type MusicMode } from './audio';
 import { createAnalytics } from './analytics';
 import { TARGETS } from '../shared/analytics';
@@ -132,6 +134,19 @@ let textTimer = 0;
 const touch = document.querySelector<HTMLElement>('.touch-controls');
 if (!touch) throw new Error('Missing touch controls.');
 let scene: WeddingScene | undefined;
+let lastReplay: Replay | undefined;
+const rewatchButton = element('result-rewatch', HTMLButtonElement);
+const replayViewer = createReplayViewer(key => {
+  if (!scene) throw new Error('Game artwork is still loading. Close and try again shortly.');
+  const image = scene.textures.get(key).getSourceImage();
+  if (!(image instanceof HTMLCanvasElement) && !(image instanceof HTMLImageElement)) {
+    throw new Error('Replay artwork is unavailable. Reload the page and try again.');
+  }
+  return image;
+});
+rewatchButton.addEventListener('click', () => {
+  if (lastReplay) void replayViewer.show(lastReplay, 'Rewatch your run');
+});
 let started = false;
 const analytics = createAnalytics('game');
 analytics.observeScreens({
@@ -147,7 +162,7 @@ analytics.observeScreens({
 const audio = new GameAudio(message => { console.error(message); notice.textContent = message; });
 
 function showMenu(): void {
-  if (result.open || challengesDialog.open || errorDialog.open || topList.open || shareModal.open || scene?.celebrating) return;
+  if (replayViewer.open || result.open || challengesDialog.open || errorDialog.open || topList.open || shareModal.open || scene?.celebrating) return;
   scene?.pause();
   setButtonText(play, started ? 'Back to Becky ↗' : "I'm coming! ↗");
   restart.hidden = !started;
@@ -193,6 +208,16 @@ function scoreRow(entry: ScoreEntry, rank: number, you?: ScoreEntry): HTMLTableR
     const cell = document.createElement('td');
     cell.textContent = value;
     row.append(cell);
+  }
+  if (entry.hasReplay) {
+    const watch = document.createElement('button');
+    watch.type = 'button';
+    watch.className = 'watch-replay';
+    watch.textContent = 'Watch run';
+    watch.setAttribute('aria-label', `Watch ${entry.name}'s run`);
+    watch.setAttribute('aria-haspopup', 'dialog');
+    watch.addEventListener('click', () => { void replayViewer.show(entry.id, `${entry.name}'s run · ${entry.score} points`); });
+    row.cells[1].append(watch);
   }
   if (you && entry.id === you.id) {
     row.dataset.you = '';
@@ -356,6 +381,10 @@ const wedding = new WeddingScene({
     if (record) saveBest(run.score);
     const title = runTitle(run);
     lastRun = { score: run.score, squashed: run.squashed.size, won, title, lives: run.lives, rings: run.rings.size };
+    lastReplay = scene?.recordedReplay();
+    rewatchButton.disabled = !lastReplay;
+    element('result-replay-status', HTMLElement).textContent = lastReplay ? ''
+      : 'Replay unavailable: this run exceeded the three-minute recording limit. Start a fresh run to record again.';
     element('result-badge', HTMLElement).textContent = `🏅 ${title}`;
     element('result-best', HTMLElement).textContent = record
       ? `NEW RECORD! ${run.score} beats your old best of ${best}.`
@@ -422,6 +451,10 @@ async function postScore(): Promise<RankedEntry | undefined> {
   if (!lastRun) return undefined;
   if (posted) return posted;
   if (submitScore.disabled) return undefined;
+  if (!lastReplay) {
+    showStatus('This run has no replay and cannot be posted. Start a fresh run to record again.', true);
+    return undefined;
+  }
   const run = lastRun;
   const name = cleanName(playerName.value);
   if (!name || isRude(name)) {
@@ -437,7 +470,7 @@ async function postScore(): Promise<RankedEntry | undefined> {
     const response = await fetch('/api/scores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ name, score: lastRun.score, squashed: lastRun.squashed, won: lastRun.won, analytics: analytics.scoreEvent() }),
+      body: JSON.stringify({ name, score: lastRun.score, squashed: lastRun.squashed, won: lastRun.won, replay: lastReplay, analytics: analytics.scoreEvent() }),
     });
     const data = await response.json() as { error?: string; entry?: RankedEntry; scores?: ScoreEntry[] };
     if (lastRun !== run) return undefined;
@@ -713,7 +746,7 @@ menu.addEventListener('cancel', event => {
 result.addEventListener('cancel', event => event.preventDefault());
 errorDialog.addEventListener('close', showMenu);
 window.addEventListener('keydown', event => {
-  if (event.code === 'Escape' && !menu.open && !result.open && !challengesDialog.open && !errorDialog.open && !topList.open && !shareModal.open) {
+  if (event.code === 'Escape' && !replayViewer.open && !menu.open && !result.open && !challengesDialog.open && !errorDialog.open && !topList.open && !shareModal.open) {
     event.preventDefault(); showMenu();
   }
 });

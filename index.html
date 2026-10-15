@@ -76,8 +76,11 @@
             <button id="submit-score" data-icon="📮" type="submit">Post to the top list ↗</button>
           </div>
           <p id="score-status" role="status"></p>
+          <p class="replay-notice">Posting a score also publishes its gameplay replay for everyone to watch.</p>
         </form>
         <button id="again" data-icon="🔄" type="button" class="primary" autofocus>One more big day ↗</button>
+        <button id="result-rewatch" type="button" aria-haspopup="dialog" aria-controls="replay-dialog">Rewatch run</button>
+        <p id="result-replay-status" role="status"></p>
         <button id="result-challenges-button" data-icon="🏅" type="button" aria-haspopup="dialog" aria-controls="challenges-dialog">My Achievements</button>
         <div class="text-links">
           <button id="result-top-list" data-icon="🏆" type="button" class="link">See the top list</button>
@@ -139,6 +142,20 @@
         <button id="share-modal-copy" data-icon="🔗" type="button" class="primary">Copy link ↗</button>
         <p id="share-modal-status" role="status"></p>
         <button id="share-modal-close" data-icon="↩️" type="button" class="link">Back</button>
+      </dialog>
+      <dialog id="replay-dialog" aria-labelledby="replay-title">
+        <span class="stamp">WEDDINGRUSH / REPLAY</span>
+        <h2 id="replay-title">Rewatch run</h2>
+        <p class="replay-notice">Recorded gameplay · No new scores or achievements. Press Play to watch.</p>
+        <canvas id="replay-canvas" width="960" height="540" role="img" aria-label="Recorded WeddingRush run"></canvas>
+        <p id="replay-status" role="status"></p>
+        <label for="replay-seek">Replay position</label>
+        <input id="replay-seek" type="range" min="0" max="1" value="0" step="1" disabled />
+        <div class="replay-controls">
+          <button id="replay-play" type="button" disabled>Play replay</button>
+          <button id="replay-restart" type="button" disabled>Restart replay</button>
+        </div>
+        <button id="replay-close" type="button" autofocus>Back</button>
       </dialog>
       <dialog id="error-dialog" aria-labelledby="error-title">
         <h2 id="error-title">A bump in the road</h2>

@@ -7,6 +7,7 @@ export interface ScoreEntry {
   squashed: number;
   won: boolean;
   at: string;
+  hasReplay?: boolean;
 }
 export interface ScoreSubmission {
   name: string;

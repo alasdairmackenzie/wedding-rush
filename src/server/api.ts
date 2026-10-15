@@ -5,6 +5,7 @@ import { cleanName, ENTRY_ID, FULL_RESULTS_SIZE, isRude, LEADERBOARD_SIZE, NAME_
 import { ADMIN_LIST_SIZE, type ScoreStore } from './store.ts';
 import { ANALYTICS_ID, analyticsBatch, isAnalyticsEvent, type AnalyticsEvent } from '../shared/analytics.ts';
 import { ACTIVE_WINDOW_MS } from '../shared/presence.ts';
+import { isReplay, MAX_REPLAY_BYTES, type Replay } from '../shared/replay.ts';
 
 const MAX_BODY = 1024;
 const WINDOW_MS = 60_000;
@@ -162,8 +163,16 @@ export function createApi(getStore: () => Promise<ScoreStore>, options: { adminT
     const path = url.pathname;
     const isFaces = path === '/api/faces' || path.startsWith('/api/faces/');
     const isAdmin = path.startsWith('/api/admin/');
-    if (path !== '/api/scores' && path !== '/api/analytics' && path !== '/api/presence' && !isFaces && !isAdmin) return false;
+    const isReplayPath = path.startsWith('/api/replays/');
+    if (path !== '/api/scores' && path !== '/api/analytics' && path !== '/api/presence' && !isFaces && !isAdmin && !isReplayPath) return false;
     try {
+      if (isReplayPath) {
+        if (req.method !== 'GET') return notAllowed(res, 'GET');
+        const id = path.slice('/api/replays/'.length);
+        const replay = ENTRY_ID.test(id) ? await (await getStore()).replay(id) : undefined;
+        send(res, replay ? 200 : 404, replay ? { replay } : { error: 'No replay is available for that score.' });
+        return true;
+      }
       if (path === '/api/presence' && req.method === 'GET') {
         send(res, 200, { activeUsers: await (await getStore()).activeUsers(), windowMinutes: ACTIVE_WINDOW_MS / 60_000 });
         return true;
@@ -250,7 +259,7 @@ export function createApi(getStore: () => Promise<ScoreStore>, options: { adminT
       }
       let body: unknown;
       try {
-        body = JSON.parse(await readBody(req));
+        body = JSON.parse((await readBytes(req, MAX_REPLAY_BYTES)).toString('utf8'));
       } catch (error) {
         send(res, error instanceof TooLarge ? 413 : 400, { error: 'That request could not be read.' });
         return true;
@@ -258,6 +267,23 @@ export function createApi(getStore: () => Promise<ScoreStore>, options: { adminT
       const result = validateSubmission(body);
       if (!result.ok) {
         send(res, 400, { error: result.error });
+        return true;
+      }
+      let replay: Replay | undefined;
+      if (typeof body === 'object' && body !== null && 'replay' in body) {
+        if (!isReplay(body.replay)) {
+          send(res, 400, { error: 'That replay is invalid or uses an unsupported game version.' });
+          return true;
+        }
+        replay = body.replay;
+        const final = replay.frames.at(-1)!;
+        if (final[3] !== result.value.score || replay.won !== result.value.won ||
+          final[8].toString(2).replaceAll('0', '').length !== result.value.squashed) {
+          send(res, 400, { error: 'The replay does not match that score.' });
+          return true;
+        }
+      } else if (Buffer.byteLength(JSON.stringify(body)) > MAX_BODY) {
+        send(res, 413, { error: 'That request is too big.' });
         return true;
       }
       recent.push(now);
@@ -271,7 +297,7 @@ export function createApi(getStore: () => Promise<ScoreStore>, options: { adminT
         }
         analytics = body.analytics;
       }
-      const entry = await store.add(result.value, analytics);
+      const entry = await store.add(result.value, analytics, replay);
       send(res, 201, { entry, scores: await store.top() });
     } catch (error) {
       console.error('WeddingRush API error', error);

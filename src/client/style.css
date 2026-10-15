@@ -164,6 +164,15 @@ dialog > button.link { width: auto; margin: 10px auto 0; }
 .toplist tr[data-you] td { background: #f6d4dc; color: #8f2f47; font-weight: bold; }
 .toplist tr.gap td { text-align: center; border-bottom: 0; color: #756553; }
 .toplist td.empty { text-align: center; color: #756553; }
+.toplist .watch-replay { display: block; margin-top: 4px; padding: 5px 7px; font: bold 11px/1.4 monospace; box-shadow: 2px 2px 0 #302825; background: #f6d4dc; min-height: 32px; }
+#replay-dialog { width: min(1040px, calc(100% - 32px)); }
+#replay-dialog h2 { margin: 18px 0; }
+#replay-canvas { display: block; width: 100%; height: auto; border: 2px solid #302825; background: #ded4bd; }
+#replay-seek { display: block; width: 100%; min-height: 44px; accent-color: #b84b64; }
+.replay-controls { display: flex; flex-wrap: wrap; gap: 12px; }
+.replay-controls button { flex: 1; min-height: 44px; }
+.replay-notice, #result-replay-status { font-size: 12px; color: #756553; }
+#replay-status { font: bold 13px/1.5 monospace; min-height: 3em; }
 .unique-names { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 0; font-size: 13px; cursor: pointer; }
 .unique-names input { position: absolute; width: 48px; height: 28px; margin: 0; opacity: 0; cursor: pointer; }
 .unique-track { position: relative; flex: 0 0 48px; height: 28px; border: 2px solid #302825; border-radius: 20px; background: #ded4bd; box-shadow: 2px 2px 0 #302825; pointer-events: none; }

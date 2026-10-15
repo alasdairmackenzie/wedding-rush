@@ -31,6 +31,33 @@ a password when you start the server, for example
 
 ## Live screen and admin
 
+### Run replays
+
+The results screen offers **Rewatch run** for the latest completed run (including
+losses). Posting a score from the game also publishes its gameplay recording:
+**Watch run** appears beside that score in the top 10 and full results. The TV
+leaderboard links to the score's watch button. Older scores have no replay.
+
+Replays start paused, with play/pause, restart and a keyboard-accessible seek bar.
+They are silent visual recordings using sampled positions, dice faces, score,
+lives and collected-object state, not a physics re-simulation or video. Watching
+does not submit scores, change personal bests, award badges or start another game.
+The current artwork is reused, so later face uploads may change replay appearance.
+
+Recordings exclude menu/pause time, sample at most every 50 ms, and are capped at
+three minutes of active play and 1 MB per score upload. A run beyond that cap
+reports replay unavailable and cannot be posted from the current game client.
+Normal runs take under a minute. Replay version 1 is tied to this course layout;
+future incompatible course changes must increment the format version.
+
+`GET /api/replays/:scoreId` is public and returns `{ replay }`, or 404 for missing
+recordings. Leaderboard responses include only `hasReplay`, not recording data.
+PostgreSQL stores the recording transactionally with its score in `score_replays`;
+deleting the score removes its replay. Memory mode retains recordings only for
+its retained 500 scores and loses them on restart. Legacy API clients may still
+submit scores without recordings. Upload validation bounds the format and checks
+the final score/result/squash count; it is not authoritative anti-cheat verification.
+
 - `/live` is a top list for a TV or projector at the venue. It
   shows the address to play at, has a **Back to game** link and refreshes every 15 seconds.
   Add `?url=seanandbeckywedding.run` to override the address it shows.
