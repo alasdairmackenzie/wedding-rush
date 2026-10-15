@@ -489,6 +489,7 @@ document.querySelectorAll<HTMLAnchorElement>('[data-live-scores]').forEach(link 
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     showMenu();
+    if (!menu.open) return;
     menu.close();
     void openTopList(null, { fromMenu: true, live: true });
   });
@@ -535,6 +536,7 @@ document.addEventListener('click', event => {
 });
 element('mobile-pause', HTMLButtonElement).addEventListener('click', showMenu);
 function openShareModal(): void {
+  if (scene?.celebrating) return;
   if (!menu.open && !result.open && !topList.open) showMenu();
   const url = `${location.origin}/?from=share`;
   shareModalLink.textContent = url;
