@@ -57,7 +57,7 @@ test('uses the Sean and Becky title and character names throughout the UI', asyn
   await expect(page).toHaveTitle('WeddingRush featuring Sean and Becky');
   await expect(page.getByRole('heading', { name: 'WeddingRush featuring Sean and Becky' })).toBeVisible();
   await expect(page.locator('.audio-controls > #music-toggle + #effects-toggle')).toHaveCount(1);
-  await expect(page.locator('.audio-controls + #menu-share')).toHaveCount(1);
+  await expect(page.locator('.audio-controls + .menu-footer > #menu-share + #live-link')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Share WeddingRush with friends', exact: true })).toHaveClass('link');
   await expect(page.locator('#objective')).toContainText('get Sean to Becky');
   await expect(page.locator('#notice')).toContainText('Becky is ready. Sean');
@@ -1677,6 +1677,11 @@ for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await start(page);
     await page.keyboard.press('Escape');
+    const shareBox = await page.locator('#menu-share').boundingBox();
+    const liveBox = await page.locator('#live-link').boundingBox();
+    if (!shareBox || !liveBox) throw new Error('Menu footer actions are not visible.');
+    expect(Math.abs(shareBox.y + shareBox.height / 2 - liveBox.y - liveBox.height / 2)).toBeLessThan(1);
+    expect(liveBox.x).toBeGreaterThanOrEqual(shareBox.x + shareBox.width);
     const paused = await state(page);
     for (const closeWithEscape of [false, true]) {
       await page.locator('#menu-share').click();
