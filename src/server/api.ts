@@ -218,12 +218,18 @@ export function createApi(getStore: () => Promise<ScoreStore>, options: { adminT
       if (req.method === 'GET') {
         const limit = url.searchParams.get('limit');
         if (limit !== null && limit !== String(LEADERBOARD_SIZE) && limit !== String(FULL_RESULTS_SIZE)) {
-          send(res, 400, { error: 'Score limit must be 10 or 50.' });
+          send(res, 400, { error: `Score limit must be ${LEADERBOARD_SIZE} or ${FULL_RESULTS_SIZE}.` });
           return true;
         }
         const id = url.searchParams.get('you');
-        const you = id && ENTRY_ID.test(id) ? await store.find(id) : undefined;
-        send(res, 200, { scores: await store.top(limit === String(FULL_RESULTS_SIZE) ? FULL_RESULTS_SIZE : LEADERBOARD_SIZE), you });
+        const unique = url.searchParams.get('unique');
+        if (unique !== null && unique !== '1' && unique !== '0') {
+          send(res, 400, { error: 'Unique names must be 1 or 0.' });
+          return true;
+        }
+        const uniqueNames = unique === '1';
+        const you = id && ENTRY_ID.test(id) ? await store.find(id, uniqueNames) : undefined;
+        send(res, 200, { scores: await store.top(limit === String(FULL_RESULTS_SIZE) ? FULL_RESULTS_SIZE : LEADERBOARD_SIZE, uniqueNames), you });
         return true;
       }
       if (req.method !== 'POST') {

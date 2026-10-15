@@ -164,6 +164,24 @@ dialog > button.link { width: auto; margin: 10px auto 0; }
 .toplist tr[data-you] td { background: #f6d4dc; color: #8f2f47; font-weight: bold; }
 .toplist tr.gap td { text-align: center; border-bottom: 0; color: #756553; }
 .toplist td.empty { text-align: center; color: #756553; }
+.unique-names { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 0; font-size: 13px; cursor: pointer; }
+.unique-names input { position: absolute; width: 48px; height: 28px; margin: 0; opacity: 0; cursor: pointer; }
+.unique-track { position: relative; flex: 0 0 48px; height: 28px; border: 2px solid #302825; border-radius: 20px; background: #ded4bd; box-shadow: 2px 2px 0 #302825; pointer-events: none; }
+.unique-track::before { content: ''; box-sizing: border-box; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border: 2px solid #302825; border-radius: 50%; background: #fffaf0; }
+.unique-names input:checked + .unique-track { background: #b84b64; }
+.unique-names input:checked + .unique-track::before { transform: translateX(20px); }
+.unique-names input:focus-visible + .unique-track { outline: 3px solid #8b46a8; outline-offset: 4px; }
+.unique-names:hover .unique-track { box-shadow: 3px 3px 0 #302825; }
+.unique-label { display: grid; gap: 3px; }
+.unique-label small { color: #756553; font: 11px/1.4 monospace; }
+@media (prefers-reduced-motion: no-preference) {
+  .unique-track { transition: background-color 150ms; }
+  .unique-track::before { transition: transform 150ms; }
+}
+@media (forced-colors: active) {
+  .unique-names input { position: static; width: 28px; opacity: 1; }
+  .unique-track { display: none; }
+}
 #top-list-intro strong { color: #b84b64; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .share-qr { display: flex; justify-content: center; align-items: center; margin: 16px auto; padding: 12px; background: #fffaf0; border: 2px solid #302825; box-shadow: 4px 4px 0 #302825; width: fit-content; }

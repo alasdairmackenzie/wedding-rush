@@ -1689,10 +1689,44 @@ test('the main menu opens the guest top list and returns or starts a run', async
 });
 
 for (const width of [1280, 390]) {
-  test(`full results show the top 50 and return to the top list at ${width}px`, async ({ page }) => {
+  test(`duplicate-name switches stay in sync across both lists at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
-    await page.route('**/api/scores?limit=50', route => route.fulfill({
-      json: { scores: Array.from({ length: 50 }, (_, index) => ({
+    const scores = [
+      { id: 'aaaaaaaaaaaa', name: 'Gran', score: 200, squashed: 2, won: true, at: '2026-10-15T12:00:00Z' },
+      { id: 'bbbbbbbbbbbb', name: 'GRAN', score: 150, squashed: 1, won: true, at: '2026-10-15T12:00:00Z' },
+      { id: 'cccccccccccc', name: 'Becky', score: 100, squashed: 0, won: false, at: '2026-10-15T12:00:00Z' },
+    ];
+    await page.route('**/api/scores*', route => {
+      const unique = new URL(route.request().url()).searchParams.get('unique') === '1';
+      return route.fulfill({ json: { scores: unique ? [scores[0], scores[2]] : scores } });
+    });
+    await page.goto('/top');
+    const top = page.locator('#top-list');
+    const full = page.locator('#full-results');
+    await expect(page.locator('#top-list-rows tr')).toHaveCount(3);
+    const toggle = top.getByRole('switch', { name: 'Hide duplicate names' });
+    await toggle.focus();
+    await expect(top.locator('.unique-track')).toHaveCSS('outline-style', 'solid');
+    await page.keyboard.press('Space');
+    await expect(toggle).toBeChecked();
+    await expect(top.locator('.unique-track')).toHaveCSS('background-color', 'rgb(184, 75, 100)');
+    await expect(page.locator('#top-list-rows tr')).toHaveCount(2);
+    await expect(page.locator('#top-list-rows tr').last()).toContainText('2Becky');
+    await page.locator('#full-results-open').click();
+    await expect(full.getByRole('switch', { name: 'Hide duplicate names' })).toBeChecked();
+    await expect(page.locator('#full-results-rows tr')).toHaveCount(2);
+    await full.getByRole('switch', { name: 'Hide duplicate names' }).uncheck();
+    await expect(page.locator('#full-results-rows tr')).toHaveCount(3);
+    await page.locator('#full-results-back').click();
+    await expect(top.getByRole('switch', { name: 'Hide duplicate names' })).not.toBeChecked();
+    await expect(page.locator('#top-list-rows tr')).toHaveCount(3);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test(`full results show the top 100 and return to the top list at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.route('**/api/scores?limit=100', route => route.fulfill({
+      json: { scores: Array.from({ length: 100 }, (_, index) => ({
         id: String(index).padStart(12, '0'), name: `Guest ${index + 1}`, score: 100 - index,
         squashed: 0, won: false, at: '2026-10-15T12:00:00Z',
       })) },
@@ -1706,10 +1740,10 @@ for (const width of [1280, 390]) {
     const menu = await page.locator('#top-list-menu').boundingBox();
     if (!back || !menu) throw new Error('Top list navigation is not visible.');
     expect(Math.abs(back.y - menu.y)).toBeLessThan(1);
-    await page.getByRole('button', { name: 'Full results — top 50' }).click();
+    await page.getByRole('button', { name: 'Full results — top 100' }).click();
     await expect(page.getByRole('dialog', { name: 'Full results', exact: true })).toBeVisible();
-    await expect(page.locator('#full-results-rows tr')).toHaveCount(50);
-    await expect(page.locator('#full-results-rows tr').last()).toContainText('Guest 50');
+    await expect(page.locator('#full-results-rows tr')).toHaveCount(100);
+    await expect(page.locator('#full-results-rows tr').last()).toContainText('Guest 100');
     await page.keyboard.press('Escape');
     await expect(page.locator('#full-results-open')).toBeFocused();
     await page.locator('#top-list-back').click();

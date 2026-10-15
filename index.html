@@ -96,12 +96,17 @@
         <span class="stamp">WEDDINGRUSH / TOP LIST</span>
         <h2 id="top-list-title">Wedding guest top list</h2>
         <p id="top-list-intro" role="status">Loading the top list…</p>
+        <label class="unique-names">
+          <input id="top-list-unique" type="checkbox" role="switch" aria-labelledby="top-list-unique-label" aria-describedby="top-list-unique-help" />
+          <span class="unique-track" aria-hidden="true"></span>
+          <span class="unique-label"><strong id="top-list-unique-label">Hide duplicate names</strong><small id="top-list-unique-help">Best score per name</small></span>
+        </label>
         <table class="toplist">
           <caption class="visually-hidden">Top wedding guest scores</caption>
           <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Points</th><th scope="col">Squashed</th></tr></thead>
           <tbody id="top-list-rows"></tbody>
         </table>
-        <div class="text-links"><button id="full-results-open" data-icon="📊" type="button" class="link" aria-haspopup="dialog" aria-controls="full-results">Full results — top 50</button></div>
+        <div class="text-links"><button id="full-results-open" data-icon="📊" type="button" class="link" aria-haspopup="dialog" aria-controls="full-results">Full results — top 100</button></div>
         <button id="share" data-icon="📣" type="button" class="share" hidden>Share my place on the top list ↗</button>
         <p id="share-status" role="status"></p>
         <button id="top-list-play" data-icon="🏃" type="button" class="primary" autofocus>Beat them! Play WeddingRush ↗</button>
@@ -112,9 +117,14 @@
       </dialog>
       <dialog id="full-results" aria-labelledby="full-results-title">
         <h2 id="full-results-title">Full results</h2>
-        <p id="full-results-status" role="status">The top 50 wedding guests.</p>
+        <p id="full-results-status" role="status">The top 100 wedding guests.</p>
+        <label class="unique-names">
+          <input id="full-results-unique" type="checkbox" role="switch" aria-labelledby="full-results-unique-label" aria-describedby="full-results-unique-help" />
+          <span class="unique-track" aria-hidden="true"></span>
+          <span class="unique-label"><strong id="full-results-unique-label">Hide duplicate names</strong><small id="full-results-unique-help">Best score per name</small></span>
+        </label>
         <table class="toplist">
-          <caption class="visually-hidden">Top 50 wedding guest scores</caption>
+          <caption class="visually-hidden">Top 100 wedding guest scores</caption>
           <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Points</th><th scope="col">Squashed</th></tr></thead>
           <tbody id="full-results-rows"></tbody>
         </table>

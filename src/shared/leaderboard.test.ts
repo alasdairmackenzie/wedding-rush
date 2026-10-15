@@ -48,10 +48,13 @@ describe('leaderboard API', () => {
     server = createServer(async (req, res) => {
       if (!await api(req, res)) res.writeHead(404).end();
     });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  });
 
-    it('serves the top 50 on request while keeping the default top 10 and rejecting invalid limits', async () => {
+    it('serves the top 100 on request while keeping the default top 10 and rejecting invalid limits', async () => {
       const store = memoryStore();
-      for (let i = 0; i < 55; i++) {
+      for (let i = 0; i < 105; i++) {
         await store.add({ name: `Guest ${i}`, score: i, squashed: 0, won: false });
       }
       const api = createApi(lazyStore(async () => store));
@@ -62,23 +65,54 @@ describe('leaderboard API', () => {
       const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/scores`;
       try {
         expect((await (await fetch(base)).json()).scores).toHaveLength(10);
-        const full = (await (await fetch(`${base}?limit=50`)).json()).scores;
-        expect(full).toHaveLength(50);
-        expect(full[0].score).toBe(54);
-        expect(full[49].score).toBe(5);
-        for (const limit of ['0', '51', '-1', 'abc']) {
+        const full = (await (await fetch(`${base}?limit=100`)).json()).scores;
+        expect(full).toHaveLength(100);
+        expect(full[0].score).toBe(104);
+        expect(full[99].score).toBe(5);
+        for (const limit of ['0', '50', '101', '-1', 'abc']) {
           expect((await fetch(`${base}?limit=${limit}`)).status).toBe(400);
         }
       } finally {
         await new Promise<void>(resolve => server.close(() => resolve()));
       }
     });
-    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
-    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  });
   afterAll(() => new Promise<void>(resolve => server.close(() => resolve())));
   const post = (body: unknown) => fetch(`${base}/api/scores`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+
+  it('filters case-insensitive duplicates before limiting and ranks the best entry for shared links', async () => {
+    const store = memoryStore();
+    const low = await store.add({ name: 'Gran', score: 1, squashed: 0, won: false });
+    await store.add({ name: 'GRAN', score: 200, squashed: 1, won: true });
+    const best = await store.add({ name: 'gran', score: 200, squashed: 2, won: true });
+    for (let i = 0; i < 100; i++) {
+      await store.add({ name: `Guest ${i}`, score: 100 - i, squashed: 0, won: false });
+    }
+    const api = createApi(lazyStore(async () => store));
+    const server = createServer(async (req, res) => {
+      if (!await api(req, res)) res.writeHead(404).end();
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/scores`;
+    try {
+      const filtered = await (await fetch(`${url}?unique=1&limit=100&you=${low.id}`)).json();
+      expect(filtered.scores).toHaveLength(100);
+      expect(filtered.scores[0]).toMatchObject({ id: best.id, name: 'gran' });
+      expect(filtered.scores[99].name).toBe('Guest 98');
+      expect(filtered.you).toMatchObject({ id: best.id, rank: 1 });
+      const top = await (await fetch(`${url}?unique=1`)).json();
+      expect(top.scores).toHaveLength(10);
+      expect(top.scores[9].name).toBe('Guest 8');
+      expect(await store.find(low.id)).toMatchObject({ id: low.id, rank: 102 });
+      expect(await store.find('zzzzzzzzzzzz', true)).toBeUndefined();
+      const unfiltered = await (await fetch(`${url}?unique=0`)).json();
+      expect(unfiltered.scores.slice(0, 2).map((entry: { name: string }) => entry.name)).toEqual(['gran', 'GRAN']);
+      expect(await store.top(500)).toHaveLength(103);
+      expect((await fetch(`${url}?unique=yes`)).status).toBe(400);
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
   });
 
   it('stores scores and returns them ranked', async () => {

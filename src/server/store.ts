@@ -7,13 +7,13 @@ import { ACTIVE_WINDOW_MS } from '../shared/presence.ts';
 
 export interface Face { mime: string; data: Buffer; version: number }
 export interface ScoreStore {
-  top(limit?: number): Promise<ScoreEntry[]>;
+  top(limit?: number, uniqueNames?: boolean): Promise<ScoreEntry[]>;
   add(entry: ScoreSubmission, analytics?: AnalyticsEvent): Promise<RankedEntry>;
   track(events: AnalyticsEvent[]): Promise<void>;
   analytics(days: number): Promise<AnalyticsReport>;
   recordPresence(visitor: string): Promise<void>;
   activeUsers(): Promise<number>;
-  find(id: string): Promise<RankedEntry | undefined>;
+  find(id: string, uniqueNames?: boolean): Promise<RankedEntry | undefined>;
   rename(id: string, name: string): Promise<boolean>;
   remove(id: string): Promise<boolean>;
   faces(): Promise<Record<string, number>>;
@@ -56,8 +56,15 @@ export function memoryStore(): ScoreStore {
       prunePresence();
       return presence.size;
     },
-    async top(limit = LEADERBOARD_SIZE) {
-      return entries.slice(0, limit);
+    async top(limit = LEADERBOARD_SIZE, uniqueNames = false) {
+      const seen = new Set<string>();
+      return entries.filter(entry => {
+        if (!uniqueNames) return true;
+        const key = entry.name.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, limit);
     },
     async track(batch) {
       prune();
@@ -79,7 +86,19 @@ export function memoryStore(): ScoreStore {
       }
       return ranked(entry.id) ?? { ...entry, rank: entries.length + 1 };
     },
-    async find(id) {
+    async find(id, uniqueNames = false) {
+      if (uniqueNames) {
+        const entry = entries.find(item => item.id === id);
+        if (!entry) return undefined;
+        const seen = new Set<string>();
+        for (const item of entries) {
+          const name = item.name.toLowerCase();
+          if (seen.has(name)) continue;
+          seen.add(name);
+          if (name === entry.name.toLowerCase()) return { ...item, rank: seen.size };
+        }
+        return undefined;
+      }
       return ranked(id);
     },
     async rename(id, name) {
@@ -173,7 +192,18 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
     lastPrune = Date.now();
   };
   await prune();
-  const find = async (id: string): Promise<RankedEntry | undefined> => {
+  const find = async (id: string, uniqueNames = false): Promise<RankedEntry | undefined> => {
+    if (uniqueNames) {
+      const { rows } = await pool.query<ScoreRow>(`
+        WITH best AS (
+          SELECT DISTINCT ON (lower(name)) ${COLUMNS} FROM scores WHERE public_id IS NOT NULL
+          ORDER BY lower(name), score DESC, squashed DESC, created_at ASC
+        ), ranked AS (
+          SELECT *, row_number() OVER (ORDER BY score DESC, squashed DESC, created_at ASC) AS rank FROM best
+        )
+        SELECT * FROM ranked WHERE lower(name) = (SELECT lower(name) FROM scores WHERE public_id = $1)`, [id]);
+      return rows[0] && { ...toEntry(rows[0]), rank: Number(rows[0].rank) };
+    }
     const { rows } = await pool.query<ScoreRow>(`SELECT ${COLUMNS}, ${RANK} FROM scores s WHERE public_id = $1`, [id]);
     return rows[0] && { ...toEntry(rows[0]), rank: Number(rows[0].rank) };
   };
@@ -270,9 +300,14 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
         ) AS report`, [since, days, new Date().toISOString()]);
       return rows[0].report;
     },
-    async top(limit = LEADERBOARD_SIZE) {
+    async top(limit = LEADERBOARD_SIZE, uniqueNames = false) {
       const { rows } = await pool.query<ScoreRow>(
-        `SELECT ${COLUMNS} FROM scores WHERE public_id IS NOT NULL ORDER BY score DESC, squashed DESC, created_at ASC LIMIT $1`,
+        uniqueNames
+          ? `SELECT ${COLUMNS} FROM (
+              SELECT DISTINCT ON (lower(name)) ${COLUMNS} FROM scores WHERE public_id IS NOT NULL
+              ORDER BY lower(name), score DESC, squashed DESC, created_at ASC
+            ) best ORDER BY score DESC, squashed DESC, created_at ASC LIMIT $1`
+          : `SELECT ${COLUMNS} FROM scores WHERE public_id IS NOT NULL ORDER BY score DESC, squashed DESC, created_at ASC LIMIT $1`,
         [limit],
       );
       return rows.map(toEntry);

@@ -159,7 +159,12 @@ character's line waits until the intro finishes. Later encounter spacing stays u
   **Share my place on the top list** shares (or copies) a `/top?you=<id>` link
   that opens the top 10 with your row highlighted, plus your rank if you are
   outside the top 10. The top list can also be opened from the main menu.
-  **Full results — top 50** below the table opens a separate results screen with up to 50 ranked guests.
+  **Full results — top 100** below the table opens a separate results screen with up to 100 ranked guests.
+  Both lists share a **Hide duplicate names** switch (off by default). When on,
+  each name appears once, ignoring capitalisation, with its best score retained
+  before the top 10/100 limit is applied. Ranks reflect the filtered list;
+  shared links to a lower duplicate show that name's best entry instead.
+  The switch lasts for the current page session and does not change `/live` or admin.
   Returning to the top list preserves the current score and navigation context.
   **Back to results** and **Back to menu** sit side by side when both are available.
   **Back to results** returns from the top list or **My Achievements** without losing

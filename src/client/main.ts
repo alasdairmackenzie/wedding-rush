@@ -219,12 +219,26 @@ async function fetchScores(you?: string, limit?: number): Promise<{ scores: Scor
   const params = new URLSearchParams();
   if (you) params.set('you', you);
   if (limit !== undefined) params.set('limit', String(limit));
+  if (hideDuplicateNames) params.set('unique', '1');
   const query = params.size ? `?${params}` : '';
   const response = await fetch(`/api/scores${query}`, { headers: { Accept: 'application/json' } });
   if (!response.ok) throw new Error(String(response.status));
   return response.json() as Promise<{ scores: ScoreEntry[]; you?: RankedEntry }>;
 }
 type TopListData = { scores: ScoreEntry[]; you?: RankedEntry };
+let hideDuplicateNames = false;
+let refreshTopList: (() => Promise<void>) | undefined;
+const uniqueSwitches = [
+  element('top-list-unique', HTMLInputElement), element('full-results-unique', HTMLInputElement),
+];
+for (const input of uniqueSwitches) {
+  input.addEventListener('change', () => {
+    hideDuplicateNames = input.checked;
+    for (const toggle of uniqueSwitches) toggle.checked = hideDuplicateNames;
+    if (fullResults.open) void loadFullResults();
+    if (topList.open) void refreshTopList?.();
+  });
+}
 async function openTopList(
   id: string | null,
   options: { fromRun?: boolean; fromMenu?: boolean; live?: boolean; data?: TopListData } = {},
@@ -254,13 +268,16 @@ async function openTopList(
       if (!document.hidden) void refresh();
     }, 15_000);
   }
-  let refreshing = false;
+  let refreshRequest = 0;
+  let initialData = options.data;
+  refreshTopList = refresh;
   async function refresh(): Promise<void> {
-    if (refreshing) return;
-    refreshing = true;
+    const current = ++refreshRequest;
+    const cached = initialData;
+    initialData = undefined;
     try {
-      const data = options.data ?? await fetchScores(id && ENTRY_ID.test(id) ? id : undefined);
-      if (!topList.open || request !== topListRequest) return;
+      const data = cached ?? await fetchScores(id && ENTRY_ID.test(id) ? id : undefined);
+      if (!topList.open || request !== topListRequest || current !== refreshRequest) return;
       renderScores(topListRows, data.scores, data.you);
       if (data.you) {
         const yours = posted?.id === data.you.id;
@@ -271,17 +288,17 @@ async function openTopList(
             : ` is #${data.you.rank} on the WeddingRush top list with ${data.you.score} points and ${data.you.squashed} squashed mates. Can you beat them?`,
         );
         shareButton.hidden = !yours;
-        if (yours && !options.live) shareButton.focus();
+        if (yours && !options.live && current === 1 && !fullResults.open) shareButton.focus();
       } else {
         topListIntro.textContent = id ? "We couldn't find that score, but here are the top wedding guests."
           : options.live ? 'The top wedding guests so far. Refreshes every 15 seconds.' : 'The top wedding guests so far.';
       }
-    } catch {
-      if (!topList.open || request !== topListRequest) return;
+    } catch (error) {
+      if (!topList.open || request !== topListRequest || current !== refreshRequest) return;
+      console.error('Could not load top list:', error);
       topListRows.replaceChildren();
+      shareButton.hidden = true;
       topListIntro.textContent = 'The top list is offline right now. Try again soon.';
-    } finally {
-      refreshing = false;
     }
   }
   await refresh();
@@ -469,21 +486,27 @@ async function shareLink(entry: RankedEntry): Promise<void> {
   }
 }
 shareButton.addEventListener('click', () => { if (posted) void shareLink(posted); });
-fullResultsOpen.addEventListener('click', async () => {
+async function loadFullResults(): Promise<void> {
   const request = ++fullResultsRequest;
   fullResultsRows.replaceChildren();
-  fullResultsStatus.textContent = 'Loading the top 50…';
-  fullResults.showModal();
+  fullResultsStatus.textContent = `Loading the top ${FULL_RESULTS_SIZE}…`;
   try {
     const data = await fetchScores(undefined, FULL_RESULTS_SIZE);
     if (!fullResults.open || request !== fullResultsRequest) return;
-    renderScores(fullResultsRows, data.scores, posted && data.scores.some(entry => entry.id === posted?.id) ? posted : undefined);
-    fullResultsStatus.textContent = 'The top 50 wedding guests.';
+    const highlighted = posted && data.scores.find(entry => hideDuplicateNames
+      ? entry.name.toLowerCase() === posted?.name.toLowerCase() : entry.id === posted?.id);
+    renderScores(fullResultsRows, data.scores, highlighted ? { ...highlighted, rank: data.scores.indexOf(highlighted) + 1 } : undefined);
+    fullResultsStatus.textContent = `The top ${FULL_RESULTS_SIZE} wedding guests.`;
   } catch (error) {
     if (!fullResults.open || request !== fullResultsRequest) return;
     console.error('Could not load full results:', error);
+    fullResultsRows.replaceChildren();
     fullResultsStatus.textContent = 'Full results are offline right now. Go back and try again.';
   }
+}
+fullResultsOpen.addEventListener('click', () => {
+  fullResults.showModal();
+  void loadFullResults();
 });
 element('full-results-back', HTMLButtonElement).addEventListener('click', () => fullResults.close());
 fullResults.addEventListener('close', () => {

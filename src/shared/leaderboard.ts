@@ -24,7 +24,7 @@ export function topListUrl(origin: string, id: string): string {
   return `${origin}${TOP_LIST_PATH}?you=${encodeURIComponent(id)}`;
 }
 export const LEADERBOARD_SIZE = 10;
-export const FULL_RESULTS_SIZE = 50;
+export const FULL_RESULTS_SIZE = 100;
 
 const BLOCKED = ['fuck', 'shit', 'cunt', 'bitch', 'wank', 'twat', 'nigg', 'retard', 'whore', 'slut', 'porn', 'jizz',
   'bellend', 'asshole', 'pussy', 'penis', 'vagina', 'hitler', 'dickhead', 'cockhead', 'motherf'];
