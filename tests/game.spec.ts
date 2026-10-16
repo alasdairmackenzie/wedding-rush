@@ -26,6 +26,111 @@ async function state(page: Page): Promise<{ x: number; y: number; grounded: bool
   });
 }
 
+async function setPageHidden(page: Page, hidden: boolean): Promise<void> {
+  await page.evaluate(hidden => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => hidden ? 'hidden' : 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, hidden);
+}
+
+test('return refresh only reloads after five minutes away and preserves saved data', async ({ page }) => {
+  const now = Date.now();
+  await page.clock.setFixedTime(now);
+  await page.goto('/');
+  await expect(page.locator('#play')).toBeEnabled();
+  await page.locator('html').evaluate(html => html.setAttribute('data-before-return', 'true'));
+  await page.evaluate(() => localStorage.setItem('wedding-rush-best', '321'));
+  await setPageHidden(page, true);
+  await page.clock.setFixedTime(now + 299_999);
+  await setPageHidden(page, false);
+  await expect(page.locator('#play')).toBeEnabled();
+  await expect(page.locator('html')).toHaveAttribute('data-before-return', 'true');
+  await setPageHidden(page, true);
+  await page.clock.setFixedTime(now + 599_999);
+  const reloaded = page.waitForEvent('framenavigated', frame => frame === page.mainFrame());
+  await setPageHidden(page, false);
+  await reloaded;
+  await expect(page.locator('#play')).toBeEnabled();
+  await expect(page.locator('html')).not.toHaveAttribute('data-before-return');
+  expect(await page.evaluate(() => localStorage.getItem('wedding-rush-best'))).toBe('321');
+});
+
+for (const restoredFromCache of [false, true]) {
+  test(`return refresh handles ${restoredFromCache ? 'back-forward cache restoration' : 'window focus'}`, async ({ page }) => {
+    const now = Date.now();
+    await page.clock.setFixedTime(now);
+    await page.goto('/');
+    await expect(page.locator('#play')).toBeEnabled();
+    await page.evaluate(persisted => {
+      window.dispatchEvent(persisted ? new PageTransitionEvent('pagehide', { persisted: true }) : new Event('blur'));
+    }, restoredFromCache);
+    await page.clock.setFixedTime(now + 300_000);
+    const reloaded = page.waitForEvent('framenavigated', frame => frame === page.mainFrame());
+    await page.evaluate(persisted => {
+      window.dispatchEvent(persisted ? new PageTransitionEvent('pageshow', { persisted: true }) : new Event('focus'));
+    }, restoredFromCache);
+    await reloaded;
+    await expect(page.locator('#play')).toBeEnabled();
+  });
+}
+
+test('return refresh protects paused games and unposted results at the menu', async ({ page }) => {
+  const now = Date.now();
+  await page.clock.setFixedTime(now);
+  await start(page);
+  await exposeScene(page);
+  await setPageHidden(page, true);
+  await page.clock.setFixedTime(now + 300_000);
+  await setPageHidden(page, false);
+  await expect(page.locator('#menu')).toBeVisible();
+  expect(await page.evaluate<boolean>('window.__scene.run.phase === "paused"')).toBe(true);
+  await page.locator('#play').click();
+  await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+  await page.evaluate(`(() => { const scene = window.__scene; scene.run.phase = 'late'; scene.end(); })()`);
+  await expect(page.locator('#result')).toBeVisible();
+  await page.locator('#result-menu').click();
+  await expect(page.locator('#menu')).toBeVisible();
+  await page.locator('#menu-results').click();
+  await expect(page.locator('#result')).toBeVisible();
+  await expect(page.locator('#submit-score')).toBeEnabled();
+});
+
+test('return refresh waits until replay closes', async ({ page }) => {
+  const now = Date.now();
+  await page.clock.setFixedTime(now);
+  await page.goto('/');
+  await page.locator('#how-to-play').click();
+  await page.locator('#perfect-replay').click({ clickCount: 5 });
+  await expect(page.locator('#replay-play')).toBeEnabled();
+  await setPageHidden(page, true);
+  await page.clock.setFixedTime(now + 300_000);
+  await setPageHidden(page, false);
+  await expect(page.locator('#replay-dialog')).toBeVisible();
+  const reloaded = page.waitForEvent('framenavigated', frame => frame === page.mainFrame());
+  await page.locator('#replay-close').click();
+  await reloaded;
+  await expect(page.locator('#play')).toBeEnabled();
+});
+
+test('return refresh waits for an offline connection to recover', async ({ page, context }) => {
+  const now = Date.now();
+  await page.clock.setFixedTime(now);
+  await page.goto('/');
+  await expect(page.locator('#play')).toBeEnabled();
+  await page.locator('html').evaluate(html => html.setAttribute('data-before-return', 'true'));
+  await setPageHidden(page, true);
+  await context.setOffline(true);
+  await page.clock.setFixedTime(now + 300_000);
+  await setPageHidden(page, false);
+  await expect(page.locator('#menu')).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-before-return', 'true');
+  const reloaded = page.waitForEvent('framenavigated', frame => frame === page.mainFrame());
+  await context.setOffline(false);
+  await reloaded;
+  await expect(page.locator('#play')).toBeEnabled();
+});
+
 test('main menu shows the wedding day badge in the top right on desktop and mobile', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-17T12:00:00Z') });
   await page.goto('/');

@@ -907,7 +907,40 @@ document.querySelector<HTMLAnchorElement>('.wordmark')?.addEventListener('click'
   event.preventDefault();
   showMenu();
 });
+const RETURN_REFRESH_DELAY = 5 * 60_000;
+let awaySince: number | undefined = document.hidden ? Date.now() : undefined;
+let returnRefreshPending = false;
+let returnRefreshStarted = false;
+function refreshReturnedMenu(): void {
+  if (!returnRefreshPending || returnRefreshStarted || document.hidden || !navigator.onLine
+    || !menu.open || started || (lastRun && !posted)
+    || document.querySelector('dialog[open]:not(#menu)')) return;
+  returnRefreshStarted = true;
+  location.reload();
+}
+function markAway(): void {
+  awaySince ??= Date.now();
+}
+function markReturned(): void {
+  if (document.hidden) return;
+  if (awaySince !== undefined) {
+    returnRefreshPending ||= Date.now() - awaySince >= RETURN_REFRESH_DELAY;
+    awaySince = undefined;
+  }
+  refreshReturnedMenu();
+}
+const returnRefreshObserver = new MutationObserver(refreshReturnedMenu);
+document.querySelectorAll('dialog').forEach(dialog => {
+  returnRefreshObserver.observe(dialog, { attributes: true, attributeFilter: ['open'] });
+});
+window.addEventListener('blur', markAway);
+window.addEventListener('pagehide', markAway);
+window.addEventListener('focus', markReturned);
+window.addEventListener('pageshow', markReturned);
+window.addEventListener('online', refreshReturnedMenu);
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden) markAway();
+  else markReturned();
   if (document.hidden) { audio.stop(); if (started) showMenu(); }
 });
 window.addEventListener('blur', () => { audio.stop(); if (started) showMenu(); });
@@ -918,6 +951,7 @@ window.addEventListener('pagehide', event => {
   if (started) showMenu();
   // A persisted page can be restored from the back/forward cache, so keep the game and audio alive.
   if (event.persisted) return;
+  returnRefreshObserver.disconnect();
   confettiObserver.disconnect(); clearMenuConfetti();
   observer.disconnect(); audio.destroy(); game.destroy(true);
 });

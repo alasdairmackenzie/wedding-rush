@@ -26,6 +26,12 @@ Tap or keyboard-activate the
 badge for another burst, including on countdown days. Confetti stops when the
 menu closes or the page is hidden, and is disabled with reduced-motion settings.
 
+After five minutes away from the tab or window, returning to a safe main menu
+automatically reloads the page to pick up the latest game. Paused games,
+unposted results and open dialogs (including replays) are preserved; the reload
+waits until they are cleared. Offline returns wait until the connection is back.
+Saved personal bests, names and challenge badges remain on the device.
+
 Click **faster** five times in **How to play** to enable a 75%-speed cheat for
 the current page session. Sean's horizontal running speed is reduced by 25%
 throughout the route; jumps and obstacles are unchanged. The instruction changes
