@@ -33,7 +33,7 @@ function render(scores: ScoreEntry[]): void {
   const fresh = new Set<string>();
   const items = scores.map((entry, index) => {
     const row = document.createElement('tr');
-    for (const value of [String(index + 1), `${entry.name}${entry.won ? ' 💍' : ''}`, String(entry.score), String(entry.squashed)]) {
+    for (const value of [String(index + 1), entry.name, String(entry.score), String(entry.squashed), '']) {
       const cell = document.createElement('td');
       cell.textContent = value;
       row.append(cell);
@@ -41,10 +41,11 @@ function render(scores: ScoreEntry[]): void {
     if (entry.hasReplay) {
       const watch = document.createElement('a');
       watch.href = `/top?you=${encodeURIComponent(entry.id)}`;
-      watch.textContent = ' 🎞';
-      watch.title = `View ${entry.name}'s score and replay`;
-      watch.setAttribute('aria-label', `View ${entry.name}'s score and replay`);
-      row.cells[1].append(watch);
+      watch.className = 'watch-replay';
+      watch.textContent = 'Watch';
+      watch.title = `Watch replay of ${entry.name}'s run`;
+      watch.setAttribute('aria-label', `Watch replay of ${entry.name}'s run`);
+      row.cells[4].append(watch);
     }
     if (seen && !seen.has(entry.id)) row.dataset.new = '';
     fresh.add(entry.id);
@@ -52,7 +53,7 @@ function render(scores: ScoreEntry[]): void {
   });
   if (!items.length) {
     const empty = document.createElement('tr');
-    empty.innerHTML = '<td class="empty" colspan="4">No scores yet. Be the first!</td>';
+    empty.innerHTML = '<td class="empty" colspan="5">No scores yet. Be the first!</td>';
     items.push(empty);
   }
   rows.replaceChildren(...items);

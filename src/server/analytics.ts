@@ -3,7 +3,7 @@ import type { AnalyticsCount, AnalyticsEventCount, AnalyticsReport, StoredEvent 
 function count(label: string, events: StoredEvent[]): AnalyticsCount {
   return { label, count: events.length, visitors: new Set(events.map(e => e.visitor)).size, sessions: new Set(events.map(e => e.session)).size };
 }
-export function summarize(events: StoredEvent[], days: number, since: string): AnalyticsReport {
+export function summarize(events: StoredEvent[], days: number, since: string, hourlyEvents = events, hourlyPage = 0): AnalyticsReport {
   const groups = (key: (event: StoredEvent) => string): AnalyticsCount[] => {
     const grouped = new Map<string, StoredEvent[]>();
     for (const event of events) {
@@ -68,12 +68,12 @@ export function summarize(events: StoredEvent[], days: number, since: string): A
     stats.gamers.add(event.visitor);
     deviceGames.set(event.device, stats);
   }
-  const currentHour = Math.floor(Date.now() / 3600_000) * 3600_000;
+  const currentHour = Math.floor(Date.now() / 3600_000) * 3600_000 - hourlyPage * 12 * 3600_000;
   const hourlyPlayers = Array.from({ length: 12 }, (_, index) => {
     const start = currentHour - (11 - index) * 3600_000;
-    const visitors = new Set(events.filter(event => event.name === 'game_start' && event.page === 'game'
-      && Date.parse(event.at) >= start && Date.parse(event.at) < start + 3600_000).map(event => event.visitor));
-    return { hour: new Date(start).toISOString(), devices: visitors.size };
+    const starts = hourlyEvents.filter(event => event.name === 'game_start' && event.page === 'game'
+      && Date.parse(event.at) >= start && Date.parse(event.at) < start + 3600_000);
+    return { hour: new Date(start).toISOString(), devices: new Set(starts.map(event => event.visitor)).size, plays: starts.length };
   });
   return {
     days, since, storage: 'memory', totals: count('All activity', events), events: breakdown,

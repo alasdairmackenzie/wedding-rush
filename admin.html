@@ -49,10 +49,20 @@
           </figure>
           <div class="analytics-charts" aria-label="Analytics charts">
             <figure class="analytics-chart analytics-hourly">
-              <figcaption>Devices playing by hour — last 12 hours (UTC)</figcaption>
-              <p class="hint">Unique game browsers starting a game each hour, not physical devices or people. Includes the current, incomplete hour and the previous 11 hours, regardless of the period filter. Repeat plays count once per browser per hour.</p>
+              <figcaption id="analytics-hourly-title">Devices playing by hour — last 12 hours (UTC)</figcaption>
+              <p class="hint">Devices counts unique game browsers starting a game each hour, not physical devices or people. Plays counts every game started, including repeats. Latest includes the current, incomplete hour and the previous 11 hours. Browse earlier 12-hour windows within the 90-day retention period, regardless of the period filter.</p>
+              <div class="row hourly-measure">
+                <label for="analytics-hourly-metric">Hourly measure</label>
+                <select id="analytics-hourly-metric" disabled><option value="devices">Devices</option><option value="plays">Plays</option></select>
+              </div>
+              <nav class="hourly-pagination" aria-label="Hourly chart pagination">
+                <button id="analytics-hourly-previous" type="button" disabled>Previous</button>
+                <button id="analytics-hourly-next" type="button" disabled>Next</button>
+                <button id="analytics-hourly-latest" type="button" disabled>Latest</button>
+              </nav>
+              <p id="analytics-hourly-range" role="status">Loading hourly counts…</p>
               <div id="analytics-hourly-chart"></div>
-              <details><summary>View hourly counts</summary><div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Hour starting (UTC)</th><th scope="col">Devices / browsers</th></tr></thead><tbody id="analytics-hourly-table"></tbody></table></div></details>
+              <details><summary>View hourly counts</summary><div class="table-wrap"><table class="toplist"><thead><tr><th scope="col">Hour starting (UTC)</th><th id="analytics-hourly-column" scope="col">Devices / browsers</th></tr></thead><tbody id="analytics-hourly-table"></tbody></table></div></details>
             </figure>
             <figure class="analytics-chart">
               <figcaption>Daily activity (UTC)</figcaption>

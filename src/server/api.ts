@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { imageType, isFaceKind, MAX_FACE_BYTES } from '../shared/faces.ts';
 import { cleanName, ENTRY_ID, FULL_RESULTS_SIZE, isRude, LEADERBOARD_SIZE, NAME_MAX, validateSubmission } from '../shared/leaderboard.ts';
 import { ADMIN_LIST_SIZE, type ScoreStore } from './store.ts';
-import { ANALYTICS_ID, analyticsBatch, isAnalyticsEvent, type AnalyticsEvent } from '../shared/analytics.ts';
+import { ANALYTICS_ID, MAX_HOURLY_PAGE, analyticsBatch, isAnalyticsEvent, type AnalyticsEvent } from '../shared/analytics.ts';
 import { ACTIVE_WINDOW_MS } from '../shared/presence.ts';
 import { isReplay, MAX_REPLAY_BYTES, type Replay } from '../shared/replay.ts';
 
@@ -85,12 +85,19 @@ async function admin(req: IncomingMessage, res: ServerResponse, store: ScoreStor
   const [, , , section, key = ''] = path.split('/');
   if (section === 'analytics' && !key) {
     if (req.method !== 'GET') return notAllowed(res, 'GET');
-    const days = Number(new URL(req.url ?? '/', 'http://localhost').searchParams.get('days') ?? 7);
+    const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
+    const days = Number(params.get('days') ?? 7);
     if (![1, 7, 30, 90].includes(days)) {
       send(res, 400, { error: 'Choose 1, 7, 30 or 90 days.' });
       return true;
     }
-    send(res, 200, await store.analytics(days));
+    const rawHourlyPage = params.get('hourlyPage') ?? '0';
+    const hourlyPage = Number(rawHourlyPage);
+    if (!/^\d+$/.test(rawHourlyPage) || !Number.isInteger(hourlyPage) || hourlyPage < 0 || hourlyPage > MAX_HOURLY_PAGE) {
+      send(res, 400, { error: `Hourly page must be a whole number from 0 to ${MAX_HOURLY_PAGE}.` });
+      return true;
+    }
+    send(res, 200, await store.analytics(days, hourlyPage));
     return true;
   }
   if (section === 'check' && !key) {

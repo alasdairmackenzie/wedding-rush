@@ -203,8 +203,8 @@ function showText(message: string): void {
 }
 function scoreRow(entry: ScoreEntry, rank: number, you?: ScoreEntry): HTMLTableRowElement {
   const row = document.createElement('tr');
-  const name = `${entry.name}${entry.won ? ' 💍' : ''}`;
-  for (const value of [String(rank), name, String(entry.score), String(entry.squashed)]) {
+  const name = entry.name;
+  for (const value of [String(rank), name, String(entry.score), String(entry.squashed), '']) {
     const cell = document.createElement('td');
     cell.textContent = value;
     row.append(cell);
@@ -213,12 +213,12 @@ function scoreRow(entry: ScoreEntry, rank: number, you?: ScoreEntry): HTMLTableR
     const watch = document.createElement('button');
     watch.type = 'button';
     watch.className = 'watch-replay';
-    watch.textContent = '🎞';
-    watch.title = `Watch ${entry.name}'s run`;
-    watch.setAttribute('aria-label', `Watch ${entry.name}'s run`);
+    watch.textContent = 'Watch';
+    watch.title = `Watch replay of ${entry.name}'s run`;
+    watch.setAttribute('aria-label', `Watch replay of ${entry.name}'s run`);
     watch.setAttribute('aria-haspopup', 'dialog');
     watch.addEventListener('click', () => { void replayViewer.show(entry.id, `${entry.name}'s run · ${entry.score} points`); });
-    row.cells[1].append(watch);
+    row.cells[4].append(watch);
   }
   if (you && entry.id === you.id) {
     row.dataset.you = '';
@@ -231,12 +231,12 @@ function renderScores(body: HTMLTableSectionElement, scores: ScoreEntry[], you?:
   if (you && !scores.some(entry => entry.id === you.id)) {
     const gap = document.createElement('tr');
     gap.className = 'gap';
-    gap.innerHTML = '<td colspan="4">⋯</td>';
+    gap.innerHTML = '<td colspan="5">⋯</td>';
     rows.push(gap, scoreRow(you, you.rank, you));
   }
   if (!rows.length) {
     const empty = document.createElement('tr');
-    empty.innerHTML = '<td class="empty" colspan="4">No scores yet. Be the first!</td>';
+    empty.innerHTML = '<td class="empty" colspan="5">No scores yet. Be the first!</td>';
     rows.push(empty);
   }
   body.replaceChildren(...rows);

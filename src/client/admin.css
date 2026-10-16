@@ -79,6 +79,10 @@ body.admin main {
 .analytics-chart { min-width: 0; margin: 0; padding: 12px; border: 2px solid #302825; background: #f8efe3; }
 .analytics-chart figcaption { margin-bottom: 8px; font-weight: 700; }
 .analytics-hourly { grid-column: 1 / -1; }
+.hourly-measure { margin-bottom: 12px; }
+.hourly-pagination { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.hourly-pagination button { min-height: 44px; padding: 8px 12px; font-size: 13px; }
+#analytics-hourly-range { margin-bottom: 12px; }
 .analytics-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
 .analytics-flow { margin: 16px 0 24px; }
 .analytics-flow-scroll { overflow-x: auto; }

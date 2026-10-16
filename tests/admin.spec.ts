@@ -29,7 +29,9 @@ test('live screen shows scores, where to play and a return link', async ({ page,
   await page.goto('/live?url=seanandbeckywedding.run');
   await expect(page.locator('#live-url')).toHaveText('seanandbeckywedding.run');
   await expect(page.locator('#live-rows tr').first()).toContainText(name);
-  await expect(page.locator('#live-rows tr').first()).toContainText('💍');
+  await expect(page.locator('#live-rows tr').first()).not.toContainText('💍');
+  await expect(page.getByRole('columnheader', { name: 'Replay', exact: true })).toBeVisible();
+  await expect(page.locator('#live-rows tr').first().locator('td')).toHaveCount(5);
   await expect(page.getByRole('button')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Back to game' })).toHaveAttribute('href', '/');
 

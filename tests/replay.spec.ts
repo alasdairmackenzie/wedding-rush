@@ -60,18 +60,43 @@ for (const width of [1280, 390]) {
     await expect(page.locator('.replay-notice').first()).toContainText('publishes its gameplay replay');
     await page.locator('#submit-score').click();
     await expect(page.locator('#top-list')).toBeVisible();
-    await page.getByRole('button', { name: `Watch Replay ${width}'s run`, exact: true }).click();
+    const watch = page.getByRole('button', { name: `Watch replay of Replay ${width}'s run`, exact: true });
+    await expect(watch).toHaveText('Watch');
+    await expect(watch.locator('..')).toHaveJSProperty('cellIndex', 4);
+    await expect(watch.locator('../..').locator('td').nth(1)).toHaveText(`Replay ${width}`);
+    await expect(page.locator('#top-list').getByRole('columnheader', { name: 'Replay', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await watch.click();
     await expect(page.locator('#replay-play')).toBeEnabled();
     await expect(page.locator('#replay-title')).toContainText(`Replay ${width}'s run`);
     await page.locator('#replay-seek').focus();
     await page.keyboard.press('End');
     await expect(page.locator('#replay-status')).toContainText('Made it to Becky!');
     await page.locator('#replay-close').click();
+    await page.locator('#full-results-open').click();
+    const fullWatch = page.locator('#full-results').getByRole('button', { name: `Watch replay of Replay ${width}'s run`, exact: true });
+    await expect(fullWatch).toHaveText('Watch');
+    await expect(fullWatch.locator('..')).toHaveJSProperty('cellIndex', 4);
+    await expect(page.locator('#full-results').getByRole('columnheader', { name: 'Replay', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(posts).toBe(1);
     expect(await page.evaluate(() => localStorage.getItem('wedding-rush-challenges'))).toBe(achievements);
   });
+
 }
 
+test('live leaderboard puts Watch links in the Replay column', async ({ page }) => {
+    await page.route('**/api/scores*', route => route.fulfill({ json: { scores: [
+      { id: 'bbbbbbbbbbbb', name: 'Guest', score: 5, squashed: 0, won: true, at: '2026-10-15T12:00:00Z', hasReplay: true },
+    ] } }));
+    await page.goto('/live');
+    await expect(page.getByRole('columnheader', { name: 'Replay', exact: true })).toBeVisible();
+    const watch = page.getByRole('link', { name: "Watch replay of Guest's run", exact: true });
+    await expect(watch).toHaveText('Watch');
+    await expect(watch).toHaveAttribute('href', '/top?you=bbbbbbbbbbbb');
+    await expect(watch.locator('..')).toHaveJSProperty('cellIndex', 4);
+    await expect(page.locator('#live-rows tr td').nth(1)).toHaveText('Guest');
+  });
 test('records losses and keeps them available when returning from the top list', async ({ page }) => {
   await completeRun(page, false);
   await page.locator('#result-rewatch').click();
@@ -92,12 +117,13 @@ test('public replay failures are explicit and legacy scores have no watch button
   ] } }));
   await page.route('**/api/replays/*', route => route.fulfill({ status: 404, json: { error: 'Missing' } }));
   await page.goto('/top');
-  await expect(page.getByRole('button', { name: "Watch Old Guest's run" })).toHaveCount(0);
-  await page.getByRole('button', { name: "Watch New Guest's run" }).click();
+  await expect(page.getByRole('button', { name: "Watch replay of Old Guest's run" })).toHaveCount(0);
+  await expect(page.locator('#full-results-rows')).not.toContainText('💍');
+  await page.getByRole('button', { name: "Watch replay of New Guest's run" }).click();
   await expect(page.locator('#replay-status')).toHaveText('No replay is available for that score.');
   await expect(page.locator('#replay-play')).toBeDisabled();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: "Watch New Guest's run" })).toBeFocused();
+  await expect(page.getByRole('button', { name: "Watch replay of New Guest's run" })).toBeFocused();
 });
 
 test('unsupported public replay versions cannot play', async ({ page }) => {
@@ -106,7 +132,7 @@ test('unsupported public replay versions cannot play', async ({ page }) => {
   ] } }));
   await page.route('**/api/replays/*', route => route.fulfill({ json: { replay: { version: 2, dice: new Run().sweetValues, frames: [] } } }));
   await page.goto('/top');
-  await page.getByRole('button', { name: "Watch Guest's run" }).click();
+  await page.getByRole('button', { name: "Watch replay of Guest's run" }).click();
   await expect(page.locator('#replay-status')).toContainText('unsupported game version');
   await expect(page.locator('#replay-play')).toBeDisabled();
 });

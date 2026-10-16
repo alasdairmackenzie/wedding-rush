@@ -33,7 +33,7 @@ a password when you start the server, for example
 
 The results screen offers **Rewatch run** for the latest completed run (including
 losses). Posting a score from the game also publishes its gameplay recording:
-An inline film icon appears beside that score in the top 10 and full results. The TV
+A **Replay** column with a **Watch** button appears in the top 10 and full results. The TV
 leaderboard links to the score's watch button. Older scores have no replay.
 
 Replays start paused, with play/pause, restart and a keyboard-accessible seek bar.
@@ -269,11 +269,16 @@ not a chronological clickstream or traffic volume. Only events received within
 the selected period are included. Expand **View journey counts** for the text
 alternative, including score-post attempts.
 
-**Devices playing by hour** shows 12 UTC hourly buckets (the current partial
-hour and previous 11), independently of the selected reporting period. Each
-browser starting a game counts once in that hour, even across multiple tabs or
-replays. Empty hours show zero; these are browser counts, not physical devices
-or identifiable people. Expand **View hourly counts** for exact dates and values.
+The hourly chart shows 12 UTC hourly buckets, independently of the selected
+reporting period. **Hourly measure** switches between **Devices** (each browser
+starting a game counts once per hour, even across tabs or replays) and **Plays**
+(every recorded game start, including repeats). Devices are browsers, not physical
+devices or identifiable people. Empty hours show zero.
+**Previous** and **Next** browse adjacent 12-hour windows within the
+90-day retention period; **Latest** returns to the current partial hour and
+previous 11. The UTC date range is shown above the chart. Refreshing or changing
+the report period preserves the hourly page and measure. Expand **View hourly
+counts** for exact dates and values; it follows the selected measure.
 
 The public live scores page also shows **Active in the last 15 minutes**:
 unique anonymous browsers with a visible game page during that rolling window.

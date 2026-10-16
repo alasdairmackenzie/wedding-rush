@@ -22,6 +22,8 @@ h1 { margin: 0; font-size: clamp(20px, 2.6vw, 52px); text-transform: uppercase; 
 .board tbody tr:nth-child(-n+3) td:first-child { font-weight: bold; }
 .board tr[data-new] td { animation: arrive 4s ease-out; }
 .board td.empty { text-align: center; color: #756553; }
+.board .watch-replay { display: inline-block; padding: .3em .5em; border: 2px solid #302825; box-shadow: 2px 2px 0 #302825; background: #f9f2df; color: #302825; font-size: .65em; font-weight: 700; text-decoration: none; }
+.board .watch-replay:hover { background: #f6d4dc; }
 @keyframes arrive { 0%, 40% { background: #ffd465; } 100% { background: transparent; } }
 @media (prefers-reduced-motion: reduce) { .board tr[data-new] td { animation: none; background: #ffe9a8; } }
 .join {

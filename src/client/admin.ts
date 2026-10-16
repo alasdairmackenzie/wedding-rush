@@ -1,6 +1,6 @@
 import { FACE_KINDS, FACE_LABELS, type FaceKind } from '../shared/faces';
 import { NAME_MAX, type ScoreEntry } from '../shared/leaderboard';
-import type { AnalyticsCount, AnalyticsReport } from '../shared/analytics';
+import { MAX_HOURLY_PAGE, type AnalyticsCount, type AnalyticsReport } from '../shared/analytics';
 import brideHeadUrl from '../assets/art/bride-head.png';
 import dealHeadUrl from '../assets/art/deal-head.png';
 import pingpongHeadUrl from '../assets/art/pingpong-head.png';
@@ -95,6 +95,31 @@ async function signIn(candidate: string): Promise<void> {
 const analyticsDays = $<HTMLSelectElement>('analytics-days');
 const analyticsStatus = $('analytics-status');
 let analyticsRequest = 0;
+let hourlyPage = 0;
+let hourlyRows: AnalyticsReport['hourlyPlayers'] | undefined;
+const hourlyMetric = $<HTMLSelectElement>('analytics-hourly-metric');
+const hourlyPrevious = $<HTMLButtonElement>('analytics-hourly-previous');
+const hourlyNext = $<HTMLButtonElement>('analytics-hourly-next');
+const hourlyLatest = $<HTMLButtonElement>('analytics-hourly-latest');
+function updateHourlyControls(loading = false): void {
+  hourlyMetric.disabled = loading || !hourlyRows;
+  hourlyPrevious.disabled = loading || hourlyPage >= MAX_HOURLY_PAGE;
+  hourlyNext.disabled = hourlyLatest.disabled = loading || hourlyPage === 0;
+}
+function renderHourlyCounts(rows: AnalyticsReport['hourlyPlayers']): void {
+  const plays = hourlyMetric.value === 'plays';
+  renderActivityChart(rows.map(row => ({ label: row.hour, count: plays ? row.plays : row.devices })), true);
+  $('analytics-hourly-title').textContent = `${plays ? 'Plays' : 'Devices playing'} by hour — ${hourlyPage === 0 ? 'last' : 'earlier'} 12 hours (UTC)`;
+  $('analytics-hourly-column').textContent = plays ? 'Plays / game starts' : 'Devices / browsers';
+  const firstHour = rows[0].hour;
+  const endHour = new Date(Date.parse(rows.at(-1)!.hour) + 3600_000).toISOString();
+  const hourLabel = (iso: string) => `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
+  $('analytics-hourly-range').textContent = `${hourLabel(firstHour)} – ${hourLabel(endHour)} UTC`
+    + (hourlyPage === 0 ? ' · Current hour incomplete.' : '');
+  analyticsTable('analytics-hourly-table', rows.map(row => [
+    hourLabel(row.hour), plays ? row.plays : row.devices,
+  ]), 2);
+}
 const label = (text: string): string => text.replaceAll('_', ' ').replaceAll('-', ' ');
 function analyticsTable(id: string, rows: (string | number)[][], columns: number): void {
   const body = $(id);
@@ -185,10 +210,13 @@ function renderHorizontalChart(id: string, title: string, description: string, r
 }
 function renderActivityChart(rows: { label: string; count: number }[], hourly = false): void {
   const id = hourly ? 'analytics-hourly-chart' : 'analytics-daily-chart';
-  const title = hourly ? 'Devices playing by hour (UTC)' : 'Daily activity (UTC)';
+  const plays = hourlyMetric.value === 'plays';
+  const unit = hourly ? (plays ? 'plays' : 'browsers') : 'events';
+  const title = hourly ? `${plays ? 'Plays' : 'Devices playing'} by hour (UTC)` : 'Daily activity (UTC)';
   const description = hourly
-    ? 'Unique browsers starting a game in each of the last 12 hourly buckets. The current hour is incomplete. '
-      + rows.map(row => `${row.label}: ${row.count} browsers.`).join(' ')
+    ? (plays ? 'Every game started in each displayed hourly bucket, including repeat plays. '
+      : 'Unique browsers starting a game in each displayed hourly bucket. ')
+      + rows.map(row => `${row.label}: ${row.count} ${unit}.`).join(' ')
     : 'Number of analytics events recorded each day in the selected period.';
   const width = 720;
   const height = 220;
@@ -229,7 +257,7 @@ function renderActivityChart(rows: { label: string; count: number }[], hourly = 
       bar.setAttribute('height', String(barHeight));
       bar.setAttribute('fill', '#d89a21');
       const tooltip = svgElement('title');
-      tooltip.textContent = `${row.label}: ${row.count.toLocaleString()} ${hourly ? 'browsers' : 'events'}`;
+      tooltip.textContent = `${row.label}: ${row.count.toLocaleString()} ${unit}`;
       bar.append(tooltip);
       svg.append(bar);
       if (hourly) chartText(svg, row.count.toLocaleString(), left + index * slot + slot / 2, top + plotHeight - barHeight - 8, 'middle');
@@ -349,10 +377,8 @@ function renderAnalytics(report: AnalyticsReport): void {
   }));
   renderFlowChart(report);
   renderActivityChart(report.daily);
-  renderActivityChart(report.hourlyPlayers.map(row => ({ label: row.hour, count: row.devices })), true);
-  analyticsTable('analytics-hourly-table', report.hourlyPlayers.map(row => [
-    `${row.hour.slice(0, 10)} ${row.hour.slice(11, 16)}`, row.devices,
-  ]), 2);
+  hourlyRows = report.hourlyPlayers;
+  renderHourlyCounts(hourlyRows);
   const outcomes: [string, number][] = [
     ['Started', report.funnel.started], ['Reached Becky', report.funnel.won],
     ['Lost', report.funnel.lost], ['Score saved', report.funnel.submitted],
@@ -403,19 +429,33 @@ function renderAnalytics(report: AnalyticsReport): void {
 }
 async function loadAnalytics(): Promise<void> {
   const request = ++analyticsRequest;
+  updateHourlyControls(true);
+  $('analytics-hourly-chart').setAttribute('aria-busy', 'true');
+  $('analytics-hourly-range').textContent = 'Loading hourly counts…';
   say(analyticsStatus, 'Loading analytics…');
   try {
-    const report = await api<AnalyticsReport>(`/api/admin/analytics?days=${analyticsDays.value}`);
+    const report = await api<AnalyticsReport>(`/api/admin/analytics?days=${analyticsDays.value}&hourlyPage=${hourlyPage}`);
     if (request === analyticsRequest && token) renderAnalytics(report);
   } catch (error) {
     if (request !== analyticsRequest) return;
+    hourlyRows = undefined;
     $('analytics-metrics').replaceChildren();
     for (const id of ['funnel', 'screens', 'actions', 'daily', 'devices', 'sources', 'daily-chart', 'outcomes-chart', 'devices-chart', 'flow-chart', 'flow-table', 'hourly-chart', 'hourly-table']) {
       $(`analytics-${id}`).replaceChildren();
     }
+    $('analytics-hourly-range').textContent = 'Hourly counts unavailable. Refresh to try again or choose another window.';
     failed(error, analyticsStatus);
+  } finally {
+    if (request === analyticsRequest) {
+      updateHourlyControls();
+      $('analytics-hourly-chart').removeAttribute('aria-busy');
+    }
   }
 }
+hourlyPrevious.addEventListener('click', () => { hourlyPage = Math.min(MAX_HOURLY_PAGE, hourlyPage + 1); void loadAnalytics(); });
+hourlyNext.addEventListener('click', () => { hourlyPage = Math.max(0, hourlyPage - 1); void loadAnalytics(); });
+hourlyLatest.addEventListener('click', () => { hourlyPage = 0; void loadAnalytics(); });
+hourlyMetric.addEventListener('change', () => { if (hourlyRows) renderHourlyCounts(hourlyRows); });
 analyticsDays.addEventListener('change', () => { void loadAnalytics(); });
 $('analytics-refresh').addEventListener('click', () => { void loadAnalytics(); });
 

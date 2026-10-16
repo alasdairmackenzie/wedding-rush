@@ -146,7 +146,7 @@ test('player journey shows counts, conversion rates and a readable mobile scroll
   expect(response.ok()).toBe(true);
   const report: AnalyticsReport = await response.json();
   report.hourlyPlayers = Array.from({ length: 12 }, (_, index) => ({
-    hour: new Date(Date.UTC(2026, 9, 15, index)).toISOString(), devices: index === 11 ? 7 : 0,
+    hour: new Date(Date.UTC(2026, 9, 15, index)).toISOString(), devices: index === 11 ? 7 : 0, plays: index === 11 ? 12 : 0,
   }));
   report.flow = { openedSessions: 10, playedSessions: 4, menuRuns: 3, resumedRuns: 2, attemptedRuns: 3 };
   report.funnel = { started: 6, won: 2, lost: 3, unfinished: 1, submitted: 2, wonSubmitted: 1, lostSubmitted: 1 };
@@ -181,3 +181,90 @@ test('player journey shows counts, conversion rates and a readable mobile scroll
   await expect(diagram).not.toContainText('NaN');
   await expect(diagram).toContainText('0, tab sessions');
 });
+
+for (const width of [1100, 375]) {
+  test(`hourly chart pages and switches between browsers and plays at ${width}px`, async ({ page, request }) => {
+    await page.setViewportSize({ width, height: 850 });
+    const response = await request.get('/api/admin/analytics?days=7', {
+      headers: { Authorization: 'Bearer test-admin-token' },
+    });
+    expect(response.ok()).toBe(true);
+    const report: AnalyticsReport = await response.json();
+    const queries: URL[] = [];
+    let fail = false;
+    await page.route('**/api/admin/analytics?*', route => {
+      const url = new URL(route.request().url());
+      queries.push(url);
+      if (fail) return route.fulfill({ status: 503, json: { error: 'Analytics are unavailable.' } });
+      const offset = Number(url.searchParams.get('hourlyPage'));
+      return route.fulfill({ json: {
+        ...report,
+        hourlyPlayers: Array.from({ length: 12 }, (_, index) => ({
+          hour: new Date(Date.UTC(2026, 9, 15, 1 - offset * 12 - 11 + index)).toISOString(),
+          devices: index === 11 ? 2 + offset : 0,
+          plays: index === 11 ? 5 + offset : 0,
+        })),
+      } });
+    });
+    await page.goto('/admin/stats');
+    await page.getByLabel('Admin password').fill('test-admin-token');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    const previous = page.getByRole('button', { name: 'Previous', exact: true });
+    const next = page.getByRole('button', { name: 'Next', exact: true });
+    const latest = page.getByRole('button', { name: 'Latest', exact: true });
+    const range = page.locator('#analytics-hourly-range');
+    const chart = page.locator('#analytics-hourly-chart');
+    const metric = page.getByLabel('Hourly measure', { exact: true });
+    await expect(range).toHaveText('2026-10-14 14:00 – 2026-10-15 02:00 UTC · Current hour incomplete.');
+    await expect(next).toBeDisabled();
+    await expect(latest).toBeDisabled();
+    await expect(previous).toBeEnabled();
+    await expect(chart).toContainText('2 browsers');
+    await page.getByText('View hourly counts', { exact: true }).click();
+    const lastCount = page.locator('#analytics-hourly-table tr').last().locator('td').last();
+    await expect(lastCount).toHaveText('2');
+    const requestCount = queries.length;
+    await metric.selectOption('plays');
+    await expect(page.getByRole('img', { name: /^Plays by hour/ })).toBeVisible();
+    await expect(chart).toContainText('5 plays');
+    await expect(lastCount).toHaveText('5');
+    await expect(page.locator('#analytics-hourly-column')).toHaveText('Plays / game starts');
+    expect(queries).toHaveLength(requestCount);
+    await previous.click();
+    await expect(range).toHaveText('2026-10-14 02:00 – 2026-10-14 14:00 UTC');
+    await expect(chart).toContainText('6 plays');
+    await expect(lastCount).toHaveText('6');
+    expect(queries.at(-1)?.searchParams.get('hourlyPage')).toBe('1');
+    await previous.click();
+    await expect(range).toHaveText('2026-10-13 14:00 – 2026-10-14 02:00 UTC');
+    await page.getByLabel('Period', { exact: true }).selectOption('1');
+    await expect(page.locator('#analytics-status')).toContainText('Updated');
+    expect(queries.at(-1)?.searchParams.get('hourlyPage')).toBe('2');
+    expect(queries.at(-1)?.searchParams.get('days')).toBe('1');
+    await page.getByRole('button', { name: 'Refresh analytics' }).click();
+    await expect(previous).toBeEnabled();
+    await expect(metric).toHaveValue('plays');
+    expect(queries.at(-1)?.searchParams.get('hourlyPage')).toBe('2');
+    await next.click();
+    await expect(range).toHaveText('2026-10-14 02:00 – 2026-10-14 14:00 UTC');
+    await metric.selectOption('devices');
+    await expect(chart).toContainText('3 browsers');
+    await expect(lastCount).toHaveText('3');
+    await latest.click();
+    await expect(range).toContainText('Current hour incomplete.');
+    await expect(next).toBeDisabled();
+    await expect(chart.locator('[data-chart-bar]')).toHaveCount(12);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    fail = true;
+    await previous.click();
+    await expect(range).toContainText('Hourly counts unavailable.');
+    await expect(chart).toBeEmpty();
+    await expect(page.locator('#analytics-hourly-table')).toBeEmpty();
+    await expect(metric).toBeDisabled();
+    fail = false;
+    await latest.click();
+    await expect(range).toContainText('Current hour incomplete.');
+    await expect(metric).toBeEnabled();
+    await expect(chart).toContainText('2 browsers');
+  });
+}

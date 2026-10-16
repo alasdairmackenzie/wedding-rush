@@ -132,13 +132,51 @@ describe('analytics validation and aggregation', () => {
       vi.setSystemTime(new Date('2026-10-15T01:30:00Z'));
       const report = await store.analytics(1);
       expect(report.hourlyPlayers).toHaveLength(12);
-      expect(report.hourlyPlayers[0]).toEqual({ hour: '2026-10-14T14:00:00.000Z', devices: 1 });
-      expect(report.hourlyPlayers[1]).toEqual({ hour: '2026-10-14T15:00:00.000Z', devices: 0 });
-      expect(report.hourlyPlayers[10]).toEqual({ hour: '2026-10-15T00:00:00.000Z', devices: 2 });
-      expect(report.hourlyPlayers[11]).toEqual({ hour: '2026-10-15T01:00:00.000Z', devices: 1 });
+      expect(report.hourlyPlayers[0]).toEqual({ hour: '2026-10-14T14:00:00.000Z', devices: 1, plays: 1 });
+      expect(report.hourlyPlayers[1]).toEqual({ hour: '2026-10-14T15:00:00.000Z', devices: 0, plays: 0 });
+      expect(report.hourlyPlayers[10]).toEqual({ hour: '2026-10-15T00:00:00.000Z', devices: 2, plays: 3 });
+      expect(report.hourlyPlayers[11]).toEqual({ hour: '2026-10-15T01:00:00.000Z', devices: 1, plays: 1 });
       expect((await store.analytics(30)).hourlyPlayers).toEqual(report.hourlyPlayers);
       expect((await memoryStore().analytics(7)).hourlyPlayers).toHaveLength(12);
       expect((await memoryStore().analytics(7)).hourlyPlayers.every(row => row.devices === 0)).toBe(true);
+      const previous = await store.analytics(1, 1);
+      expect(previous.hourlyPlayers[0]).toEqual({ hour: '2026-10-14T02:00:00.000Z', devices: 0, plays: 0 });
+      expect(previous.hourlyPlayers[11]).toEqual({ hour: '2026-10-14T13:00:00.000Z', devices: 1, plays: 1 });
+      expect(previous.totals).toEqual(report.totals);
+      expect(Date.parse(report.hourlyPlayers[0].hour) - Date.parse(previous.hourlyPlayers[11].hour)).toBe(3600_000);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('pages hourly counts beyond the period filter, respecting boundaries and retention', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = memoryStore();
+      vi.setSystemTime(new Date('2026-07-16T01:00:00Z'));
+      await store.track([event('game_start')]);
+      vi.setSystemTime(new Date('2026-07-17T14:00:00Z'));
+      await store.track([event('game_start')]);
+      vi.setSystemTime(new Date('2026-10-13T01:59:59Z'));
+      await store.track([event('game_start')]);
+      vi.setSystemTime(new Date('2026-10-13T02:00:00Z'));
+      await store.track([
+        event('game_start'), event('game_start', 'game', { run: randomUUID(), session: randomUUID() }),
+        event('game_start', 'game', { visitor: randomUUID() }),
+        event('page_view', 'game', { visitor: randomUUID() }),
+      ]);
+      vi.setSystemTime(new Date('2026-10-13T14:00:00Z'));
+      await store.track([event('game_start')]);
+      vi.setSystemTime(new Date('2026-10-15T01:30:00Z'));
+      const report = await store.analytics(1, 3);
+      expect(report.totals.count).toBe(0);
+      expect(report.hourlyPlayers).toHaveLength(12);
+      expect(report.hourlyPlayers[0]).toEqual({ hour: '2026-10-13T02:00:00.000Z', devices: 2, plays: 3 });
+      expect(report.hourlyPlayers[11]).toEqual({ hour: '2026-10-13T13:00:00.000Z', devices: 0, plays: 0 });
+      expect((await store.analytics(90, 3)).hourlyPlayers).toEqual(report.hourlyPlayers);
+      const oldest = await store.analytics(1, 179);
+      expect(oldest.hourlyPlayers[0]).toEqual({ hour: '2026-07-17T02:00:00.000Z', devices: 0, plays: 0 });
+      expect(oldest.hourlyPlayers[11]).toEqual({ hour: '2026-07-17T13:00:00.000Z', devices: 0, plays: 0 });
+      expect(oldest.hourlyPlayers.every(row => row.devices === 0)).toBe(true);
+      expect((await store.analytics(1, 178)).hourlyPlayers[0]).toEqual({ hour: '2026-07-17T14:00:00.000Z', devices: 1, plays: 1 });
     } finally { vi.useRealTimers(); }
   });
 
@@ -178,6 +216,15 @@ describe('analytics API', () => {
     expect((await fetch(`${base}/api/admin/analytics`)).status).toBe(401);
     expect((await fetch(`${base}/api/admin/analytics?days=365`, { headers: auth })).status).toBe(400);
     expect((await fetch(`${base}/api/admin/analytics?days=7`, { headers: auth })).status).toBe(200);
+    for (const value of ['-1', '180', '1.5', 'abc', '', 'Infinity']) {
+      expect((await fetch(`${base}/api/admin/analytics?days=7&hourlyPage=${value}`, { headers: auth })).status).toBe(400);
+    }
+    expect((await fetch(`${base}/api/admin/analytics?hourlyPage=1`)).status).toBe(401);
+    const latest = await (await fetch(`${base}/api/admin/analytics?days=1`, { headers: auth })).json() as AnalyticsReport;
+    const previous = await (await fetch(`${base}/api/admin/analytics?days=1&hourlyPage=1`, { headers: auth })).json() as AnalyticsReport;
+    expect(previous.hourlyPlayers).toHaveLength(12);
+    expect(Date.parse(latest.hourlyPlayers[0].hour) - Date.parse(previous.hourlyPlayers[0].hour)).toBe(12 * 3600_000);
+    expect((await fetch(`${base}/api/admin/analytics?days=1&hourlyPage=179`, { headers: auth })).status).toBe(200);
   });
   it('rejects malformed, cross-site, oversized and forged conversion events', async () => {
     expect((await post({ events: [event('action')] }, { 'Sec-Fetch-Site': 'cross-site' })).status).toBe(403);

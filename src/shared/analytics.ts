@@ -1,4 +1,6 @@
 export const ANALYTICS_RETENTION_DAYS = 90;
+export const HOURLY_PAGE_HOURS = 12;
+export const MAX_HOURLY_PAGE = ANALYTICS_RETENTION_DAYS * 24 / HOURLY_PAGE_HOURS - 1;
 export const ANALYTICS_BATCH_SIZE = 25;
 export const ANALYTICS_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 export const EVENT_NAMES = [
@@ -45,7 +47,7 @@ export interface AnalyticsReport {
   totals: AnalyticsCount;
   events: AnalyticsEventCount[];
   daily: AnalyticsCount[];
-  hourlyPlayers: { hour: string; devices: number }[];
+  hourlyPlayers: { hour: string; devices: number; plays: number }[];
   devices: AnalyticsDeviceCount[];
   sources: AnalyticsCount[];
   flow: { openedSessions: number; playedSessions: number; menuRuns: number; resumedRuns: number; attemptedRuns: number };

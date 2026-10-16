@@ -12,7 +12,7 @@ export interface ScoreStore {
   add(entry: ScoreSubmission, analytics?: AnalyticsEvent, replay?: Replay): Promise<RankedEntry>;
   replay(id: string): Promise<Replay | undefined>;
   track(events: AnalyticsEvent[]): Promise<void>;
-  analytics(days: number): Promise<AnalyticsReport>;
+  analytics(days: number, hourlyPage?: number): Promise<AnalyticsReport>;
   recordPresence(visitor: string): Promise<void>;
   activeUsers(): Promise<number>;
   find(id: string, uniqueNames?: boolean): Promise<RankedEntry | undefined>;
@@ -73,10 +73,11 @@ export function memoryStore(): ScoreStore {
       prune();
       for (const event of batch) if (!events.has(event.id)) events.set(event.id, { ...event, at: new Date().toISOString() });
     },
-    async analytics(days) {
+    async analytics(days, hourlyPage = 0) {
       prune();
       const since = new Date(Date.now() - days * 86400_000).toISOString();
-      return summarize([...events.values()].filter(e => e.at >= since), days, since);
+      const retained = [...events.values()];
+      return summarize(retained.filter(e => e.at >= since), days, since, retained, hourlyPage);
     },
     async replay(id) {
       return replays.get(id);
@@ -240,7 +241,7 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
       await prune();
       await insertEvents(batch, pool.query.bind(pool));
     },
-    async analytics(days) {
+    async analytics(days, hourlyPage = 0) {
       await prune();
       const since = new Date(Date.now() - days * 86400_000).toISOString();
       const { rows } = await pool.query<{ report: AnalyticsReport }>(`
@@ -276,10 +277,10 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
             date_trunc('hour', $3::timestamptz AT TIME ZONE 'UTC') - interval '11 hours',
             date_trunc('hour', $3::timestamptz AT TIME ZONE 'UTC'), interval '1 hour') AS hour
         ), hourly_players AS (
-          SELECT hours.hour, count(DISTINCT filtered.visitor)::int AS devices
-          FROM hours LEFT JOIN filtered ON filtered.name = 'game_start' AND filtered.page = 'game'
-            AND filtered.created_at AT TIME ZONE 'UTC' >= hours.hour
-            AND filtered.created_at AT TIME ZONE 'UTC' < hours.hour + interval '1 hour'
+          SELECT hours.hour, count(DISTINCT activity.visitor)::int AS devices, count(activity.id)::int AS plays
+          FROM hours LEFT JOIN analytics_events activity ON activity.name = 'game_start' AND activity.page = 'game'
+            AND activity.created_at >= hours.hour AT TIME ZONE 'UTC'
+            AND activity.created_at < (hours.hour + interval '1 hour') AT TIME ZONE 'UTC'
           GROUP BY hours.hour
         )
         SELECT jsonb_build_object(
@@ -288,7 +289,7 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
           'events', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', target, 'name', name, 'target', target, 'count', count, 'visitors', visitors, 'sessions', sessions, 'runs', runs) ORDER BY name, target) FROM grouped WHERE kind = 7), '[]'::jsonb),
           'daily', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', day, 'count', count, 'visitors', visitors, 'sessions', sessions) ORDER BY day) FROM grouped WHERE kind = 11), '[]'::jsonb),
           'hourlyPlayers', (SELECT jsonb_agg(jsonb_build_object(
-            'hour', to_char(hour, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'devices', devices) ORDER BY hour) FROM hourly_players),
+            'hour', to_char(hour, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'devices', devices, 'plays', plays) ORDER BY hour) FROM hourly_players),
           'devices', COALESCE((SELECT jsonb_agg(jsonb_build_object(
             'label', grouped.device, 'count', grouped.count, 'visitors', grouped.visitors, 'sessions', grouped.sessions,
             'games', COALESCE(device_games.games, 0), 'gamers', COALESCE(device_games.gamers, 0),
@@ -312,7 +313,7 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
             'wonSubmitted', count(*) FILTER (WHERE started AND won AND submitted),
             'lostSubmitted', count(*) FILTER (WHERE started AND lost AND submitted),
             'unfinished', count(*) FILTER (WHERE started AND NOT won AND NOT lost)) FROM runs)
-        ) AS report`, [since, days, new Date().toISOString()]);
+        ) AS report`, [since, days, new Date(Date.now() - hourlyPage * 12 * 3600_000).toISOString()]);
       return rows[0].report;
     },
     async top(limit = LEADERBOARD_SIZE, uniqueNames = false) {
