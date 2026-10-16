@@ -27,8 +27,66 @@ document.querySelectorAll<HTMLButtonElement>('button[data-icon]').forEach(button
 });
 const arena = element('game', HTMLElement);
 const menu = element('menu', HTMLDialogElement);
-const weddingBadge = element('wedding-day-badge', HTMLElement);
+const weddingBadge = element('wedding-day-badge', HTMLButtonElement);
 const weddingMessage = element('wedding-day-message', HTMLElement);
+const confettiMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const menuConfetti = document.createElement('div');
+menuConfetti.className = 'menu-confetti';
+menuConfetti.setAttribute('aria-hidden', 'true');
+menu.append(menuConfetti);
+let weddingDay = false;
+let menuCelebrated = false;
+let firstMenuOpening = true;
+function clearMenuConfetti(): void {
+  menuConfetti.getAnimations({ subtree: true }).forEach(animation => animation.cancel());
+  menuConfetti.replaceChildren();
+}
+function burstMenuConfetti(): void {
+  if (!menu.open || weddingBadge.hidden || document.hidden || confettiMotion.matches) return;
+  clearMenuConfetti();
+  const badge = weddingBadge.getBoundingClientRect();
+  const bounds = menu.getBoundingClientRect();
+  const x = badge.x + badge.width / 2 - bounds.x - menu.clientLeft + menu.scrollLeft;
+  const y = badge.y + badge.height / 2 - bounds.y - menu.clientTop + menu.scrollTop;
+  const colours = ['#b84b64', '#ffd465', '#578878', '#795777', '#fffaf0'];
+  for (let i = 0; i < 120; i++) {
+    const piece = document.createElement('span');
+    piece.style.left = `${x}px`;
+    piece.style.top = `${y}px`;
+    piece.style.background = colours[i % colours.length];
+    menuConfetti.append(piece);
+    const angle = (i + Math.random()) / 120 * Math.PI * 2;
+    const velocity = 130 + Math.random() * 300;
+    const vx = Math.cos(angle) * velocity;
+    const vy = Math.sin(angle) * velocity;
+    const spin = (Math.random() - .5) * 900;
+    const frames = Array.from({ length: 13 }, (_, frame) => {
+      const progress = frame / 12;
+      const time = progress * 2.2;
+      return {
+        transform: `translate(${vx * time}px, ${vy * time + 190 * time * time}px) rotate(${spin * progress}deg)`,
+        opacity: progress < .7 ? 1 : (1 - progress) / .3,
+      };
+    });
+    const animation = piece.animate(frames, { duration: 2200, easing: 'linear' });
+    animation.onfinish = () => piece.remove();
+  }
+}
+function celebrateMenu(): void {
+  if (!menu.open) { menuCelebrated = false; clearMenuConfetti(); return; }
+  if ((!weddingDay && !firstMenuOpening) || menuCelebrated || document.hidden) return;
+  firstMenuOpening = false;
+  menuCelebrated = true;
+  burstMenuConfetti();
+}
+weddingBadge.addEventListener('click', burstMenuConfetti);
+const confettiObserver = new MutationObserver(celebrateMenu);
+confettiObserver.observe(menu, { attributes: true, attributeFilter: ['open'] });
+confettiMotion.addEventListener('change', clearMenuConfetti);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clearMenuConfetti();
+  else celebrateMenu();
+});
 function updateWeddingBadge(): void {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/London', year: 'numeric', month: 'numeric', day: 'numeric',
@@ -36,8 +94,9 @@ function updateWeddingBadge(): void {
   const part = (type: Intl.DateTimeFormatPartTypes): number => Number(parts.find(value => value.type === type)!.value);
   const today = Date.UTC(part('year'), part('month') - 1, part('day'));
   const days = Math.round((Date.UTC(2026, 9, 17) - today) / 86400_000);
+  weddingDay = days === 0;
   weddingBadge.hidden = days < 0;
-  if (days < 0) return;
+  if (days < 0) { clearMenuConfetti(); return; }
   const lines = days === 0 ? ['HAPPY', 'WEDDING', 'DAY!'] : [String(days), days === 1 ? 'DAY' : 'DAYS', 'TO GO'];
   weddingBadge.setAttribute('aria-label', lines.join(' '));
   weddingMessage.replaceChildren();
@@ -45,6 +104,7 @@ function updateWeddingBadge(): void {
     if (index) weddingMessage.append(document.createElement('br'));
     weddingMessage.append(line);
   }
+  celebrateMenu();
 }
 updateWeddingBadge();
 window.setInterval(updateWeddingBadge, 1000);
@@ -856,6 +916,7 @@ window.addEventListener('pagehide', event => {
   if (started) showMenu();
   // A persisted page can be restored from the back/forward cache, so keep the game and audio alive.
   if (event.persisted) return;
+  confettiObserver.disconnect(); clearMenuConfetti();
   observer.disconnect(); audio.destroy(); game.destroy(true);
 });
 if (location.pathname === TOP_LIST_PATH) void openTopList(new URLSearchParams(location.search).get('you'));

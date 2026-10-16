@@ -66,6 +66,94 @@ test('wedding badge follows UK dates and updates across midnight', async ({ page
   await expect(badge).toBeHidden();
 });
 
+test('countdown badge fires confetti on load and activation, from the badge on every screen size', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-16T12:00:00Z') });
+  await page.goto('/');
+  const pieces = page.locator('.menu-confetti > span');
+  await expect(pieces).toHaveCount(120);
+  await page.locator('.menu-confetti').evaluate(layer => layer.getAnimations({ subtree: true }).forEach(animation => animation.finish()));
+  await expect(pieces).toHaveCount(0);
+  await page.clock.runFor(3000);
+  await expect(pieces).toHaveCount(0);
+  for (const width of [1280, 375, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const badge = page.getByRole('button', { name: '1 DAY TO GO', exact: true });
+    await badge.focus();
+    await page.keyboard.press('Enter');
+    await expect(pieces).toHaveCount(120);
+    const origin = await page.evaluate(() => {
+      const badge = document.querySelector('#wedding-day-badge')!.getBoundingClientRect();
+      const menu = document.querySelector<HTMLDialogElement>('#menu')!;
+      const bounds = menu.getBoundingClientRect();
+      const piece = document.querySelector<HTMLElement>('.menu-confetti > span')!;
+      return {
+        x: Number.parseFloat(piece.style.left) - menu.scrollLeft + menu.clientLeft + bounds.x,
+        y: Number.parseFloat(piece.style.top) - menu.scrollTop + menu.clientTop + bounds.y,
+        expectedX: badge.x + badge.width / 2,
+        expectedY: badge.y + badge.height / 2,
+        overlayWidth: document.querySelector('.menu-confetti')!.getBoundingClientRect().width,
+        menuWidth: menu.clientWidth,
+        pointerEvents: getComputedStyle(piece.parentElement!).pointerEvents,
+      };
+    });
+    expect(origin.x).toBeCloseTo(origin.expectedX);
+    expect(origin.y).toBeCloseTo(origin.expectedY);
+    expect(origin.overlayWidth).toBeLessThanOrEqual(origin.menuWidth);
+    expect(origin.pointerEvents).toBe('none');
+    const directions = await page.locator('.menu-confetti').evaluate(layer =>
+      layer.getAnimations({ subtree: true }).map(animation => {
+        const effect = animation.effect;
+        if (!(effect instanceof KeyframeEffect)) throw new Error('Missing confetti keyframes.');
+        const transform = String(effect.getKeyframes()[1].transform);
+        const match = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(transform);
+        if (!match) throw new Error('Missing confetti trajectory.');
+        return { x: Number(match[1]), y: Number(match[2]) };
+      }));
+    expect(directions.some(direction => direction.x < 0)).toBe(true);
+    expect(directions.some(direction => direction.x > 0)).toBe(true);
+    expect(directions.some(direction => direction.y < 0)).toBe(true);
+    expect(directions.some(direction => direction.y > 0)).toBe(true);
+    await badge.click();
+    await expect(pieces).toHaveCount(120);
+    await page.locator('.menu-confetti').evaluate(layer => layer.getAnimations({ subtree: true }).forEach(animation => animation.finish()));
+    await expect(pieces).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await page.locator('#menu-achievements').click();
+  await page.locator('#challenges-back').click();
+  await expect(pieces).toHaveCount(0);
+});
+
+test('wedding-day confetti fires once per menu opening, clears on close and can be retriggered', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-17T12:00:00Z') });
+  await page.goto('/');
+  const pieces = page.locator('.menu-confetti > span');
+  await expect(pieces).toHaveCount(120);
+  await page.locator('.menu-confetti').evaluate(layer => layer.getAnimations({ subtree: true }).forEach(animation => animation.finish()));
+  await expect(pieces).toHaveCount(0);
+  await page.clock.runFor(3000);
+  await expect(pieces).toHaveCount(0);
+  await page.locator('#wedding-day-badge').click();
+  await expect(pieces).toHaveCount(120);
+  await page.locator('#menu-achievements').click();
+  await expect(pieces).toHaveCount(0);
+  await page.locator('#challenges-back').click();
+  await expect(pieces).toHaveCount(120);
+});
+
+test('wedding confetti honours reduced motion for automatic and manual bursts', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.clock.install({ time: new Date('2026-10-17T12:00:00Z') });
+  await page.goto('/');
+  await page.locator('#wedding-day-badge').click();
+  await expect(page.locator('.menu-confetti > span')).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.locator('#wedding-day-badge').click();
+  await expect(page.locator('.menu-confetti > span')).toHaveCount(120);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('.menu-confetti > span')).toHaveCount(0);
+});
+
 for (const duringRun of [false, true]) {
   test(`five sweets clicks enable all sixes ${duringRun ? 'during a paused run' : 'before starting'}`, async ({ page }) => {
     let posts = 0;

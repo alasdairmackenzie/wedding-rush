@@ -19,6 +19,12 @@ Open http://127.0.0.1:5200 and select **I'm coming!**
 The main-menu badge counts down to 17 October 2026 using Europe/London dates,
 shows **HAPPY WEDDING DAY!** on the day, then disappears. It updates automatically
 across midnight and when returning to the page.
+A 120-piece confetti burst sprays in all directions from the badge when the menu
+first appears after page load, including during the countdown. On the wedding
+day it also fires each time the menu opens (or when its message changes at midnight).
+Tap or keyboard-activate the
+badge for another burst, including on countdown days. Confetti stops when the
+menu closes or the page is hidden, and is disabled with reduced-motion settings.
 
 Click **faster** five times in **How to play** to enable a 75%-speed cheat for
 the current page session. Sean's horizontal running speed is reduced by 25%
