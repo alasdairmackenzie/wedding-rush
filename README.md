@@ -15,6 +15,10 @@ npm run dev
 ```
 
 Open http://127.0.0.1:5200 and select **I'm coming!**
+
+The main-menu badge counts down to 17 October 2026 using Europe/London dates,
+shows **HAPPY WEDDING DAY!** on the day, then disappears. It updates automatically
+across midnight and when returning to the page.
 The original game can continue running on port 5199.
 
 To try the production build and leaderboard locally:

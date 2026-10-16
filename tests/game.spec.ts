@@ -26,6 +26,46 @@ async function state(page: Page): Promise<{ x: number; y: number; grounded: bool
   });
 }
 
+test('main menu shows the wedding day badge in the top right on desktop and mobile', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-17T12:00:00Z') });
+  await page.goto('/');
+  for (const width of [1280, 375, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const banner = page.locator('#menu .wedding-day-badge');
+    await expect(banner).toBeVisible();
+    await expect(banner).toHaveAccessibleName('HAPPY WEDDING DAY!');
+    await expect(page.locator('#menu .wedding-day-banner')).toHaveCount(0);
+    const bounds = await banner.boundingBox();
+    const heading = await page.locator('#menu-title').boundingBox();
+    const intro = await page.locator('#menu .intro').boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    expect(bounds!.x).toBeGreaterThan(heading!.x + heading!.width);
+    expect(bounds!.y + bounds!.height).toBeLessThan(intro!.y);
+    await expect(page.locator('#play')).toBeVisible();
+  }
+});
+
+test('wedding badge follows UK dates and updates across midnight', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-15T12:00:00Z') });
+  await page.goto('/');
+  const badge = page.locator('#wedding-day-badge');
+  await expect(badge).toHaveAccessibleName('2 DAYS TO GO');
+  await page.clock.setSystemTime(new Date('2026-10-16T22:59:58Z'));
+  await page.clock.runFor(1000);
+  await expect(badge).toHaveAccessibleName('1 DAY TO GO');
+  await page.clock.runFor(2000);
+  await expect(badge).toHaveAccessibleName('HAPPY WEDDING DAY!');
+  await page.clock.setSystemTime(new Date('2026-10-17T22:59:58Z'));
+  await page.clock.runFor(3000);
+  await expect(badge).toBeHidden();
+  await expect(page.locator('.menu-heading')).toHaveCSS('grid-template-columns', /^[\d.]+px$/);
+  await page.clock.setSystemTime(new Date('2027-10-17T12:00:00Z'));
+  await page.clock.runFor(1000);
+  await expect(badge).toBeHidden();
+});
+
 test('runs automatically, collects exact sweet values, pauses and resets', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));

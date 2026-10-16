@@ -38,6 +38,23 @@ dialog h1 { font-size: clamp(42px, 8vw, 62px); line-height: 1; letter-spacing: -
 dialog h2 { font-size: 38px; line-height: 1.05; letter-spacing: -2px; }
 dialog p { line-height: 1.6; font-size: 14px; }
 .intro { font-weight: 800; font-size: 21px; }
+.menu-heading { display: grid; grid-template-columns: minmax(0, 1fr) clamp(4.5rem, 21vw, 7.5rem); align-items: start; gap: 12px; }
+.menu-heading > div { min-width: 0; }
+.menu-heading:has(.wedding-day-badge[hidden]) { grid-template-columns: minmax(0, 1fr); }
+.wedding-day-badge[hidden] { display: none; }
+.menu-heading h1 { font-size: clamp(1.25rem, 6.4vw, 2.5rem); letter-spacing: -2px; }
+.menu-heading h1 small { font-size: clamp(.65rem, 2.8vw, 1rem); }
+.menu-heading .stamp { font-size: clamp(.4rem, 1.6vw, .625rem); letter-spacing: .04em; }
+.wedding-day-badge {
+  --badge-edge: polygon(50% 0%, 57% 6%, 65% 2%, 70% 10%, 79% 10%, 82% 19%, 91% 23%, 91% 32%, 98% 39%, 94% 47%, 100% 55%, 93% 62%, 94% 71%, 85% 75%, 82% 84%, 73% 85%, 66% 94%, 58% 92%, 50% 100%, 42% 94%, 34% 98%, 28% 90%, 19% 90%, 16% 81%, 7% 77%, 8% 68%, 1% 61%, 6% 53%, 0% 45%, 7% 38%, 6% 29%, 15% 25%, 18% 16%, 27% 15%, 34% 6%, 42% 8%);
+  position: relative; isolation: isolate; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: .3em;
+  aspect-ratio: 1; margin: 0; padding: 1em; background: #302825; color: #fffaf0; clip-path: var(--badge-edge);
+  font-size: clamp(.5rem, 2.2vw, .8rem); line-height: 1.1; text-align: center; rotate: 8deg;
+}
+.wedding-day-badge::before { content: ''; position: absolute; z-index: -1; inset: 5px; background: #8f2f47; clip-path: var(--badge-edge); }
+.wedding-day-badge::after { content: ''; position: absolute; z-index: -1; inset: 10px; border: 1px solid #f6d4dc; border-radius: 50%; }
+.wedding-day-badge strong { font-size: 1.2em; line-height: 1.05; }
+.wedding-day-badge > span { font-size: .65em; letter-spacing: .15em; color: #ffd465; }
 .stamp { font: bold 10px monospace; letter-spacing: 1px; color: #9c4937; border: 2px solid; padding: 6px 8px; display: inline-block; transform: rotate(-3deg); }
 dialog > button { display: block; width: 100%; margin-top: 13px; }
 .primary { background: #ffd465; padding: 15px; font-size: 17px; }

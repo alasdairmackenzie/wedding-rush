@@ -26,6 +26,29 @@ document.querySelectorAll<HTMLButtonElement>('button[data-icon]').forEach(button
 });
 const arena = element('game', HTMLElement);
 const menu = element('menu', HTMLDialogElement);
+const weddingBadge = element('wedding-day-badge', HTMLElement);
+const weddingMessage = element('wedding-day-message', HTMLElement);
+function updateWeddingBadge(): void {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London', year: 'numeric', month: 'numeric', day: 'numeric',
+  }).formatToParts(new Date());
+  const part = (type: Intl.DateTimeFormatPartTypes): number => Number(parts.find(value => value.type === type)!.value);
+  const today = Date.UTC(part('year'), part('month') - 1, part('day'));
+  const days = Math.round((Date.UTC(2026, 9, 17) - today) / 86400_000);
+  weddingBadge.hidden = days < 0;
+  if (days < 0) return;
+  const lines = days === 0 ? ['HAPPY', 'WEDDING', 'DAY!'] : [String(days), days === 1 ? 'DAY' : 'DAYS', 'TO GO'];
+  weddingBadge.setAttribute('aria-label', lines.join(' '));
+  weddingMessage.replaceChildren();
+  for (const [index, line] of lines.entries()) {
+    if (index) weddingMessage.append(document.createElement('br'));
+    weddingMessage.append(line);
+  }
+}
+updateWeddingBadge();
+window.setInterval(updateWeddingBadge, 1000);
+document.addEventListener('visibilitychange', updateWeddingBadge);
+window.addEventListener('focus', updateWeddingBadge);
 const result = element('result', HTMLDialogElement);
 const errorDialog = element('error-dialog', HTMLDialogElement);
 const play = element('play', HTMLButtonElement);
