@@ -41,8 +41,8 @@ function clearMenuConfetti(): void {
   menuConfetti.getAnimations({ subtree: true }).forEach(animation => animation.cancel());
   menuConfetti.replaceChildren();
 }
-function burstMenuConfetti(): void {
-  if (!menu.open || weddingBadge.hidden || document.hidden || confettiMotion.matches) return;
+function burstMenuConfetti(manual = false): void {
+  if (!menu.open || weddingBadge.hidden || document.hidden || (!manual && confettiMotion.matches)) return;
   clearMenuConfetti();
   const badge = weddingBadge.getBoundingClientRect();
   const bounds = menu.getBoundingClientRect();
@@ -79,7 +79,7 @@ function celebrateMenu(): void {
   menuCelebrated = true;
   burstMenuConfetti();
 }
-weddingBadge.addEventListener('click', burstMenuConfetti);
+weddingBadge.addEventListener('click', () => burstMenuConfetti(true));
 const confettiObserver = new MutationObserver(celebrateMenu);
 confettiObserver.observe(menu, { attributes: true, attributeFilter: ['open'] });
 confettiMotion.addEventListener('change', clearMenuConfetti);

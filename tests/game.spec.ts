@@ -246,12 +246,19 @@ test('wedding-day confetti fires once per menu opening, clears on close and can 
   await expect(pieces).toHaveCount(120);
 });
 
-test('wedding confetti honours reduced motion for automatic and manual bursts', async ({ page }) => {
+test('wedding confetti honours reduced motion automatically but allows explicit badge activation', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.clock.install({ time: new Date('2026-10-17T12:00:00Z') });
   await page.goto('/');
-  await page.locator('#wedding-day-badge').click();
   await expect(page.locator('.menu-confetti > span')).toHaveCount(0);
+  await page.locator('#wedding-day-badge').tap();
+  await expect(page.locator('.menu-confetti > span')).toHaveCount(120);
+  await page.locator('#menu-achievements').click();
+  await page.locator('#challenges-back').click();
+  await expect(page.locator('.menu-confetti > span')).toHaveCount(0);
+  await page.locator('#wedding-day-badge').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.menu-confetti > span')).toHaveCount(120);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.locator('#wedding-day-badge').click();
   await expect(page.locator('.menu-confetti > span')).toHaveCount(120);

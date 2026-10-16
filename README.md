@@ -24,7 +24,8 @@ first appears after page load, including during the countdown. On the wedding
 day it also fires each time the menu opens (or when its message changes at midnight).
 Tap or keyboard-activate the
 badge for another burst, including on countdown days. Confetti stops when the
-menu closes or the page is hidden, and is disabled with reduced-motion settings.
+menu closes or the page is hidden. Reduced-motion settings disable automatic
+bursts, but explicitly tapping or keyboard-activating the badge still celebrates.
 
 After five minutes away from the tab or window, returning to a safe main menu
 automatically reloads the page to pick up the latest game. Paused games,
