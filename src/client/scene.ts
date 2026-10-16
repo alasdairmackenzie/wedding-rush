@@ -84,11 +84,27 @@ export class WeddingScene extends Phaser.Scene {
   private replayFrames: ReplayFrame[] = [];
   private replayOverflow = false;
   private slowMode = false;
+  private allSixes = false;
+
+  enableAllSixes(): void {
+    this.allSixes = true;
+    this.run.enableAllSixes();
+    if (this.pickups) {
+      this.pickups.children.each(child => {
+        if (child instanceof Phaser.Physics.Arcade.Sprite && child.active) {
+          child.setTexture(`sweet-${this.run.sweetValues[child.getData('sweetId')]}`);
+        }
+        return true;
+      });
+    }
+    if (this.player) this.syncUI();
+  }
 
   enableSlowMode(): void {
     this.slowMode = true;
     if (this.run.phase === 'ready' || this.run.phase === 'playing' || this.run.phase === 'paused') {
       this.run.cheated = true;
+      this.run.slowMode = true;
     }
   }
 
@@ -323,6 +339,7 @@ export class WeddingScene extends Phaser.Scene {
       this.tweens.killTweensOf([this.player, this.brideArt]);
       this.brideArt.setPosition(BRIDE.x, 610);
       this.run = new Run();
+      if (this.allSixes) this.run.enableAllSixes();
       this.effects.getChildren().forEach(effect => this.tweens.killTweensOf(effect));
       this.effects.clear(true, true);
       this.eventOverlay = undefined;
@@ -364,7 +381,8 @@ export class WeddingScene extends Phaser.Scene {
       this.invulnerableUntil = 0;
     }
     if (newRun) {
-      this.run.cheated = this.slowMode;
+      this.run.cheated = this.slowMode || this.discoMode || this.allSixes;
+      this.run.slowMode = this.slowMode;
       this.replayFrames = [];
       this.replayOverflow = false;
       this.setPlayerPhoto('groom-photo');
@@ -396,6 +414,9 @@ export class WeddingScene extends Phaser.Scene {
   setDiscoMode(active: boolean): void {
     this.discoMode = active;
     if (active) {
+      if (this.run.phase === 'ready' || this.run.phase === 'playing' || this.run.phase === 'paused') {
+        this.run.cheated = true;
+      }
       this.announceEvent('DISCO GROOM!', 'INVINCIBLE & READY TO DANCE!', '#b84b64');
       this.ui.audio.effect('sparkle');
       this.ui.notice('Secret Cheat Activated! Sean is invincible with a disco sparkle trail.');
@@ -652,7 +673,7 @@ export class WeddingScene extends Phaser.Scene {
           this.jumpUntil = this.run.elapsed + 120;
         }
       }
-      this.player.setVelocityX(runnerSpeed(this.player.x, this.run.cheated));
+      this.player.setVelocityX(runnerSpeed(this.player.x, this.run.slowMode));
       if (this.jumpUntil >= this.run.elapsed && this.run.elapsed - this.groundedAt <= 100) {
         this.setDucking(false);
         this.player.setVelocityY(-GROOM.jump);

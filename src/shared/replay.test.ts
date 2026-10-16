@@ -1,4 +1,5 @@
 import { createServer, type Server } from 'node:http';
+import { readFile } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApi, lazyStore } from '../server/api';
@@ -10,6 +11,19 @@ const frame = (time: number): ReplayFrame => [time, 110 + time / 3, 570, 0, 3, 1
 const recording = (): Replay => ({ version: 1, dice: [...new Run(() => 0).sweetValues], won: true, frames: [frame(0), frame(1000)] });
 
 describe('replay format', () => {
+  it('ships a complete clean winning demonstration with all collectibles and no lost lives', async () => {
+    const replay: unknown = JSON.parse(await readFile(new URL('../assets/other/perfect-run.json', import.meta.url), 'utf8'));
+    expect(isReplay(replay)).toBe(true);
+    if (!isReplay(replay)) throw new Error('Invalid bundled perfect run.');
+    expect(replay.won).toBe(true);
+    expect(replay.dice).toEqual(Array(27).fill(6));
+    expect(replay.frames.length).toBeGreaterThan(800);
+    expect(replay.frames.every(frame => frame[4] === 3)).toBe(true);
+    const final = replay.frames.at(-1)!;
+    expect(final[3]).toBe(707);
+    expect(final[6] & 2).toBe(2);
+    expect(final.slice(7, 13)).toEqual([2 ** 27 - 1, 127, 0, 127, 0, 7]);
+  });
   it('accepts bounded recordings and encodes pickup masks', () => {
     expect(isReplay(recording())).toBe(true);
     expect(replayMask(new Set([0, 2, 26]))).toBe(1 + 4 + 2 ** 26);

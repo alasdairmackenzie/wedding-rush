@@ -119,6 +119,8 @@ export type RunPhase = 'ready' | 'playing' | 'paused' | 'won' | 'late';
 export class Run {
   phase: RunPhase = 'ready';
   cheated = false;
+  slowMode = false;
+  allSixes = false;
   lives = 3;
   elapsed = 0;
   distractions = 0;
@@ -140,9 +142,15 @@ export class Run {
   comboScore = 0;
   hatCollected = false;
 
-  readonly sweetValues: readonly number[];
+  private diceValues: readonly number[];
   constructor(random: () => number = Math.random) {
-    this.sweetValues = Object.freeze(rollSweetValues(random));
+    this.diceValues = Object.freeze(rollSweetValues(random));
+  }
+  get sweetValues(): readonly number[] { return this.diceValues; }
+  enableAllSixes(): void {
+    if (this.phase === 'won' || this.phase === 'late') return;
+    this.allSixes = this.cheated = true;
+    this.diceValues = Object.freeze(this.diceValues.map((value, id) => this.collected.has(id) ? value : 6));
   }
   get totalSweetScore(): number { return this.sweetValues.reduce((sum, value) => sum + value, 0); }
   get sweetScore(): number { return [...this.collected].reduce((sum, id) => sum + this.sweetValues[id], 0); }

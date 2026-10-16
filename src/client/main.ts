@@ -4,7 +4,8 @@ import { BRIDE, GROOM, hurdles, people, rings, Run, runChallenges, runnerSpeed, 
 import { cleanName, ENTRY_ID, FULL_RESULTS_SIZE, isRude, NAME_MAX, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
 import { WeddingScene } from './scene';
 import { createReplayViewer } from './replay';
-import type { Replay } from '../shared/replay';
+import { isReplay, type Replay } from '../shared/replay';
+import perfectRunUrl from '../assets/other/perfect-run.json?url';
 import { GameAudio, type MusicMode } from './audio';
 import { createAnalytics } from './analytics';
 import { TARGETS } from '../shared/analytics';
@@ -158,6 +159,28 @@ const touch = document.querySelector<HTMLElement>('.touch-controls');
 if (!touch) throw new Error('Missing touch controls.');
 let scene: WeddingScene | undefined;
 let slowModeEnabled = false;
+let allSixesEnabled = false;
+let sweetsClicks = 0;
+element('sweets-cheat', HTMLButtonElement).addEventListener('click', () => {
+  if (++sweetsClicks !== 5) return;
+  allSixesEnabled = true;
+  scene?.enableAllSixes();
+  const status = element('sweets-cheat-status', HTMLElement);
+  status.hidden = false;
+  status.textContent = 'All-sixes cheat enabled. Remaining dice are now sixes; collected points stay unchanged. Cheat runs cannot be posted to the top list. Reload the page to turn it off.';
+});
+let invincibilityEnabled = false;
+let invincibilityClicks = 0;
+function enableInvincibility(): void {
+  invincibilityEnabled = true;
+  scene?.setDiscoMode(true);
+  const status = element('invincibility-cheat-status', HTMLElement);
+  status.hidden = false;
+  status.textContent = 'Invincibility cheat enabled. Cheat runs cannot be posted to the top list. Reload the page to turn it off.';
+}
+element('invincibility-cheat', HTMLButtonElement).addEventListener('click', () => {
+  if (++invincibilityClicks === 5) enableInvincibility();
+});
 let speedClicks = 0;
 element('speed-cheat', HTMLButtonElement).addEventListener('click', () => {
   if (++speedClicks !== 5) return;
@@ -382,7 +405,7 @@ const wedding = new WeddingScene({
     score.textContent = `${run.score} points`;
     lives.textContent = `${run.lives} / 3`;
     cleared.textContent = `${run.cleared.size} / ${hurdles.length}`;
-    speed.textContent = `${Math.round(runnerSpeed(x, run.cheated))}`;
+    speed.textContent = `${Math.round(runnerSpeed(x, run.slowMode))}`;
     concentratePower.hidden = run.concentrateRemaining === 0;
     const powerText = `4× ORANGE SQUASH · ${(Math.ceil(run.concentrateRemaining / 100) / 10).toFixed(1)}s`;
     if (concentratePower.textContent !== powerText) concentratePower.textContent = powerText;
@@ -404,7 +427,7 @@ const wedding = new WeddingScene({
     arena.dataset.bonus = String(run.bonusScore);
     arena.dataset.distractions = String(run.distractions);
     arena.dataset.cleared = String(run.cleared.size);
-    arena.dataset.speed = String(runnerSpeed(x, run.cheated));
+    arena.dataset.speed = String(runnerSpeed(x, run.slowMode));
   },
   end: run => {
     const won = run.phase === 'won';
@@ -427,7 +450,8 @@ const wedding = new WeddingScene({
     posted = undefined;
     submitScore.disabled = run.cheated;
     playerName.disabled = run.cheated;
-    scoreStatus.textContent = run.cheated ? '75% speed cheat run: scores cannot be posted to the top list.' : '';
+    scoreStatus.textContent = run.cheated
+      ? `${run.allSixes ? 'All-sixes' : scene?.isDiscoMode() ? 'Invincibility' : '75% speed'} cheat run: scores cannot be posted to the top list.` : '';
     scoreStatus.removeAttribute('data-error');
     element('result-kicker', HTMLElement).textContent = won ? 'THE BIG DAY / SAVED' : 'THE BIG DAY / OUT OF CHANCES';
     element('result-title', HTMLElement).textContent = won ? 'Sean, you may kiss Becky.' : 'Too many distractions!';
@@ -460,6 +484,8 @@ const wedding = new WeddingScene({
   ready: readyScene => {
     scene = readyScene;
     if (slowModeEnabled) scene.enableSlowMode();
+    if (allSixesEnabled) scene.enableAllSixes();
+    if (invincibilityEnabled) scene.setDiscoMode(true);
     play.disabled = false;
     if (menu.open) play.focus();
   },
@@ -486,7 +512,7 @@ function showStatus(message: string, error = false): void {
 async function postScore(): Promise<RankedEntry | undefined> {
   if (!lastRun) return undefined;
   if (lastRun.cheated) {
-    showStatus('75% speed cheat run: scores cannot be posted to the top list.', true);
+    showStatus('Cheat runs cannot be posted to the top list.', true);
     return undefined;
   }
   if (posted) return posted;
@@ -683,6 +709,30 @@ challengesDialog.addEventListener('cancel', event => {
 element('menu-button', HTMLButtonElement).addEventListener('click', showMenu);
 const howToPlay = element('how-to-play', HTMLButtonElement);
 const playInstructions = element('play-instructions', HTMLElement);
+const perfectReplay = element('perfect-replay', HTMLButtonElement);
+let friendClicks = 0;
+let perfectReplayLoading = false;
+perfectReplay.addEventListener('click', async () => {
+  if (perfectReplayLoading || ++friendClicks < 5) return;
+  friendClicks = 0;
+  perfectReplayLoading = true;
+  perfectReplay.setAttribute('aria-busy', 'true');
+  try {
+    const response = await fetch(perfectRunUrl, { signal: AbortSignal.timeout(15_000) });
+    if (!response.ok) throw new Error(`Replay request failed (${response.status}).`);
+    const recording: unknown = await response.json();
+    if (!isReplay(recording)) throw new Error('The perfect-run recording is invalid or uses an unsupported game version.');
+    if (menu.open && !playInstructions.hidden) {
+      await replayViewer.show(recording, `A perfect run · ${recording.frames.at(-1)![3]} points`);
+    }
+  } catch (error) {
+    console.error('Could not load the perfect run.', error);
+    reportError('The perfect run could not be loaded. Close this message and click the sentence five times to try again.');
+  } finally {
+    perfectReplayLoading = false;
+    perfectReplay.removeAttribute('aria-busy');
+  }
+});
 howToPlay.addEventListener('click', () => {
   playInstructions.hidden = !playInstructions.hidden;
   howToPlay.setAttribute('aria-expanded', String(!playInstructions.hidden));
@@ -737,7 +787,7 @@ function onHeartTap(event: MouseEvent | TouchEvent): void {
   heartTapCount++;
   if (heartTapCount >= 5) {
     heartTapCount = 0;
-    scene?.setDiscoMode(true);
+    enableInvincibility();
   } else {
     heartTapTimer = window.setTimeout(() => { heartTapCount = 0; }, 2500);
   }

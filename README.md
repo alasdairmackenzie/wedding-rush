@@ -25,6 +25,15 @@ the current page session. Sean's horizontal running speed is reduced by 25%
 throughout the route; jumps and obstacles are unchanged. The instruction changes
 to **Sean runs slowly as ever.** Cheat runs can be rewatched but cannot be posted
 to the top list. Reloading turns the cheat off.
+Click **invincibility** five times in **How to play** to enable the existing disco
+invincibility mode until reload. It applies to the current run and fresh runs,
+protects Sean from hurdles, mates, barrels and pigeons, and leaves running speed
+unchanged unless the speed cheat is also enabled. Affected runs can be rewatched
+but cannot be posted. The existing five-heart-tap shortcut enables the same mode.
+Click **sweets** five times in **How to play** to set all uncollected dice to six.
+Collected dice retain their original values and points, including combo bonuses.
+New runs have all 27 dice set to six until reload. This cheat can be combined with
+the others; affected runs can be rewatched but cannot be posted.
 The original game can continue running on port 5199.
 
 To try the production build and leaderboard locally:
@@ -47,6 +56,15 @@ A **Replay** column with a **Watch** button appears in the top 10 and full resul
 leaderboard links to the score's watch button. Older scores have no replay.
 
 Replays start paused, with play/pause, restart and a keyboard-accessible seek bar.
+Click **Still not sure? Ask a friend.** five times at the end of **How to play**
+to watch the bundled perfect-run recording in `src/assets/other/perfect-run.json`.
+It uses the movement from a clean normal-speed run with all dice, seven mates,
+seven hurdles, three rings, the hat and four close shaves, finishing with all three
+lives. For this demo only, all 27 dice are set to six and the sampled scores are
+recalculated with the recorded combo multipliers, for a final score of 707.
+Normal games still roll randomly.
+It demonstrates a clean run, not the maximum possible score. Every five clicks
+opens it again; closing returns to the instructions without affecting your run.
 They are silent visual recordings using sampled positions, dice faces, score,
 lives and collected-object state, not a physics re-simulation or video. Watching
 does not submit scores, change personal bests, award badges or start another game.

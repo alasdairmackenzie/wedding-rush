@@ -23,6 +23,51 @@ async function completeRun(page: Page, won = true): Promise<void> {
 }
 
 for (const width of [1280, 390]) {
+  test(`five friend clicks reveal the perfect run without replacing your replay at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    let posts = 0;
+    let demoRequests = 0;
+    page.on('request', request => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/scores') posts++;
+      if (request.resourceType() === 'fetch' && request.url().includes('perfect-run.json')) demoRequests++;
+    });
+    await completeRun(page);
+    const stats = await page.locator('#result-detail').textContent();
+    const storage = await page.evaluate(() => JSON.stringify(localStorage));
+    await page.locator('#result-menu').click();
+    await page.locator('#how-to-play').click();
+    const friend = page.getByRole('button', { name: 'Still not sure? Ask a friend.', exact: true });
+    await expect(page.locator('#play-instructions p').last()).toHaveText('Still not sure? Ask a friend.');
+    for (let i = 0; i < 4; i++) await friend.click();
+    await expect(page.locator('#replay-dialog')).not.toBeVisible();
+    expect(demoRequests).toBe(0);
+    await friend.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog', { name: 'A perfect run · 707 points' })).toBeVisible();
+    await expect(page.locator('#replay-play')).toHaveText('Play replay');
+    await page.locator('#replay-play').click();
+    await expect(page.locator('#replay-play')).toHaveText('Pause replay');
+    await page.locator('#replay-seek').focus();
+    await page.keyboard.press('End');
+    await expect(page.locator('#replay-status')).toContainText('707 points · 3/3 lives · ×3 combo · Made it to Becky!');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(friend).toBeFocused();
+    await expect(page.locator('#play-instructions')).toBeVisible();
+    for (let i = 0; i < 5; i++) await page.keyboard.press('Enter');
+    await expect(page.locator('#replay-dialog')).toBeVisible();
+    await page.locator('#replay-close').click();
+    await page.locator('#menu-results').click();
+    await expect(page.locator('#result-detail')).toHaveText(stats ?? '');
+    await page.locator('#result-rewatch').click();
+    await expect(page.locator('#replay-title')).toHaveText('Rewatch your run');
+    await page.locator('#replay-seek').focus();
+    await page.keyboard.press('End');
+    await expect(page.locator('#replay-status')).not.toContainText('707 points');
+    expect(await page.evaluate(() => JSON.stringify(localStorage))).toBe(storage);
+    expect(posts).toBe(0);
+  });
+
   test(`rewatches the latest run and its public score without gameplay side effects at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     let posts = 0;
@@ -84,6 +129,37 @@ for (const width of [1280, 390]) {
   });
 
 }
+
+test('perfect replay failure is explicit and can be retried', async ({ page }) => {
+  await page.route('**/perfect-run.json*', route => route.request().resourceType() === 'fetch'
+    ? route.fulfill({ status: 503, body: 'Unavailable' }) : route.continue());
+  await page.goto('/');
+  await page.locator('#how-to-play').click();
+  for (let i = 0; i < 5; i++) await page.locator('#perfect-replay').click();
+  await expect(page.locator('#error-message')).toContainText('The perfect run could not be loaded');
+  await page.locator('#error-dialog button').click();
+  await page.unroute('**/perfect-run.json*');
+  for (let i = 0; i < 5; i++) await page.locator('#perfect-replay').click();
+  await expect(page.locator('#replay-play')).toBeEnabled();
+});
+
+test('watching the perfect run from pause keeps the current game paused and unchanged', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#play').click();
+  await page.waitForFunction(() => Number(document.querySelector<HTMLElement>('#game')?.dataset.x) > 300);
+  await page.keyboard.press('Escape');
+  await page.locator('#how-to-play').click();
+  const before = await page.locator('#game').evaluate(element => ({ ...((element as HTMLElement).dataset) }));
+  for (let i = 0; i < 5; i++) await page.locator('#perfect-replay').click();
+  await expect(page.locator('#replay-play')).toBeEnabled();
+  await page.locator('#replay-seek').focus();
+  await page.keyboard.press('End');
+  await page.locator('#replay-close').click();
+  const after = await page.locator('#game').evaluate(element => ({ ...((element as HTMLElement).dataset) }));
+  expect(after).toEqual(before);
+  await page.locator('#play').click();
+  await page.waitForFunction(x => Number(document.querySelector<HTMLElement>('#game')?.dataset.x) > Number(x), before.x);
+});
 
 test('live leaderboard puts Watch links in the Replay column', async ({ page }) => {
     await page.route('**/api/scores*', route => route.fulfill({ json: { scores: [

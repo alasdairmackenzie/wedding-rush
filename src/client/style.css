@@ -38,8 +38,8 @@ dialog h1 { font-size: clamp(42px, 8vw, 62px); line-height: 1; letter-spacing: -
 dialog h2 { font-size: 38px; line-height: 1.05; letter-spacing: -2px; }
 dialog p { line-height: 1.6; font-size: 14px; }
 .intro { font-weight: 800; font-size: 21px; }
-#speed-cheat { display: inline; margin: 0; padding: 0; border: 0; box-shadow: none; background: none; color: inherit; font: inherit; }
-#speed-cheat:active { translate: none; }
+#speed-cheat, #invincibility-cheat, #sweets-cheat, #perfect-replay { display: inline; margin: 0; padding: 0; border: 0; box-shadow: none; background: none; color: inherit; font: inherit; }
+#speed-cheat:active, #invincibility-cheat:active, #sweets-cheat:active, #perfect-replay:active { translate: none; }
 .menu-heading { display: grid; grid-template-columns: minmax(0, 1fr) clamp(4.5rem, 21vw, 7.5rem); align-items: start; gap: 12px; }
 .menu-heading > div { min-width: 0; }
 .menu-heading:has(.wedding-day-badge[hidden]) { grid-template-columns: minmax(0, 1fr); }

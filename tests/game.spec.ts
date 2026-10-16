@@ -67,6 +67,127 @@ test('wedding badge follows UK dates and updates across midnight', async ({ page
 });
 
 for (const duringRun of [false, true]) {
+  test(`five sweets clicks enable all sixes ${duringRun ? 'during a paused run' : 'before starting'}`, async ({ page }) => {
+    let posts = 0;
+    page.on('request', request => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/scores') posts++;
+    });
+    await page.goto('/');
+    let previousScore = 0;
+    let previousValues: number[] = [];
+    if (duringRun) {
+      await page.locator('#play').click();
+      await page.waitForFunction(() => Number(document.getElementById('game')?.dataset.collected) === 2);
+      await page.keyboard.press('Escape');
+      await exposeScene(page);
+      previousScore = await page.evaluate<number>('window.__scene.run.score');
+      previousValues = await page.evaluate<number[]>('[...window.__scene.run.sweetValues]');
+    }
+    await page.locator('#how-to-play').click();
+    await expect(page.locator('#play-instructions')).toContainText('dice worth a random 1–6 points each');
+    await exposeScene(page);
+    const trigger = page.getByRole('button', { name: 'sweets', exact: true });
+    for (let i = 0; i < 4; i++) await trigger.click();
+    expect(await page.evaluate<boolean>('window.__scene.run.allSixes')).toBe(false);
+    await expect(page.locator('#sweets-cheat-status')).toBeHidden();
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#sweets-cheat-status')).toContainText('All-sixes cheat enabled');
+    expect(await page.evaluate<number>('window.__scene.run.score')).toBe(previousScore);
+    const values = await page.evaluate<number[]>('[...window.__scene.run.sweetValues]');
+    expect(values).toEqual(duringRun ? [...previousValues.slice(0, 2), ...Array(25).fill(6)] : Array(27).fill(6));
+    expect(await page.evaluate<boolean>(`window.__scene.pickups.getChildren().filter(p => p.active).every(p => p.texture.key === 'sweet-6')`)).toBe(true);
+    await page.locator('#play').click();
+    await page.waitForFunction(() => Number(document.getElementById('game')?.dataset.x) > 300);
+    await teleport(page, BRIDE.x - 50);
+    await expect(page.locator('#result')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#submit-score')).toBeDisabled();
+    await expect(page.locator('#score-status')).toContainText('All-sixes cheat run');
+    await page.locator('#score-form').evaluate(form => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    expect(posts).toBe(0);
+    const replayDice = await page.evaluate<number[]>('window.__scene.recordedReplay().dice');
+    expect(replayDice).toEqual(values);
+    await page.locator('#result-rewatch').click();
+    await expect(page.locator('#replay-play')).toBeEnabled();
+    await page.locator('#replay-close').click();
+    await page.locator('#again').click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+    expect(await page.evaluate<number[]>('[...window.__scene.run.sweetValues]')).toEqual(Array(27).fill(6));
+    expect(await page.evaluate<boolean>('window.__scene.run.cheated')).toBe(true);
+    await page.keyboard.press('Escape');
+    await page.locator('#restart').click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+    expect(await page.evaluate<number[]>('[...window.__scene.run.sweetValues]')).toEqual(Array(27).fill(6));
+    await page.reload();
+    await page.locator('#play').click();
+    await exposeScene(page);
+    expect(await page.evaluate<boolean>('window.__scene.run.allSixes || window.__scene.run.cheated')).toBe(false);
+  });
+
+  test(`five invincibility clicks protect Sean ${duringRun ? 'during a paused run' : 'before starting'} without slowing him`, async ({ page }) => {
+    let posts = 0;
+    page.on('request', request => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/scores') posts++;
+    });
+    await page.goto('/');
+    if (duringRun) {
+      await page.locator('#play').click();
+      await page.keyboard.press('Escape');
+    }
+    await page.locator('#how-to-play').click();
+    await exposeScene(page);
+    const trigger = page.getByRole('button', { name: 'invincibility', exact: true });
+    for (let i = 0; i < 4; i++) await trigger.click();
+    expect(await page.evaluate<boolean>('window.__scene.isDiscoMode()')).toBe(false);
+    await expect(page.locator('#invincibility-cheat-status')).toBeHidden();
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#invincibility-cheat-status')).toContainText('Invincibility cheat enabled');
+    expect(await page.evaluate<boolean>('window.__scene.isDiscoMode()')).toBe(true);
+    await page.locator('#play').click();
+    expect(await page.evaluate<boolean>('window.__scene.run.cheated')).toBe(true);
+    await page.waitForFunction(() => Number(document.getElementById('game')?.dataset.x) > 150);
+    const velocity = await page.evaluate<number>('window.__scene.player.body.velocity.x');
+    expect(velocity).toBeGreaterThanOrEqual(300);
+    expect(velocity).toBeLessThan(320);
+    await teleport(page, hurdles[0].x - 20);
+    await expect(page.locator('#cleared')).toHaveText('1 / 7');
+    await teleport(page, people[0].x - 10);
+    await expect.poll(() => page.evaluate<boolean>('window.__scene.run.hitPeople.has(0)')).toBe(true);
+    for (const id of [0, 1]) {
+      await page.evaluate(`(() => {
+        const scene = window.__scene;
+        scene.player.body.reset(${movers[id].x}, 570);
+        scene.player.setVelocityY(0);
+        scene.moving[${id}].active = true;
+        scene.moving[${id}].x = scene.player.x;
+      })()`);
+      await expect.poll(() => page.evaluate<boolean>(`window.__scene.run.dodged.has(${id})`)).toBe(true);
+    }
+    await expect(page.locator('#lives')).toHaveText('3 / 3');
+    expect(await page.evaluate<number>('window.__scene.run.distractions')).toBe(0);
+    await page.keyboard.press('Escape');
+    await page.locator('#restart').click();
+    expect(await page.evaluate<boolean>('window.__scene.isDiscoMode() && window.__scene.run.cheated')).toBe(true);
+    await page.waitForFunction(() => Number(document.getElementById('game')?.dataset.x) > 150);
+    await teleport(page, BRIDE.x - 50);
+    await expect(page.locator('#result')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#submit-score')).toBeDisabled();
+    await expect(page.locator('#score-status')).toContainText('Invincibility cheat run');
+    await page.locator('#score-form').evaluate(form => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    await expect(page.locator('#score-status')).toContainText('cannot be posted');
+    expect(posts).toBe(0);
+    await page.locator('#result-rewatch').click();
+    await expect(page.locator('#replay-play')).toBeEnabled();
+    await page.locator('#replay-close').click();
+    await page.locator('#again').click();
+    expect(await page.evaluate<boolean>('window.__scene.isDiscoMode() && window.__scene.run.cheated')).toBe(true);
+    await page.reload();
+    await page.locator('#play').click();
+    await exposeScene(page);
+    expect(await page.evaluate<boolean>('window.__scene.isDiscoMode() || window.__scene.run.cheated')).toBe(false);
+  });
+
   test(`five faster clicks enable 75% speed ${duringRun ? 'during a paused run' : 'before starting'} and block score posting`, async ({ page }) => {
     let posts = 0;
     page.on('request', request => {
@@ -121,6 +242,22 @@ for (const duringRun of [false, true]) {
     expect(await page.evaluate<boolean>('window.__scene.run.cheated')).toBe(false);
   });
 }
+
+test('invincibility, all-sixes and slow-speed cheats can be combined', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#how-to-play').click();
+  for (const id of ['invincibility-cheat', 'speed-cheat', 'sweets-cheat']) {
+    for (let i = 0; i < 5; i++) await page.locator(`#${id}`).click();
+  }
+  await page.locator('#play').click();
+  await exposeScene(page);
+  await page.waitForFunction(() => Number(document.getElementById('game')?.dataset.x) > 150);
+  expect(await page.evaluate<boolean>('window.__scene.isDiscoMode() && window.__scene.run.cheated')).toBe(true);
+  expect(await page.evaluate<number[]>('[...window.__scene.run.sweetValues]')).toEqual(Array(27).fill(6));
+  const velocity = await page.evaluate<number>('window.__scene.player.body.velocity.x');
+  expect(velocity).toBeGreaterThanOrEqual(225);
+  expect(velocity).toBeLessThan(240);
+});
 
 test('runs automatically, collects exact sweet values, pauses and resets', async ({ page }) => {
   const errors: string[] = [];

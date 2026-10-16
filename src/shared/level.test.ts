@@ -5,6 +5,41 @@ import { beckyTexts, BRIDE, BUCKET_HAT, BUCKET_HAT_VALUE, concentrates, CONCENTR
 function playing(): Run { const run = new Run(); run.phase = 'playing'; return run; }
 
 describe('dice sweets', () => {
+  it('sets uncollected dice to six without changing earned points or combo bonuses', () => {
+    const run = new Run(() => 0);
+    run.phase = 'playing';
+    run.clearHurdle(0); run.clearHurdle(1); run.clearHurdle(2);
+    run.collect(0);
+    const original = [...run.sweetValues];
+    const score = run.score;
+    const combo = run.comboScore;
+    run.phase = 'paused';
+    run.enableAllSixes();
+    expect(run.cheated).toBe(true);
+    expect(run.allSixes).toBe(true);
+    expect(run.sweetValues[0]).toBe(original[0]);
+    expect(run.sweetValues.slice(1)).toEqual(Array(26).fill(6));
+    expect(Object.isFrozen(run.sweetValues)).toBe(true);
+    expect(run.score).toBe(score);
+    expect(run.comboScore).toBe(combo);
+    run.phase = 'playing';
+    run.collect(1);
+    expect(run.score).toBe(score + 12);
+  });
+  it('sets a fresh run to all sixes but never changes completed results', () => {
+    const run = new Run(() => 0);
+    run.enableAllSixes();
+    expect(run.sweetValues).toEqual(Array(27).fill(6));
+    expect(run.totalSweetScore).toBe(162);
+    for (const phase of ['won', 'late'] as const) {
+      const completed = new Run(() => 0);
+      const values = [...completed.sweetValues];
+      completed.phase = phase;
+      completed.enableAllSixes();
+      expect(completed.sweetValues).toEqual(values);
+      expect(completed.cheated).toBe(false);
+    }
+  });
   it('keeps two easy starters and places later sweets near achievable jump peaks', () => {
     expect(sweets.slice(0, 2).map(sweet => sweet.y)).toEqual([565, 565]);
     const highestBodyTop = 610 - GROOM.height - GROOM.jump ** 2 / (2 * GROOM.gravity);
