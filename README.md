@@ -31,7 +31,8 @@ the current page session. Sean's horizontal running speed is reduced by 25%
 throughout the route; jumps and obstacles are unchanged. The instruction changes
 to **Sean runs slowly as ever.** Cheat runs can be rewatched but cannot be posted
 to the top list. Reloading turns the cheat off.
-Click **invincibility** five times in **How to play** to enable the existing disco
+Click **invincibility** or **Invincible** a total of five times in **How to play**
+(either word or a mixture) to enable the existing disco
 invincibility mode until reload. It applies to the current run and fresh runs,
 protects Sean from hurdles, mates, barrels and pigeons, and leaves running speed
 unchanged unless the speed cheat is also enabled. Affected runs can be rewatched

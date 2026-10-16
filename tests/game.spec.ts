@@ -154,6 +154,35 @@ test('wedding confetti honours reduced motion for automatic and manual bursts', 
   await expect(page.locator('.menu-confetti > span')).toHaveCount(0);
 });
 
+test('all hidden instruction triggers are bold', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#how-to-play').click();
+  const triggers = page.locator('#play-instructions button');
+  await expect(triggers).toHaveCount(5);
+  for (const trigger of await triggers.all()) {
+    await expect(trigger).toHaveCSS('font-weight', '800');
+    await expect(trigger).toBeVisible();
+  }
+});
+
+for (const words of [['Invincible', 'Invincible', 'Invincible', 'Invincible', 'Invincible'],
+  ['invincibility', 'Invincible', 'invincibility', 'Invincible', 'Invincible']]) {
+  test(`invincibility shares five taps across instruction words: ${words.join(', ')}`, async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#how-to-play').click();
+    await exposeScene(page);
+    for (const word of words.slice(0, 4)) {
+      await page.getByRole('button', { name: word, exact: true }).click();
+    }
+    await expect(page.locator('#invincibility-cheat-status')).toBeHidden();
+    expect(await page.evaluate<boolean>('window.__scene.isDiscoMode()')).toBe(false);
+    await page.getByRole('button', { name: words[4], exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#invincibility-cheat-status')).toContainText('Invincibility cheat enabled');
+    expect(await page.evaluate<boolean>('window.__scene.isDiscoMode()')).toBe(true);
+  });
+}
+
 for (const duringRun of [false, true]) {
   test(`five sweets clicks enable all sixes ${duringRun ? 'during a paused run' : 'before starting'}`, async ({ page }) => {
     let posts = 0;

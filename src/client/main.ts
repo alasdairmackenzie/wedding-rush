@@ -238,9 +238,11 @@ function enableInvincibility(): void {
   status.hidden = false;
   status.textContent = 'Invincibility cheat enabled. Cheat runs cannot be posted to the top list. Reload the page to turn it off.';
 }
-element('invincibility-cheat', HTMLButtonElement).addEventListener('click', () => {
-  if (++invincibilityClicks === 5) enableInvincibility();
-});
+for (const id of ['invincibility-cheat', 'invincible-cheat']) {
+  element(id, HTMLButtonElement).addEventListener('click', () => {
+    if (++invincibilityClicks === 5) enableInvincibility();
+  });
+}
 let speedClicks = 0;
 element('speed-cheat', HTMLButtonElement).addEventListener('click', () => {
   if (++speedClicks !== 5) return;
