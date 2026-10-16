@@ -107,9 +107,9 @@ function rollSweetValues(random: () => number): number[] {
   return values;
 }
 
-export function runnerSpeed(x: number): number {
+export function runnerSpeed(x: number, slowMode = false): number {
   const progress = Math.min(1, Math.max(0, (x - START.x) / (BRIDE.x - START.x)));
-  return GROOM.speed + (GROOM.maxSpeed - GROOM.speed) * progress;
+  return (GROOM.speed + (GROOM.maxSpeed - GROOM.speed) * progress) * (slowMode ? .75 : 1);
 }
 export function daylightProgress(x: number): number {
   return Math.min(1, Math.max(0, (x - START.x) / (BRIDE.x - 54 - START.x)));
@@ -118,6 +118,7 @@ export function daylightProgress(x: number): number {
 export type RunPhase = 'ready' | 'playing' | 'paused' | 'won' | 'late';
 export class Run {
   phase: RunPhase = 'ready';
+  cheated = false;
   lives = 3;
   elapsed = 0;
   distractions = 0;

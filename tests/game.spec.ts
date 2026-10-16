@@ -66,6 +66,62 @@ test('wedding badge follows UK dates and updates across midnight', async ({ page
   await expect(badge).toBeHidden();
 });
 
+for (const duringRun of [false, true]) {
+  test(`five faster clicks enable 75% speed ${duringRun ? 'during a paused run' : 'before starting'} and block score posting`, async ({ page }) => {
+    let posts = 0;
+    page.on('request', request => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/scores') posts++;
+    });
+    await page.goto('/');
+    if (duringRun) {
+      await page.locator('#play').click();
+      await exposeScene(page);
+      expect(await page.evaluate<boolean>('window.__scene.run.cheated')).toBe(false);
+      await page.keyboard.press('Escape');
+    }
+    await page.locator('#how-to-play').click();
+    const faster = page.getByRole('button', { name: 'faster', exact: true });
+    await faster.click({ clickCount: 4 });
+    await expect(faster).toBeVisible();
+    await expect(page.locator('#speed-cheat-status')).toBeHidden();
+    await faster.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#speed-instruction')).toHaveText('Sean runs slowly as ever.');
+    await expect(page.locator('#speed-cheat-status')).toContainText('Cheat runs cannot be posted');
+    await page.locator('#play').click();
+    await exposeScene(page);
+    await expect.poll(() => page.evaluate<boolean>('window.__scene.run.cheated')).toBe(true);
+    await page.waitForFunction(() => Number(document.getElementById('game')?.dataset.x) > 150);
+    const velocity = await page.evaluate<number>('window.__scene.player.body.velocity.x');
+    expect(velocity).toBeGreaterThanOrEqual(225);
+    expect(velocity).toBeLessThan(240);
+    await page.keyboard.press('Escape');
+    await page.locator('#restart').click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+    expect(await page.evaluate<boolean>('window.__scene.run.cheated')).toBe(true);
+    await page.evaluate(`(() => {
+      const scene = window.__scene;
+      scene.run.hitHurdle(0); scene.run.hitHurdle(1); scene.run.hitHurdle(2);
+      scene.end();
+    })()`);
+    await expect(page.locator('#result')).toBeVisible();
+    await expect(page.locator('#submit-score')).toBeDisabled();
+    await expect(page.locator('#score-status')).toContainText('75% speed cheat run');
+    await page.locator('#score-form').evaluate(form => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    await expect(page.locator('#score-status')).toContainText('cannot be posted');
+    expect(posts).toBe(0);
+    await page.locator('#again').click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+    expect(await page.evaluate<boolean>('window.__scene.run.cheated')).toBe(true);
+    await page.reload();
+    await page.locator('#how-to-play').click();
+    await expect(page.getByRole('button', { name: 'faster', exact: true })).toBeVisible();
+    await page.locator('#play').click();
+    await exposeScene(page);
+    expect(await page.evaluate<boolean>('window.__scene.run.cheated')).toBe(false);
+  });
+}
+
 test('runs automatically, collects exact sweet values, pauses and resets', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));

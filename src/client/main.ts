@@ -145,7 +145,7 @@ function renderChallenges(run: Run, save = true): void {
   }));
   element('challenges-status', HTMLElement).textContent = challengeStorageError || 'Earned badges are remembered on this device. No extra points for badges.';
 }
-let lastRun: { score: number; squashed: number; won: boolean; title: string; lives: number; rings: number } | undefined;
+let lastRun: { score: number; squashed: number; won: boolean; title: string; lives: number; rings: number; cheated: boolean } | undefined;
 let posted: RankedEntry | undefined;
 let topListFromRun = false;
 let topListFromMenu = false;
@@ -157,6 +157,17 @@ let textTimer = 0;
 const touch = document.querySelector<HTMLElement>('.touch-controls');
 if (!touch) throw new Error('Missing touch controls.');
 let scene: WeddingScene | undefined;
+let slowModeEnabled = false;
+let speedClicks = 0;
+element('speed-cheat', HTMLButtonElement).addEventListener('click', () => {
+  if (++speedClicks !== 5) return;
+  slowModeEnabled = true;
+  scene?.enableSlowMode();
+  element('speed-instruction', HTMLElement).textContent = 'Sean runs slowly as ever.';
+  const status = element('speed-cheat-status', HTMLElement);
+  status.hidden = false;
+  status.textContent = '75% speed cheat enabled. Cheat runs cannot be posted to the top list. Reload the page to turn it off.';
+});
 let lastReplay: Replay | undefined;
 const rewatchButton = element('result-rewatch', HTMLButtonElement);
 const replayViewer = createReplayViewer(key => {
@@ -371,7 +382,7 @@ const wedding = new WeddingScene({
     score.textContent = `${run.score} points`;
     lives.textContent = `${run.lives} / 3`;
     cleared.textContent = `${run.cleared.size} / ${hurdles.length}`;
-    speed.textContent = `${Math.round(runnerSpeed(x))}`;
+    speed.textContent = `${Math.round(runnerSpeed(x, run.cheated))}`;
     concentratePower.hidden = run.concentrateRemaining === 0;
     const powerText = `4× ORANGE SQUASH · ${(Math.ceil(run.concentrateRemaining / 100) / 10).toFixed(1)}s`;
     if (concentratePower.textContent !== powerText) concentratePower.textContent = powerText;
@@ -393,7 +404,7 @@ const wedding = new WeddingScene({
     arena.dataset.bonus = String(run.bonusScore);
     arena.dataset.distractions = String(run.distractions);
     arena.dataset.cleared = String(run.cleared.size);
-    arena.dataset.speed = String(runnerSpeed(x));
+    arena.dataset.speed = String(runnerSpeed(x, run.cheated));
   },
   end: run => {
     const won = run.phase === 'won';
@@ -404,7 +415,7 @@ const wedding = new WeddingScene({
     const record = run.score > best;
     if (record) saveBest(run.score);
     const title = runTitle(run);
-    lastRun = { score: run.score, squashed: run.squashed.size, won, title, lives: run.lives, rings: run.rings.size };
+    lastRun = { score: run.score, squashed: run.squashed.size, won, title, lives: run.lives, rings: run.rings.size, cheated: run.cheated };
     lastReplay = scene?.recordedReplay();
     rewatchButton.disabled = !lastReplay;
     element('result-replay-status', HTMLElement).textContent = lastReplay ? ''
@@ -414,9 +425,9 @@ const wedding = new WeddingScene({
       ? `NEW RECORD! ${run.score} beats your old best of ${best}.`
       : `Your best: ${best} points.`;
     posted = undefined;
-    submitScore.disabled = false;
-    playerName.disabled = false;
-    scoreStatus.textContent = '';
+    submitScore.disabled = run.cheated;
+    playerName.disabled = run.cheated;
+    scoreStatus.textContent = run.cheated ? '75% speed cheat run: scores cannot be posted to the top list.' : '';
     scoreStatus.removeAttribute('data-error');
     element('result-kicker', HTMLElement).textContent = won ? 'THE BIG DAY / SAVED' : 'THE BIG DAY / OUT OF CHANCES';
     element('result-title', HTMLElement).textContent = won ? 'Sean, you may kiss Becky.' : 'Too many distractions!';
@@ -448,6 +459,7 @@ const wedding = new WeddingScene({
   },
   ready: readyScene => {
     scene = readyScene;
+    if (slowModeEnabled) scene.enableSlowMode();
     play.disabled = false;
     if (menu.open) play.focus();
   },
@@ -473,6 +485,10 @@ function showStatus(message: string, error = false): void {
 }
 async function postScore(): Promise<RankedEntry | undefined> {
   if (!lastRun) return undefined;
+  if (lastRun.cheated) {
+    showStatus('75% speed cheat run: scores cannot be posted to the top list.', true);
+    return undefined;
+  }
   if (posted) return posted;
   if (submitScore.disabled) return undefined;
   if (!lastReplay) {

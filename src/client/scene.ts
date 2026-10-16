@@ -83,6 +83,14 @@ export class WeddingScene extends Phaser.Scene {
   private discoSparkleTimer = 0;
   private replayFrames: ReplayFrame[] = [];
   private replayOverflow = false;
+  private slowMode = false;
+
+  enableSlowMode(): void {
+    this.slowMode = true;
+    if (this.run.phase === 'ready' || this.run.phase === 'playing' || this.run.phase === 'paused') {
+      this.run.cheated = true;
+    }
+  }
 
   recordedReplay(): Replay | undefined {
     if (this.replayOverflow || this.replayFrames.length < 2 ||
@@ -356,6 +364,7 @@ export class WeddingScene extends Phaser.Scene {
       this.invulnerableUntil = 0;
     }
     if (newRun) {
+      this.run.cheated = this.slowMode;
       this.replayFrames = [];
       this.replayOverflow = false;
       this.setPlayerPhoto('groom-photo');
@@ -643,7 +652,7 @@ export class WeddingScene extends Phaser.Scene {
           this.jumpUntil = this.run.elapsed + 120;
         }
       }
-      this.player.setVelocityX(runnerSpeed(this.player.x));
+      this.player.setVelocityX(runnerSpeed(this.player.x, this.run.cheated));
       if (this.jumpUntil >= this.run.elapsed && this.run.elapsed - this.groundedAt <= 100) {
         this.setDucking(false);
         this.player.setVelocityY(-GROOM.jump);

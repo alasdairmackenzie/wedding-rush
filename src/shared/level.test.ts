@@ -176,6 +176,15 @@ describe('runner course', () => {
     expect(runnerSpeed((START.x + BRIDE.x) / 2)).toBe((GROOM.speed + GROOM.maxSpeed) / 2);
     expect(runnerSpeed(BRIDE.x + 100)).toBe(GROOM.maxSpeed);
   });
+  it('uses 75% running speed at every position in slow mode without changing normal speed', () => {
+    for (const x of [START.x - 100, START.x, (START.x + BRIDE.x) / 2, BRIDE.x, BRIDE.x + 100]) {
+      expect(runnerSpeed(x, true)).toBe(runnerSpeed(x) * .75);
+      expect(runnerSpeed(x, false)).toBe(runnerSpeed(x));
+    }
+    expect(runnerSpeed(START.x, true)).toBe(225);
+    expect(runnerSpeed(BRIDE.x, true)).toBe(322.5);
+    expect(new Run().cheated).toBe(false);
+  });
   it('has continuous ground, achievable jumps and enough time to land between hurdles', () => {
     expect(platforms).toEqual([{ x: 0, y: 610, width: WORLD.width, height: 110, kind: 'street' }]);
     const airTime = 2 * GROOM.jump / GROOM.gravity;

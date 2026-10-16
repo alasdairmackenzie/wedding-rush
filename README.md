@@ -19,6 +19,12 @@ Open http://127.0.0.1:5200 and select **I'm coming!**
 The main-menu badge counts down to 17 October 2026 using Europe/London dates,
 shows **HAPPY WEDDING DAY!** on the day, then disappears. It updates automatically
 across midnight and when returning to the page.
+
+Click **faster** five times in **How to play** to enable a 75%-speed cheat for
+the current page session. Sean's horizontal running speed is reduced by 25%
+throughout the route; jumps and obstacles are unchanged. The instruction changes
+to **Sean runs slowly as ever.** Cheat runs can be rewatched but cannot be posted
+to the top list. Reloading turns the cheat off.
 The original game can continue running on port 5199.
 
 To try the production build and leaderboard locally:
