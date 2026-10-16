@@ -23,7 +23,9 @@ A 120-piece confetti burst sprays in all directions from the badge when the menu
 first appears after page load, including during the countdown. On the wedding
 day it also fires each time the menu opens (or when its message changes at midnight).
 Tap or keyboard-activate the
-badge for another burst, including on countdown days. Confetti stops when the
+badge for another burst, including on countdown days. Each burst overlaps existing
+confetti without restarting it; pieces disappear as their own animations finish.
+Confetti stops when the
 menu closes or the page is hidden. Reduced-motion settings disable automatic
 bursts, but explicitly tapping or keyboard-activating the badge still celebrates.
 

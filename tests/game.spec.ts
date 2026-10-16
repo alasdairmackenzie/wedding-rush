@@ -219,13 +219,41 @@ test('countdown badge fires confetti on load and activation, from the badge on e
     expect(directions.some(direction => direction.y < 0)).toBe(true);
     expect(directions.some(direction => direction.y > 0)).toBe(true);
     await badge.click();
-    await expect(pieces).toHaveCount(120);
+    await expect(pieces).toHaveCount(240);
     await page.locator('.menu-confetti').evaluate(layer => layer.getAnimations({ subtree: true }).forEach(animation => animation.finish()));
     await expect(pieces).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
   await page.locator('#menu-achievements').click();
   await page.locator('#challenges-back').click();
+  await expect(pieces).toHaveCount(0);
+});
+
+test('confetti taps add overlapping bursts without cancelling or restarting existing animations', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-16T12:00:00Z') });
+  await page.goto('/');
+  const pieces = page.locator('.menu-confetti > span');
+  await expect(pieces).toHaveCount(120);
+  await pieces.evaluateAll(pieces => pieces.forEach(piece => {
+    piece.setAttribute('data-first-burst', '');
+    for (const animation of piece.getAnimations()) {
+      animation.pause();
+      animation.currentTime = 600;
+    }
+  }));
+  await page.locator('#wedding-day-badge').tap();
+  await expect(pieces).toHaveCount(240);
+  await page.locator('#wedding-day-badge').tap();
+  await expect(pieces).toHaveCount(360);
+  const original = page.locator('.menu-confetti > [data-first-burst]');
+  await expect(original).toHaveCount(120);
+  expect(await original.evaluateAll(pieces => pieces.every(piece => {
+    const animations = piece.getAnimations();
+    return animations.length === 1 && animations[0].playState === 'paused' && animations[0].currentTime === 600;
+  }))).toBe(true);
+  await original.evaluateAll(pieces => pieces.forEach(piece => piece.getAnimations().forEach(animation => animation.finish())));
+  await expect(pieces).toHaveCount(240);
+  await page.locator('.menu-confetti').evaluate(layer => layer.getAnimations({ subtree: true }).forEach(animation => animation.finish()));
   await expect(pieces).toHaveCount(0);
 });
 

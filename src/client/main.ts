@@ -43,7 +43,6 @@ function clearMenuConfetti(): void {
 }
 function burstMenuConfetti(manual = false): void {
   if (!menu.open || weddingBadge.hidden || document.hidden || (!manual && confettiMotion.matches)) return;
-  clearMenuConfetti();
   const badge = weddingBadge.getBoundingClientRect();
   const bounds = menu.getBoundingClientRect();
   const x = badge.x + badge.width / 2 - bounds.x - menu.clientLeft + menu.scrollLeft;
