@@ -47,8 +47,8 @@ export function memoryStore(): ScoreStore {
     for (const [id, event] of events) if (Date.parse(event.at) < cutoff) events.delete(id);
   };
   const ranked = (id: string): RankedEntry | undefined => {
-    const index = entries.findIndex(entry => entry.id === id);
-    return index < 0 ? undefined : { ...entries[index], rank: index + 1 };
+    const entry = entries.find(entry => entry.id === id);
+    return entry && { ...entry, rank: entries.filter(item => item.score > entry.score).length + 1 };
   };
   return {
     async recordPresence(visitor) {
@@ -94,18 +94,22 @@ export function memoryStore(): ScoreStore {
         prune();
         if (!events.has(analytics.id)) events.set(analytics.id, { ...analytics, at: new Date().toISOString() });
       }
-      return ranked(entry.id) ?? { ...entry, rank: entries.length + 1 };
+      return ranked(entry.id) ?? { ...entry, rank: entries.filter(item => item.score > entry.score).length + 1 };
     },
     async find(id, uniqueNames = false) {
       if (uniqueNames) {
         const entry = entries.find(item => item.id === id);
         if (!entry) return undefined;
         const seen = new Set<string>();
+        let rank = 0;
+        let previousScore: number | undefined;
         for (const item of entries) {
           const name = item.name.toLowerCase();
           if (seen.has(name)) continue;
           seen.add(name);
-          if (name === entry.name.toLowerCase()) return { ...item, rank: seen.size };
+          if (item.score !== previousScore) rank = seen.size;
+          previousScore = item.score;
+          if (name === entry.name.toLowerCase()) return { ...item, rank };
         }
         return undefined;
       }
@@ -145,9 +149,7 @@ const toEntry = (row: ScoreRow): ScoreEntry => ({
 });
 const COLUMNS = 'public_id, name, score, squashed, won, created_at, has_replay';
 const RANK = `(SELECT count(*) + 1 FROM scores better
-  WHERE better.score > s.score
-     OR (better.score = s.score AND better.squashed > s.squashed)
-     OR (better.score = s.score AND better.squashed = s.squashed AND better.created_at < s.created_at)) AS rank`;
+  WHERE better.score > s.score) AS rank`;
 
 export async function postgresStore(connectionString: string): Promise<ScoreStore> {
   const { default: pg } = await import('pg');
@@ -215,7 +217,7 @@ export async function postgresStore(connectionString: string): Promise<ScoreStor
           SELECT DISTINCT ON (lower(name)) ${COLUMNS} FROM scores WHERE public_id IS NOT NULL
           ORDER BY lower(name), score DESC, squashed DESC, created_at ASC
         ), ranked AS (
-          SELECT *, row_number() OVER (ORDER BY score DESC, squashed DESC, created_at ASC) AS rank FROM best
+          SELECT *, rank() OVER (ORDER BY score DESC) AS rank FROM best
         )
         SELECT * FROM ranked WHERE lower(name) = (SELECT lower(name) FROM scores WHERE public_id = $1)`, [id]);
       return rows[0] && { ...toEntry(rows[0]), rank: Number(rows[0].rank) };

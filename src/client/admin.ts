@@ -1,5 +1,5 @@
 import { FACE_KINDS, FACE_LABELS, type FaceKind } from '../shared/faces';
-import { NAME_MAX, type ScoreEntry } from '../shared/leaderboard';
+import { NAME_MAX, rankScores, type RankedEntry, type ScoreEntry } from '../shared/leaderboard';
 import { MAX_HOURLY_PAGE, type AnalyticsCount, type AnalyticsReport } from '../shared/analytics';
 import brideHeadUrl from '../assets/art/bride-head.png';
 import dealHeadUrl from '../assets/art/deal-head.png';
@@ -461,9 +461,9 @@ $('analytics-refresh').addEventListener('click', () => { void loadAnalytics(); }
 
 const posted = (at: string): string => new Date(at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-function scoreRow(entry: ScoreEntry, index: number): HTMLTableRowElement {
+function scoreRow(entry: RankedEntry): HTMLTableRowElement {
   const row = document.createElement('tr');
-  const cells = [String(index + 1), '', String(entry.score), String(entry.squashed), posted(entry.at), ''].map(text => {
+  const cells = [String(entry.rank), '', String(entry.score), String(entry.squashed), posted(entry.at), ''].map(text => {
     const cell = document.createElement('td');
     cell.textContent = text;
     row.append(cell);
@@ -521,7 +521,7 @@ async function loadScores(): Promise<void> {
       row.innerHTML = '<td class="empty" colspan="6">No scores yet.</td>';
       scoresBody.replaceChildren(row);
     } else {
-      scoresBody.replaceChildren(...scores.map(scoreRow));
+      scoresBody.replaceChildren(...rankScores(scores).map(scoreRow));
     }
   } catch (error) {
     failed(error, scoresStatus);

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import QRCode from 'qrcode';
 import { BRIDE, GROOM, hurdles, people, rings, Run, runChallenges, runnerSpeed, runTitle, START } from '../shared/level';
-import { cleanName, ENTRY_ID, FULL_RESULTS_SIZE, isRude, NAME_MAX, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
+import { cleanName, ENTRY_ID, FULL_RESULTS_SIZE, isRude, NAME_MAX, rankScores, type RankedEntry, type ScoreEntry, TOP_LIST_PATH, topListUrl } from '../shared/leaderboard';
 import { WeddingScene } from './scene';
 import { createReplayViewer } from './replay';
 import { isReplay, type Replay } from '../shared/replay';
@@ -345,7 +345,7 @@ function scoreRow(entry: ScoreEntry, rank: number, you?: ScoreEntry): HTMLTableR
   return row;
 }
 function renderScores(body: HTMLTableSectionElement, scores: ScoreEntry[], you?: RankedEntry): void {
-  const rows = scores.map((entry, index) => scoreRow(entry, index + 1, you));
+  const rows = rankScores(scores).map(entry => scoreRow(entry, entry.rank, you));
   if (you && !scores.some(entry => entry.id === you.id)) {
     const gap = document.createElement('tr');
     gap.className = 'gap';
@@ -655,7 +655,7 @@ async function loadFullResults(): Promise<void> {
     if (!fullResults.open || request !== fullResultsRequest) return;
     const highlighted = posted && data.scores.find(entry => hideDuplicateNames
       ? entry.name.toLowerCase() === posted?.name.toLowerCase() : entry.id === posted?.id);
-    renderScores(fullResultsRows, data.scores, highlighted ? { ...highlighted, rank: data.scores.indexOf(highlighted) + 1 } : undefined);
+    renderScores(fullResultsRows, data.scores, highlighted ? rankScores(data.scores).find(entry => entry.id === highlighted.id) : undefined);
     fullResultsStatus.textContent = `The top ${FULL_RESULTS_SIZE} wedding guests.`;
   } catch (error) {
     if (!fullResults.open || request !== fullResultsRequest) return;

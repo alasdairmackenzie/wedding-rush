@@ -1,5 +1,5 @@
 import QRCode from 'qrcode';
-import type { ScoreEntry } from '../shared/leaderboard';
+import { rankScores, type ScoreEntry } from '../shared/leaderboard';
 import type { ActiveUsers } from '../shared/presence';
 import { createAnalytics } from './analytics';
 import './live.css';
@@ -31,9 +31,9 @@ const time = (): string => new Date().toLocaleTimeString([], { hour: '2-digit', 
 
 function render(scores: ScoreEntry[]): void {
   const fresh = new Set<string>();
-  const items = scores.map((entry, index) => {
+  const items = rankScores(scores).map(entry => {
     const row = document.createElement('tr');
-    for (const value of [String(index + 1), entry.name, String(entry.score), String(entry.squashed), '']) {
+    for (const value of [String(entry.rank), entry.name, String(entry.score), String(entry.squashed), '']) {
       const cell = document.createElement('td');
       cell.textContent = value;
       row.append(cell);
