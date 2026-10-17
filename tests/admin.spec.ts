@@ -60,6 +60,17 @@ test('admin sections have separate URLs and share sign-in', async ({ page }) => 
   await expect(page.locator('[data-admin-section="stats"]')).toBeVisible();
 });
 
+test('admin score ranks share positions for equal scores', async ({ page }) => {
+  await page.route('**/api/admin/scores', route => route.fulfill({
+    json: { scores: [100, 100, 90].map((score, index) => ({
+      id: String(index).padStart(12, '0'), name: `Guest ${index}`, score,
+      squashed: 7 - index, won: true, at: '2026-10-15T12:00:00Z',
+    })) },
+  }));
+  await signIn(page);
+  await expect(page.locator('#scores tr td:first-child')).toHaveText(['1', '1', '3']);
+});
+
 test('admin needs the password, then renames and deletes scores', async ({ page, request }) => {
   const stamp = String(Date.now() % 100000);
   await seed(request, `Rn ${stamp}`, 7);

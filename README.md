@@ -239,6 +239,8 @@ character's line waits until the intro finishes. Later encounter spacing stays u
   each name appears once, ignoring capitalisation, with its best score retained
   before the top 10/100 limit is applied. Ranks reflect the filtered list;
   shared links to a lower duplicate show that name's best entry instead.
+  Equal scores share a rank regardless of squash count or submission time:
+  two guests tied for first are ranked **1, 1, 3**, including on the live and admin lists.
   The switch lasts for the current page session and does not change `/live` or admin.
   Returning to the top list preserves the current score and navigation context.
   **Back to results** and **Back to menu** sit side by side when both are available.
@@ -286,8 +288,8 @@ On the "Too many distractions!" loss screen, `lose_horn.mp3` and `lose_you_lose.
 start together, replacing the old `gameover` effect.
 Both respect Sound effects On/Off and stop when leaving the results or restarting.
 `level_end` plays when the couple meet. Music pauses with the game, resumes from its previous position,
-and restarts on a fresh run. Main music stops at the finish or game over. The music setting only controls
-the main loop; the wedding music after the couple meet plays at 60% gain. Sound effects independently
+and restarts on a fresh run. Main music stops at the finish or game over. The Music On/Off setting also
+controls the wedding music after the couple meet, which plays at 60% gain. Sound effects independently
 control recordings, generated effects and menu sounds.
 Captions remain visible without audio. Backgrounding or leaving the window
 pauses the run. Reduced motion disables Sean's running bob

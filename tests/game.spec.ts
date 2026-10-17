@@ -1714,22 +1714,85 @@ test('loss clips stay silent when sound effects are off', async ({ page }) => {
   })()`)).toBe(true);
 });
 
-test('goal replaces background music with level_end during the reunion', async ({ page }) => {
+for (const musicEnabled of [true, false]) {
+  test(`goal plays wedding music only with Music ${musicEnabled ? 'On' : 'Off'} during the reunion`, async ({ page }) => {
+    await page.goto('/');
+    if (!musicEnabled) await page.getByRole('button', { name: 'Music: On', exact: true }).click();
+    await page.getByRole('button', { name: "I'm coming!" }).click();
+    await expect(page.locator('#game')).toHaveAttribute('data-phase', 'playing');
+    await page.evaluate(`(async () => {
+      const { game } = await import('/src/client/main.ts');
+      game.scene.getScene('wedding').player.body.reset(${BRIDE.x - 50}, 570);
+    })()`);
+    await expect(page.locator('#game')).toHaveAttribute('data-celebrating', 'true');
+    await expect.poll(() => page.evaluate(`(async () => {
+      const { game } = await import('/src/client/main.ts');
+      const audio = game.scene.getScene('wedding').ui.audio;
+      const buffer = await audio.clips.get('level_end');
+      const weddingMusic = await audio.clips.get('wedding');
+      const weddingPlaying = Boolean(weddingMusic && audio.weddingMusic?.buffer === weddingMusic && audio.weddingMusic.loop);
+      return Boolean(buffer && buffer.duration > 0 && !audio.background
+        && weddingPlaying === ${musicEnabled}
+        && (${musicEnabled} || !audio.clips.has('wedding'))
+        && [...audio.effects].some(effect => effect.buffer === buffer));
+    })()`)).toBe(true);
+    await expect(page.locator('#result')).not.toBeVisible();
+  });
+}
+
+test('Music Off cancels pending and active wedding music without reviving it after stop', async ({ page }) => {
+  let release!: () => void;
+  const loading = new Promise<void>(resolve => { release = resolve; });
+  let requested!: () => void;
+  const request = new Promise<void>(resolve => { requested = resolve; });
+  await page.route('**/herecomesthebride.mp3', async route => {
+    requested();
+    await loading;
+    await route.continue();
+  });
+  await start(page);
+  await exposeScene(page);
+  await page.evaluate(`(() => {
+    window.__scene.pause();
+    const audio = window.__scene.ui.audio;
+    audio.unlock();
+    audio.startWeddingMusic();
+  })()`);
+  await request;
+  await page.evaluate(`window.__scene.ui.audio.setMusicMode('off')`);
+  release();
+  await page.evaluate(`(async () => { await window.__scene.ui.audio.clips.get('wedding'); })()`);
+  const playing = () => page.evaluate<boolean>('Boolean(window.__scene.ui.audio.weddingMusic)');
+  expect(await playing()).toBe(false);
+  await page.evaluate(`window.__scene.ui.audio.setMusicMode('on')`);
+  await expect.poll(playing).toBe(true);
+  await page.evaluate(`window.__scene.ui.audio.setMusicMode('off')`);
+  expect(await playing()).toBe(false);
+  await page.evaluate(`window.__scene.ui.audio.setMusicMode('on')`);
+  await expect.poll(playing).toBe(true);
+  await page.evaluate(`(() => {
+    const audio = window.__scene.ui.audio;
+    audio.stop();
+    audio.setMusicMode('off');
+    audio.setMusicMode('on');
+  })()`);
+  expect(await playing()).toBe(false);
+});
+
+test('wedding music remains independent of the sound effects toggle', async ({ page }) => {
   await start(page);
   await page.evaluate(`(async () => {
     const { game } = await import('/src/client/main.ts');
-    game.scene.getScene('wedding').ui.audio.setMusicMode('off');
+    game.scene.getScene('wedding').ui.audio.setEffectsEnabled(false);
     game.scene.getScene('wedding').player.body.reset(${BRIDE.x - 50}, 570);
   })()`);
   await expect(page.locator('#game')).toHaveAttribute('data-celebrating', 'true');
   await expect.poll(() => page.evaluate(`(async () => {
     const { game } = await import('/src/client/main.ts');
     const audio = game.scene.getScene('wedding').ui.audio;
-    const buffer = await audio.clips.get('level_end');
     const weddingMusic = await audio.clips.get('wedding');
-    return Boolean(buffer && buffer.duration > 0 && !audio.background
-      && audio.weddingMusic?.buffer === weddingMusic
-      && [...audio.effects].some(effect => effect.buffer === buffer));
+    return Boolean(weddingMusic && audio.weddingMusic?.buffer === weddingMusic
+      && !audio.background && !audio.clips.has('level_end') && audio.effects.size === 0);
   })()`)).toBe(true);
   await expect(page.locator('#result')).not.toBeVisible();
 });
@@ -2213,6 +2276,23 @@ test('the main menu opens the guest top list and returns or starts a run', async
   await expect(list).not.toBeVisible();
   await expect(page.locator('#menu')).not.toBeVisible();
   await expect(page).toHaveURL(/\/$/);
+});
+
+test('tied scores display ranks 1, 1, 3 in the top list, full results and live screen', async ({ page }) => {
+  const scores = [
+    { id: 'aaaaaaaaaaaa', name: 'Gran', score: 100, squashed: 7, won: true, at: '2026-10-15T12:00:00Z' },
+    { id: 'bbbbbbbbbbbb', name: 'Becky', score: 100, squashed: 0, won: false, at: '2026-10-15T12:01:00Z' },
+    { id: 'cccccccccccc', name: 'Guest', score: 90, squashed: 0, won: false, at: '2026-10-15T12:02:00Z' },
+  ];
+  await page.route('**/api/scores*', route => route.fulfill({ json: { scores, you: { ...scores[1], rank: 1 } } }));
+  await page.goto('/top?you=bbbbbbbbbbbb');
+  await expect(page.locator('#top-list-rows tr td:first-child')).toHaveText(['1', '1', '3']);
+  await expect(page.locator('#top-list-rows tr[data-you] td:first-child')).toHaveText('1');
+  await expect(page.locator('#top-list-intro')).toContainText('Becky is #1');
+  await page.locator('#full-results-open').click();
+  await expect(page.locator('#full-results-rows tr td:first-child')).toHaveText(['1', '1', '3']);
+  await page.goto('/live');
+  await expect(page.locator('#live-rows tr td:first-child')).toHaveText(['1', '1', '3']);
 });
 
 for (const width of [1280, 390]) {
