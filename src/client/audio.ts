@@ -61,6 +61,7 @@ export class GameAudio {
   private menuMusicWanted = false;
   private menuMusicRequest = 0;
   private weddingMusic?: AudioBufferSourceNode;
+  private weddingMusicWanted = false;
   private weddingRequest = 0;
   private effectRequest = 0;
   private readonly effects = new Set<AudioBufferSourceNode>();
@@ -123,7 +124,9 @@ export class GameAudio {
     this.musicMode = mode;
     this.haltBackground();
     this.haltMenuMusic();
+    this.haltWeddingMusic();
     if (mode !== 'off' && this.backgroundWanted) this.startBackground();
+    if (mode !== 'off' && this.weddingMusicWanted) this.startWeddingMusic();
     if (mode !== 'off' && this.menuMusicWanted) {
       this.unlock();
     }
@@ -170,11 +173,12 @@ export class GameAudio {
     }
   }
   startWeddingMusic(): void {
+    this.weddingMusicWanted = true;
     const context = this.context;
-    if (document.hidden || this.destroyed || !context || this.weddingMusic) return;
+    if (this.musicMode === 'off' || document.hidden || this.destroyed || !context || this.weddingMusic) return;
     const request = ++this.weddingRequest;
     void Promise.all([this.loadClip(context, 'wedding'), this.resume(context)]).then(([buffer]) => {
-      if (request !== this.weddingRequest || document.hidden || this.destroyed) return;
+      if (request !== this.weddingRequest || this.musicMode === 'off' || document.hidden || this.destroyed) return;
       const source = context.createBufferSource(), gain = context.createGain();
       source.buffer = buffer;
       source.loop = true;
@@ -191,6 +195,7 @@ export class GameAudio {
     this.stopMenuMusic();
     this.backgroundWanted = false;
     this.haltBackground();
+    this.weddingMusicWanted = false;
     this.haltWeddingMusic();
     this.stopEffects();
     this.stopSpeech();
@@ -229,6 +234,7 @@ export class GameAudio {
     this.backgroundWanted = true;
     if (fresh) {
       this.haltBackground();
+      this.weddingMusicWanted = false;
       this.haltWeddingMusic();
       this.backgroundOffset = 0;
       this.stopEffects();

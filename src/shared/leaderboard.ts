@@ -27,6 +27,14 @@ export function topListUrl(origin: string, id: string): string {
 export const LEADERBOARD_SIZE = 10;
 export const FULL_RESULTS_SIZE = 100;
 
+export function rankScores(scores: readonly ScoreEntry[]): RankedEntry[] {
+  let rank = 0;
+  return scores.map((entry, index) => {
+    if (index === 0 || entry.score !== scores[index - 1].score) rank = index + 1;
+    return { ...entry, rank };
+  });
+}
+
 const BLOCKED = ['fuck', 'shit', 'cunt', 'bitch', 'wank', 'twat', 'nigg', 'retard', 'whore', 'slut', 'porn', 'jizz',
   'bellend', 'asshole', 'pussy', 'penis', 'vagina', 'hitler', 'dickhead', 'cockhead', 'motherf'];
 const BLOCKED_WORDS = new Set(['dick', 'dicks', 'cock', 'cocks', 'fag', 'fags', 'paki', 'rape', 'sex', 'cum', 'arse', 'tit', 'tits',
